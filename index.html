@@ -252,47 +252,52 @@ function parseRows(rows){
     if(v==="DIAS") dias=String(r1[j]||"").trim();
   }
 
-  // Get PDV label
-  const r3=rows[3]||[];
-  if(r3[3]) pdvLabel=String(r3[3]).trim();
+  // Get PDV label - col[1] after "Punto de Venta:"
+  for(let i=2;i<6;i++){
+    const r=rows[i]||[];
+    for(let j=0;j<r.length;j++){
+      if(String(r[j]||"").toLowerCase().includes("punto de venta")){
+        for(let k=j+1;k<r.length;k++){
+          const v=String(r[k]||"").trim();
+          if(v&&!v.toLowerCase().includes("asesor")){pdvLabel=v;break;}
+        }
+      }
+    }
+  }
 
   const CATS=["prepago","postpago","residencial","otros"];
   const struct={prepago:[],postpago:[],residencial:[],otros:[]};
   let curCat="prepago", totalRow=null;
 
+  // SheetJS strips leading empty cols, so col[0]=name, col[1]=meta, col[2]=av, col[3]=pct, col[4]=falta, col[5]=vd, col[6]=pf, col[7]=estado
   for(let i=10;i<rows.length;i++){
     const r=rows[i]||[];
-    const name=String(r[2]||"").trim();
+    const name=String(r[0]||"").trim();
     if(!name) continue;
     const nl=name.toLowerCase().trim();
 
-    // Category header
     if(CATS.includes(nl)||nl.startsWith("residencial")){
       curCat=nl.startsWith("residencial")?"residencial":nl;
       continue;
     }
 
-    // Total row
     if(nl.startsWith("total")){
       totalRow={
-        meta:r[3], av:r[4], pct:r[5],
-        falta:r[6], vd:r[7], pf:r[8],
-        estado:String(r[9]||"")
+        meta:r[1], av:r[2], pct:r[3],
+        falta:r[4], vd:r[5], pf:r[6],
+        estado:String(r[7]||"")
       };
       continue;
     }
 
-    // Skip non-product rows
     if(nl.includes("coordinador")||nl.includes("jefe")||nl.includes("gerente")) continue;
-
-    // Must have at least one number in meta or av
-    if(typeof r[3]!=="number"&&typeof r[4]!=="number") continue;
+    if(typeof r[1]!=="number"&&typeof r[2]!=="number") continue;
 
     struct[curCat].push({
       name,
-      meta:r[3], av:r[4], pct:r[5],
-      falta:r[6], vd:r[7], pf:r[8],
-      estado:String(r[9]||"")
+      meta:r[1], av:r[2], pct:r[3],
+      falta:r[4], vd:r[5], pf:r[6],
+      estado:String(r[7]||"")
     });
   }
 
