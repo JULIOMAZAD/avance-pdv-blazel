@@ -243,35 +243,65 @@ function handleFile(file){
 
 function parseSheet(rows){
   let avance="",mes="",dias="",pdvLabel="";
-  // Row 0: headers AVANCE/MES/DIAS at cols 5,6,7; Row 1: values
-  const r0=rows[0]||[], r1=rows[1]||[];
-  for(let j=0;j<r0.length;j++){
-    const v=String(r0[j]||"").trim().toUpperCase();
-    if(v==="AVANCE") avance=String(r1[j]||"").trim();
-    if(v==="MES") mes=String(r1[j]||"").trim();
-    if(v==="DIAS") dias=String(r1[j]||"").trim();
+
+  // Find column positions dynamically from headers
+  let colName=-1, colMeta=-1, colAv=-1, colPct=-1, colFalta=-1, colVd=-1, colPf=-1, colEstado=-1;
+  let headerRow=-1;
+
+  // Find AVANCE/MES/DIAS
+  for(let i=0;i<5;i++){
+    const r=rows[i]||[];
+    for(let j=0;j<r.length;j++){
+      const v=String(r[j]||"").trim().toUpperCase();
+      if(v==="AVANCE"&&rows[i+1]) avance=String(rows[i+1][j]||"").trim();
+      if(v==="MES"&&rows[i+1]) mes=String(rows[i+1][j]||"").trim();
+      if(v==="DIAS"&&rows[i+1]) dias=String(rows[i+1][j]||"").trim();
+    }
   }
-  // Row 3: PDV at col 3
-  if(rows[3]&&rows[3][3]) pdvLabel=String(rows[3][3]).trim();
+
+  // Find PDV label
+  for(let i=2;i<6;i++){
+    const r=rows[i]||[];
+    for(let j=0;j<r.length;j++){
+      if(String(r[j]||"").toLowerCase().includes("punto de venta")){
+        for(let k=j+1;k<r.length;k++){
+          const v=String(r[k]||"").trim();
+          if(v&&!v.toLowerCase().includes("asesor")) {pdvLabel=v;break;}
+        }
+      }
+    }
+  }
+
+  // Find header row with Meta/Avance/Proyeccion to get column positions
+  for(let i=5;i<15;i++){
+    const r=rows[i]||[];
+    for(let j=0;j<r.length;j++){
+      const v=String(r[j]||"").trim().toLowerCase();
+      if(v==="meta") colMeta=j;
+      if(v==="avance") colAv=j;
+      if(v==="proyección"||v==="proyeccion") colPct=j;
+      if(v==="falta") colFalta=j;
+      if(v.includes("venta diaria")) colVd=j;
+      if(v.includes("proyeccio final")||v.includes("proyección final")) colPf=j;
+    }
+    if(colMeta>=0&&colAv>=0){
+      headerRow=i;
+      colName=colMeta-1; // name is always one col before meta
+      colEstado=colPf+1; // estado is always one col after pf
+      break;
+    }
+  }
+
+  if(colMeta<0){colName=2;colMeta=3;colAv=4;colPct=5;colFalta=6;colVd=7;colPf=8;colEstado=9;}
 
   const CATS=["prepago","postpago","residencial","otros"];
   const struct={prepago:[],postpago:[],residencial:[],otros:[]};
-  let curCat="",totalRow=null;
-
-  // Find start row: row after header row with Meta/Avance
-  let startRow=9;
-  for(let i=5;i<15;i++){
-    const r=rows[i]||[];
-    const vals=r.map(v=>String(v||"").trim().toLowerCase());
-    if(vals.includes("meta")&&vals.includes("avance")){startRow=i+2;break;}
-  }
-
-  // Default to prepago since some sheets skip the category header
-  curCat="prepago";
+  let curCat="prepago", totalRow=null;
+  const startRow=headerRow>=0?headerRow+2:10;
 
   for(let i=startRow;i<rows.length;i++){
     const r=rows[i]||[];
-    const name=String(r[2]||"").trim();
+    const name=String(r[colName]||"").trim();
     if(!name) continue;
     const nl=name.toLowerCase().trim();
 
@@ -280,23 +310,25 @@ function parseSheet(rows){
       continue;
     }
     if(nl.startsWith("total")){
-      const meta=r[3], av=r[4], pct=r[5], falta=r[6], vd=r[7], pf=r[8], estado=r[9]||"";
-      totalRow={meta,av,pct,falta,vd,pf,estado:String(estado)};
+      totalRow={
+        meta:r[colMeta], av:r[colAv], pct:r[colPct],
+        falta:r[colFalta], vd:r[colVd], pf:r[colPf],
+        estado:String(r[colEstado]||"")
+      };
       continue;
     }
     if(nl.includes("coordinador")||nl.includes("jefe")||nl.includes("gerente")) continue;
-    if(r[18]&&String(r[18]).includes("Tienda")) continue;
-    if(typeof r[3]!=="number"&&typeof r[4]!=="number") continue;
+    if(typeof r[colMeta]!=="number"&&typeof r[colAv]!=="number") continue;
 
     struct[curCat].push({
       name,
-      meta:r[3]!==undefined?r[3]:"",
-      av:r[4]!==undefined?r[4]:"",
-      pct:r[5]!==undefined?r[5]:"",
-      falta:r[6]!==undefined?r[6]:"",
-      vd:r[7]!==undefined?r[7]:"",
-      pf:r[8]!==undefined?r[8]:"",
-      estado:String(r[9]||"")
+      meta:r[colMeta]!==undefined?r[colMeta]:"",
+      av:r[colAv]!==undefined?r[colAv]:"",
+      pct:r[colPct]!==undefined?r[colPct]:"",
+      falta:r[colFalta]!==undefined?r[colFalta]:"",
+      vd:r[colVd]!==undefined?r[colVd]:"",
+      pf:r[colPf]!==undefined?r[colPf]:"",
+      estado:String(r[colEstado]||"")
     });
   }
   return{struct,avance,mes,dias,pdvLabel,totalRow};
