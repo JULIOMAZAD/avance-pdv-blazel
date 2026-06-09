@@ -258,13 +258,16 @@ function parseSheet(rows){
   const struct={prepago:[],postpago:[],residencial:[],otros:[]};
   let curCat="",totalRow=null;
 
-  // Find start row: row after the one with "Meta","Avance","Proyección" headers
+  // Find start row: row after header row with Meta/Avance
   let startRow=9;
   for(let i=5;i<15;i++){
     const r=rows[i]||[];
     const vals=r.map(v=>String(v||"").trim().toLowerCase());
-    if(vals.includes("meta")&&vals.includes("avance")){startRow=i+1;break;}
+    if(vals.includes("meta")&&vals.includes("avance")){startRow=i+2;break;}
   }
+
+  // Default to prepago since some sheets skip the category header
+  curCat="prepago";
 
   for(let i=startRow;i<rows.length;i++){
     const r=rows[i]||[];
@@ -281,9 +284,7 @@ function parseSheet(rows){
       totalRow={meta,av,pct,falta,vd,pf,estado:String(estado)};
       continue;
     }
-    if(!curCat) continue;
     if(nl.includes("coordinador")||nl.includes("jefe")||nl.includes("gerente")) continue;
-    // Skip rows that are part of summary table (col 18 has tienda names)
     if(r[18]&&String(r[18]).includes("Tienda")) continue;
     if(typeof r[3]!=="number"&&typeof r[4]!=="number") continue;
 
