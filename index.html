@@ -41,7 +41,7 @@ table{width:100%;border-collapse:collapse;font-size:13px;min-width:700px}
 thead tr{background:#1a1a2e}
 thead th{padding:10px 12px;color:#fff;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px;text-align:center;white-space:nowrap}
 thead th:first-child{text-align:left;padding-left:16px}
-.cat-row td{background:#2d3561;color:#fff;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:7px 16px}
+.cat-row td{background:#2d3561;color:#ffffff !important;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:7px 16px}
 tbody tr:not(.cat-row){border-bottom:1px solid #f0f0f0}
 tbody tr:not(.cat-row):hover{background:#fafafa}
 td{padding:9px 12px;text-align:center;color:#333}
@@ -221,7 +221,9 @@ function parse(rows,mes){
     const r=rows[i];
     const allV=r.map(v=>String(v||"").trim()).filter(Boolean);
     if(!allV.length) continue;
-    const first=allV[0].toLowerCase().replace(/\s+/g," ");
+    const first=allV[0].toLowerCase().replace(/\s+/g," ").trim();
+    const firstClean=first.replace(/\s*\n.*/g,"").trim();
+    if(CATS.includes(firstClean)||CATS.some(c=>firstClean===c)){curCat=firstClean;continue;}
     if(CATS.includes(first)){curCat=first;continue;}
     if(first==="total"){
       const nums=r.filter(v=>typeof v==="number"||(v!==""&&!isNaN(parseFloat(String(v).replace(",","."))))).map(v=>parseFloat(String(v).replace(",",".")));
@@ -256,9 +258,22 @@ function parse(rows,mes){
   return{struct,avance,mesLabel,dias,pdvLabel,totalRow,mes};
 }
 
+function fmtPct(v){
+  if(v===""||v===undefined||v===null) return "-";
+  const s=String(v).trim();
+  if(s==="-"||s==="") return "-";
+  if(s.includes("%")) return s;
+  const n=parseFloat(s);
+  if(isNaN(n)) return "-";
+  // values like 0.845 are decimals (multiply by 100), values like 84.5 are already %
+  if(Math.abs(n)<=2) return (n*100).toFixed(1)+"%";
+  return n.toFixed(1)+"%";
+}
+
 function getTag(estado,pct){
   const e=(estado||"").toLowerCase();
-  const p=parseFloat(String(pct).replace("%",""))||0;
+  let p=parseFloat(String(pct).replace("%",""))||0;
+  if(p>0&&p<=2) p=p*100;
   if(e.includes("excelente")||(e===""&&p>=100)) return{cls:"t-exc",dot:"dg",lbl:"Excelente ✅"};
   if(e.includes("regular")||(e===""&&p>=75)) return{cls:"t-reg",dot:"dy",lbl:"Vamos regular 🟡"};
   return{cls:"t-pun",dot:"dr",lbl:"Ponle punche 🔴"};
@@ -299,7 +314,7 @@ function renderTable(data){
         <td>${row.name}</td>
         <td>${fmt(row.meta)}</td>
         <td>${fmt(row.av)}</td>
-        <td><span style="display:inline-flex;align-items:center;gap:4px"><span class="dot ${t.dot}"></span>${row.pct||"-"}</span></td>
+        <td><span style="display:inline-flex;align-items:center;gap:4px"><span class="dot ${t.dot}"></span>${fmtPct(row.pct)}</span></td>
         <td class="${fc}">${fmt(row.falta)}</td>
         <td>${fmt(row.vd)}</td>
         <td>${fmt(row.pf)}</td>
@@ -313,7 +328,7 @@ function renderTable(data){
       <td>TOTAL</td>
       <td>${fmt(data.totalRow.meta)}</td>
       <td>${fmt(data.totalRow.av)}</td>
-      <td>${data.totalRow.pct||"-"}</td>
+      <td>${fmtPct(data.totalRow.pct)}</td>
       <td>-</td><td>-</td>
       <td>${fmt(data.totalRow.pf)}</td>
       <td><span class="tag ${t.cls}">${t.lbl}</span></td>
