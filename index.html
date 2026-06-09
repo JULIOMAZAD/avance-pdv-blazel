@@ -247,10 +247,20 @@ function parseRows(rows){
   const struct={prepago:[],postpago:[],residencial:[],otros:[]};
   let curCat="prepago", totalRow=null;
 
-  // Data starts at row 10, col 0=name, 1=meta, 2=av, 3=pct, 4=falta, 5=vd, 6=pf, 7=estado
+  // Find name column dynamically from header row (has "Meta","Avance")
+  let nameCol=2, metaCol=3, avCol=4, pctCol=5, faltaCol=6, vdCol=7, pfCol=8, estadoCol=9;
+  for(let i=5;i<15;i++){
+    const r=rows[i]||[];
+    for(let j=0;j<r.length;j++){
+      const v=String(r[j]||"").trim().toLowerCase();
+      if(v==="meta"){metaCol=j;nameCol=j-1;avCol=j+1;pctCol=j+2;faltaCol=j+3;vdCol=j+4;pfCol=j+5;estadoCol=j+6;break;}
+    }
+    if(metaCol!==3) break;
+  }
+
   for(let i=10;i<rows.length;i++){
     const r=rows[i]||[];
-    const name=String(r[0]||"").trim();
+    const name=String(r[nameCol]||"").trim();
     if(!name) continue;
     const nl=name.toLowerCase().trim();
 
@@ -259,13 +269,13 @@ function parseRows(rows){
       continue;
     }
     if(nl.startsWith("total")){
-      totalRow={meta:r[1],av:r[2],pct:r[3],falta:r[4],vd:r[5],pf:r[6],estado:String(r[7]||"")};
+      totalRow={meta:r[metaCol],av:r[avCol],pct:r[pctCol],falta:r[faltaCol],vd:r[vdCol],pf:r[pfCol],estado:String(r[estadoCol]||"")};
       continue;
     }
     if(nl.includes("coordinador")||nl.includes("jefe")||nl.includes("gerente")) continue;
-    if(typeof r[1]!=="number"&&typeof r[2]!=="number") continue;
+    if(typeof r[metaCol]!=="number"&&typeof r[avCol]!=="number") continue;
 
-    struct[curCat].push({name,meta:r[1],av:r[2],pct:r[3],falta:r[4],vd:r[5],pf:r[6],estado:String(r[7]||"")});
+    struct[curCat].push({name,meta:r[metaCol],av:r[avCol],pct:r[pctCol],falta:r[faltaCol],vd:r[vdCol],pf:r[pfCol],estado:String(r[estadoCol]||"")});
   }
 
   return{struct,avance,mes,dias,pdvLabel,totalRow};
