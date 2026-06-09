@@ -58,11 +58,10 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
 .loading{text-align:center;padding:3rem;color:#888;font-size:14px}
 .spinner{display:inline-block;width:32px;height:32px;border:3px solid #eee;border-top-color:#cc0000;border-radius:50%;animation:spin .8s linear infinite;margin-bottom:12px}
 @keyframes spin{to{transform:rotate(360deg)}}
-.load-err{background:#fff5f5;border:1px solid #fcc;border-radius:10px;padding:1rem 1.5rem;color:#cc0000;font-size:13px;margin-bottom:1rem}
 .upload-card{background:#fff;border-radius:14px;padding:2rem;margin-bottom:1rem}
 .upload-card h3{font-size:15px;font-weight:600;color:#333;margin-bottom:1rem}
 .drop-zone{border:2px dashed #ddd;border-radius:12px;padding:2.5rem;text-align:center;cursor:pointer;color:#aaa;transition:all .2s}
-.drop-zone:hover{border-color:#cc0000;color:#cc0000}
+.drop-zone:hover,.drop-zone.drag{border-color:#cc0000;color:#cc0000}
 @media(max-width:600px){.main-wrap{padding:1rem .5rem}td,th{padding:7px 8px;font-size:12px}}
 </style>
 </head>
@@ -110,20 +109,17 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
       </div>
       <button class="btn-out" onclick="doLogout()">Cerrar sesión</button>
     </div>
-
     <div class="mes-tabs" id="mesTabs"></div>
-
     <div id="uploadSection" class="upload-card">
       <h3>Cargar Excel del mes</h3>
       <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileIn').click()">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="display:block;margin:0 auto 12px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="display:block;margin:0 auto 10px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         <p style="font-size:14px;font-weight:500">Haz clic o arrastra tu Excel aquí</p>
-        <span style="font-size:12px;opacity:.7">El archivo se leerá automáticamente</span>
+        <span style="font-size:12px;opacity:.7;display:block;margin-top:4px">El archivo no se sube a ningún servidor — se lee directo en tu navegador</span>
       </div>
       <input type="file" id="fileIn" accept=".xlsx,.xls" style="display:none" onchange="handleFile(this.files[0])"/>
-      <div id="uploadErr" style="color:#cc0000;font-size:13px;margin-top:10px;display:none"></div>
+      <div id="uploadErr" style="color:#cc0000;font-size:13px;margin-top:10px;padding:8px 12px;background:#fff5f5;border-radius:8px;display:none"></div>
     </div>
-
     <div id="infoRow" class="info-row"></div>
     <div id="loadMsg"></div>
     <div id="tableSection"></div>
@@ -143,11 +139,11 @@ const PWD={
   "Tienda - Santa Anita 2":"SAnita2-7999"
 };
 
-// Sheet names per tienda (lowercase)
-const TIENDA_SHEETS={
-  "Tienda - Mall Bellavista":["mall bellavista","bellavista","mall bella"],
+// Sheet name mapping per tienda
+const SHEETS={
+  "Tienda - Mall Bellavista":["mall bellavista","bellavista"],
   "Tienda - Mall del Sur 1":["mall del sur 1","mall del sur1","sur 1","sur1"],
-  "Tienda - Mall del Sur 2":["mall del su 2","mall del sur 2","mall del sur2","sur 2","sur2","mall del su2"],
+  "Tienda - Mall del Sur 2":["mall del su 2","mall del sur 2","mall del sur2","mall del su2","sur 2","sur2"],
   "Tienda - Mega Plaza":["mega plaza","mega"],
   "Tienda - Plaza Norte":["plaza norte","norte"],
   "Tienda - Primavera":["primavera"],
@@ -177,17 +173,15 @@ function doLogout(){
   document.getElementById("tiendaSel").value="";
   document.getElementById("mainScreen").classList.remove("active");
   document.getElementById("loginScreen").classList.add("active");
-  document.getElementById("tableSection").innerHTML="";
-  document.getElementById("infoRow").innerHTML="";
-  document.getElementById("uploadSection").style.display="block";
+  clearTable();
 }
 
 document.getElementById("passIn").addEventListener("keydown",e=>{if(e.key==="Enter")doLogin();});
 
 const dz=document.getElementById("dropZone");
-dz.addEventListener("dragover",e=>{e.preventDefault();dz.style.borderColor="#cc0000";});
-dz.addEventListener("dragleave",()=>dz.style.borderColor="");
-dz.addEventListener("drop",e=>{e.preventDefault();dz.style.borderColor="";handleFile(e.dataTransfer.files[0]);});
+dz.addEventListener("dragover",e=>{e.preventDefault();dz.classList.add("drag");});
+dz.addEventListener("dragleave",()=>dz.classList.remove("drag"));
+dz.addEventListener("drop",e=>{e.preventDefault();dz.classList.remove("drag");handleFile(e.dataTransfer.files[0]);});
 
 function handleFile(file){
   if(!file) return;
@@ -195,45 +189,42 @@ function handleFile(file){
   errEl.style.display="none";
   document.getElementById("loadMsg").innerHTML='<div class="loading"><div class="spinner"></div><br>Leyendo archivo...</div>';
   const reader=new FileReader();
-  reader.onload=function(e){
+  reader.onload=function(ev){
     try{
-      const wb=XLSX.read(e.target.result,{type:"binary"});
-      const sheets=wb.SheetNames.map(s=>s.toLowerCase().trim());
-      
-      // Find the sheet for current tienda
-      const possible=TIENDA_SHEETS[curTienda]||[];
+      const wb=XLSX.read(ev.target.result,{type:"binary"});
+      // Find sheet for current tienda
+      const possible=SHEETS[curTienda]||[];
       let sheetName=null;
       for(const p of possible){
         const found=wb.SheetNames.find(s=>s.toLowerCase().trim()===p);
         if(found){sheetName=found;break;}
       }
-      
-      // Also try PROYECCION sheet as fallback
       if(!sheetName){
-        sheetName=wb.SheetNames.find(s=>s.toUpperCase().replace(/\s/g,"").includes("PROYEC"));
+        // fallback: find sheet whose PDV matches
+        for(const sn of wb.SheetNames){
+          const rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:""});
+          if(rows[3]&&String(rows[3][3]||"").includes(curTienda.replace("Tienda - ",""))){
+            sheetName=sn; break;
+          }
+        }
       }
-      
       if(!sheetName){
-        document.getElementById("loadMsg").innerHTML='';
-        errEl.textContent="No se encontró la hoja para esta tienda en el archivo.";
+        document.getElementById("loadMsg").innerHTML="";
+        errEl.textContent="No se encontró la hoja para '"+curTienda+"'. Verifica que el Excel tenga una pestaña con ese PDV.";
         errEl.style.display="block";
         return;
       }
-      
       const rows=XLSX.utils.sheet_to_json(wb.Sheets[sheetName],{header:1,defval:""});
-      const data=parseSheet(rows);
-      
-      // Get mes label from file name or data
-      const mesKey=data.mes+"_"+data.avance;
+      const data=parseRows(rows);
+      const mesKey=data.mes+"_dia"+data.avance;
       if(!cache[curTienda]) cache[curTienda]={};
       cache[curTienda][mesKey]=data;
       curMesKey=mesKey;
-      
       refreshTabs();
-      renderTable(data);
+      showTable(data);
       document.getElementById("uploadSection").style.display="none";
     }catch(ex){
-      document.getElementById("loadMsg").innerHTML='';
+      document.getElementById("loadMsg").innerHTML="";
       errEl.textContent="Error: "+ex.message;
       errEl.style.display="block";
     }
@@ -241,128 +232,96 @@ function handleFile(file){
   reader.readAsBinaryString(file);
 }
 
-function parseSheet(rows){
-  let avance="",mes="",dias="",pdvLabel="";
+function parseRows(rows){
+  // Fixed structure verified in Python:
+  // Row 0: headers (AVANCE at col5, MES at col6, DIAS at col7)
+  // Row 1: values
+  // Row 3: "Punto de Venta:" at col2, PDV name at col3
+  // Row 8: table header (name at col2, Meta col3, Avance col4, Proyeccion col5, FALTA col6, VentaDiaria col7, ProyFinal col8)
+  // Row 9: empty
+  // Row 10+: data (col2=name, col3=meta, col4=av, col5=pct, col6=falta, col7=vd, col8=pf, col9=estado)
 
-  // Find column positions dynamically from headers
-  let colName=-1, colMeta=-1, colAv=-1, colPct=-1, colFalta=-1, colVd=-1, colPf=-1, colEstado=-1;
-  let headerRow=-1;
+  let avance="", mes="", dias="", pdvLabel="";
 
-  // Find AVANCE/MES/DIAS
-  for(let i=0;i<5;i++){
-    const r=rows[i]||[];
-    for(let j=0;j<r.length;j++){
-      const v=String(r[j]||"").trim().toUpperCase();
-      if(v==="AVANCE"&&rows[i+1]) avance=String(rows[i+1][j]||"").trim();
-      if(v==="MES"&&rows[i+1]) mes=String(rows[i+1][j]||"").trim();
-      if(v==="DIAS"&&rows[i+1]) dias=String(rows[i+1][j]||"").trim();
-    }
+  // Get AVANCE/MES/DIAS
+  const r0=rows[0]||[], r1=rows[1]||[];
+  for(let j=0;j<r0.length;j++){
+    const v=String(r0[j]||"").trim().toUpperCase();
+    if(v==="AVANCE") avance=String(r1[j]||"").trim();
+    if(v==="MES") mes=String(r1[j]||"").trim();
+    if(v==="DIAS") dias=String(r1[j]||"").trim();
   }
 
-  // Find PDV label
-  for(let i=2;i<6;i++){
-    const r=rows[i]||[];
-    for(let j=0;j<r.length;j++){
-      if(String(r[j]||"").toLowerCase().includes("punto de venta")){
-        for(let k=j+1;k<r.length;k++){
-          const v=String(r[k]||"").trim();
-          if(v&&!v.toLowerCase().includes("asesor")) {pdvLabel=v;break;}
-        }
-      }
-    }
-  }
-
-  // Find header row with Meta/Avance/Proyeccion to get column positions
-  for(let i=5;i<15;i++){
-    const r=rows[i]||[];
-    for(let j=0;j<r.length;j++){
-      const v=String(r[j]||"").trim().toLowerCase();
-      if(v==="meta") colMeta=j;
-      if(v==="avance") colAv=j;
-      if(v==="proyección"||v==="proyeccion") colPct=j;
-      if(v==="falta") colFalta=j;
-      if(v.includes("venta diaria")) colVd=j;
-      if(v.includes("proyeccio final")||v.includes("proyección final")) colPf=j;
-    }
-    if(colMeta>=0&&colAv>=0){
-      headerRow=i;
-      colName=colMeta-1; // name is always one col before meta
-      colEstado=colPf+1; // estado is always one col after pf
-      break;
-    }
-  }
-
-  if(colMeta<0){colName=2;colMeta=3;colAv=4;colPct=5;colFalta=6;colVd=7;colPf=8;colEstado=9;}
+  // Get PDV label
+  const r3=rows[3]||[];
+  if(r3[3]) pdvLabel=String(r3[3]).trim();
 
   const CATS=["prepago","postpago","residencial","otros"];
   const struct={prepago:[],postpago:[],residencial:[],otros:[]};
   let curCat="prepago", totalRow=null;
-  const startRow=headerRow>=0?headerRow+2:10;
 
-  for(let i=startRow;i<rows.length;i++){
+  for(let i=10;i<rows.length;i++){
     const r=rows[i]||[];
-    const name=String(r[colName]||"").trim();
+    const name=String(r[2]||"").trim();
     if(!name) continue;
     const nl=name.toLowerCase().trim();
 
+    // Category header
     if(CATS.includes(nl)||nl.startsWith("residencial")){
       curCat=nl.startsWith("residencial")?"residencial":nl;
       continue;
     }
+
+    // Total row
     if(nl.startsWith("total")){
       totalRow={
-        meta:r[colMeta], av:r[colAv], pct:r[colPct],
-        falta:r[colFalta], vd:r[colVd], pf:r[colPf],
-        estado:String(r[colEstado]||"")
+        meta:r[3], av:r[4], pct:r[5],
+        falta:r[6], vd:r[7], pf:r[8],
+        estado:String(r[9]||"")
       };
       continue;
     }
+
+    // Skip non-product rows
     if(nl.includes("coordinador")||nl.includes("jefe")||nl.includes("gerente")) continue;
-    if(typeof r[colMeta]!=="number"&&typeof r[colAv]!=="number") continue;
+
+    // Must have at least one number in meta or av
+    if(typeof r[3]!=="number"&&typeof r[4]!=="number") continue;
 
     struct[curCat].push({
       name,
-      meta:r[colMeta]!==undefined?r[colMeta]:"",
-      av:r[colAv]!==undefined?r[colAv]:"",
-      pct:r[colPct]!==undefined?r[colPct]:"",
-      falta:r[colFalta]!==undefined?r[colFalta]:"",
-      vd:r[colVd]!==undefined?r[colVd]:"",
-      pf:r[colPf]!==undefined?r[colPf]:"",
-      estado:String(r[colEstado]||"")
+      meta:r[3], av:r[4], pct:r[5],
+      falta:r[6], vd:r[7], pf:r[8],
+      estado:String(r[9]||"")
     });
   }
+
   return{struct,avance,mes,dias,pdvLabel,totalRow};
 }
 
 function fmtPct(v){
-  if(v===""||v===undefined||v===null) return "-";
-  const s=String(v).trim();
-  if(s==="-"||s==="") return "-";
-  if(s.includes("%")) return s;
-  const n=parseFloat(s);
+  if(v===""||v===undefined||v===null||v===" ") return "-";
+  const n=parseFloat(String(v));
   if(isNaN(n)) return "-";
+  // Values are stored as decimals: 1.374 = 137.4%
   return (n*100).toFixed(1)+"%";
 }
 
-function getTag(estado,pct){
-  const e=(estado||"").toLowerCase();
+function fmt(v){
+  if(v===""||v===undefined||v===null||v===" ") return "-";
+  const n=parseFloat(String(v));
+  if(isNaN(n)) return String(v);
+  return n%1===0?n.toLocaleString("es-PE"):n.toLocaleString("es-PE",{maximumFractionDigits:2});
+}
+
+function getTag(estado){
+  const e=String(estado||"").toLowerCase();
   if(e.includes("excelente")) return{cls:"t-exc",dot:"dg",lbl:"Excelente ✅"};
   if(e.includes("regular")) return{cls:"t-reg",dot:"dy",lbl:"Vamos regular 🟡"};
-  if(e.includes("punche")) return{cls:"t-pun",dot:"dr",lbl:"Ponle punche 🔴"};
-  const n=parseFloat(String(pct))||0;
-  const p=n>2?n:n*100;
-  if(p>=100) return{cls:"t-exc",dot:"dg",lbl:"Excelente ✅"};
-  if(p>=75) return{cls:"t-reg",dot:"dy",lbl:"Vamos regular 🟡"};
   return{cls:"t-pun",dot:"dr",lbl:"Ponle punche 🔴"};
 }
 
-function fmt(v){
-  if(v===""||v===undefined||v===null) return "-";
-  const n=parseFloat(v);
-  return isNaN(n)?v:n.toLocaleString("es-PE");
-}
-
-function renderTable(data){
+function showTable(data){
   document.getElementById("loadMsg").innerHTML="";
   document.getElementById("infoRow").innerHTML=
     `<div class="chip">Avance día: <strong>${data.avance||"-"}</strong></div>
@@ -380,28 +339,28 @@ function renderTable(data){
     </tr></thead><tbody>`;
 
   for(const cat of ["prepago","postpago","residencial","otros"]){
-    const rows=data.struct[cat];
-    if(!rows||!rows.length) continue;
+    const prods=data.struct[cat];
+    if(!prods||!prods.length) continue;
     html+=`<tr class="cat-row"><td colspan="8">${CATNAMES[cat]}</td></tr>`;
-    for(const row of rows){
-      const t=getTag(row.estado,row.pct);
-      const fv=parseFloat(row.falta);
+    for(const p of prods){
+      const t=getTag(p.estado);
+      const fv=parseFloat(p.falta);
       const fc=(!isNaN(fv)&&fv<=0)?"falta-g":"falta-r";
       html+=`<tr>
-        <td>${row.name}</td>
-        <td>${fmt(row.meta)}</td>
-        <td>${fmt(row.av)}</td>
-        <td><span style="display:inline-flex;align-items:center;gap:4px"><span class="dot ${t.dot}"></span>${fmtPct(row.pct)}</span></td>
-        <td class="${fc}">${fmt(row.falta)}</td>
-        <td>${fmt(row.vd)}</td>
-        <td>${fmt(row.pf)}</td>
+        <td>${p.name}</td>
+        <td>${fmt(p.meta)}</td>
+        <td>${fmt(p.av)}</td>
+        <td><span style="display:inline-flex;align-items:center;gap:4px"><span class="dot ${t.dot}"></span>${fmtPct(p.pct)}</span></td>
+        <td class="${fc}">${fmt(p.falta)}</td>
+        <td>${fmt(p.vd)}</td>
+        <td>${fmt(p.pf)}</td>
         <td><span class="tag ${t.cls}">${t.lbl}</span></td>
       </tr>`;
     }
   }
 
   if(data.totalRow){
-    const t=getTag(data.totalRow.estado,data.totalRow.pct);
+    const t=getTag(data.totalRow.estado);
     html+=`<tr class="total-row">
       <td>TOTAL</td>
       <td>${fmt(data.totalRow.meta)}</td>
@@ -413,12 +372,10 @@ function renderTable(data){
       <td><span class="tag ${t.cls}">${t.lbl}</span></td>
     </tr>`;
   }
+
   html+=`</tbody></table></div>
   <div style="padding:1rem;text-align:right">
-    <button class="btn-out" onclick="clearTable()">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-      Cargar otro mes
-    </button>
+    <button class="btn-out" onclick="clearTable()">↺ Cargar otro mes</button>
   </div></div>`;
 
   document.getElementById("tableSection").innerHTML=html;
@@ -429,16 +386,16 @@ function refreshTabs(){
   const keys=Object.keys(h);
   const cont=document.getElementById("mesTabs");
   if(!keys.length){cont.innerHTML="";return;}
-  cont.innerHTML=keys.map(k=>`<button class="mes-tab${k===curMesKey?' active':''}" onclick="selectMes('${k}')">${h[k].mes||k} — día ${h[k].avance||"?"}</button>`).join("");
+  cont.innerHTML=keys.map(k=>`<button class="mes-tab${k===curMesKey?" active":""}" onclick="selectMes('${k}')">${h[k].mes||k} — día ${h[k].avance||"?"}</button>`).join("");
 }
 
 function selectMes(key){
   curMesKey=key;
   const data=cache[curTienda]&&cache[curTienda][key];
   if(data){
-    renderTable(data);
+    showTable(data);
     document.getElementById("uploadSection").style.display="none";
-    document.querySelectorAll(".mes-tab").forEach(b=>b.classList.toggle("active",b.dataset&&b.textContent.includes(data.mes)));
+    refreshTabs();
   }
 }
 
@@ -447,6 +404,8 @@ function clearTable(){
   document.getElementById("infoRow").innerHTML="";
   document.getElementById("uploadSection").style.display="block";
   document.getElementById("fileIn").value="";
+  document.getElementById("loadMsg").innerHTML="";
+  document.getElementById("uploadErr").style.display="none";
 }
 </script>
 </body>
