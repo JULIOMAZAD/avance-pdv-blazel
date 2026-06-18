@@ -85,6 +85,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
           <option value="Tienda - Santa Anita">Tienda - Santa Anita</option>
           <option value="Tienda - Santa Anita 2">Tienda - Santa Anita 2</option>
           <option value="Call Center">Call Center</option>
+          <option value="GERENCIA">🔑 Gerencia — Todas las tiendas</option>
         </select>
       </div>
       <div class="fg">
@@ -113,6 +114,31 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
   </div>
 </div>
 
+<div id="vendedorScreen" class="screen">
+  <div style="background:#1a1a2e;padding:10px 16px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:10">
+    <button class="btn-out" id="vBackBtn" onclick="salirVendedor()">← Volver a Tienda</button>
+    <span style="color:#fff;font-weight:600;font-size:14px">Avance por Vendedor</span>
+  </div>
+  <iframe id="vFrame" style="width:100%;height:calc(100vh - 53px);border:none;display:block;background:#0a0b0d"></iframe>
+</div>
+
+<script>
+let gerenteMode=false;
+function abrirVendedor(){
+  var f=document.getElementById('vFrame');
+  if(!f.getAttribute('src')) f.setAttribute('src','vendedor.html');
+  document.getElementById('loginScreen').classList.remove('active');
+  document.getElementById('mainScreen').classList.remove('active');
+  document.getElementById('vendedorScreen').classList.add('active');
+  document.getElementById('vBackBtn').textContent = gerenteMode ? '⎋ Cerrar sesión' : '← Volver a Tienda';
+}
+function salirVendedor(){
+  if(gerenteMode){ doLogout(); return; }
+  document.getElementById('vendedorScreen').classList.remove('active');
+  document.getElementById('mainScreen').classList.add('active');
+}
+</script>
+
 <script>
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxlm0VRD8L88rtmDJStmEM1JkcOvO3DbZIQAM8VcVBbRF5nwbS_HpH35QsvNPK-RK9H/exec";
 
@@ -126,7 +152,8 @@ const PWD={
   "Tienda - Rambla Brasil":"Brasil7998",
   "Tienda - Santa Anita":"SAnita9995",
   "Tienda - Santa Anita 2":"SAnita2-7999",
-  "Call Center":"Callcen-2026"
+  "Call Center":"Callcen-2026",
+  "GERENCIA":"Gerencia-2026"
 };
 
 // Sheet name per tienda
@@ -157,6 +184,8 @@ function doLogin(){
   const e=document.getElementById("loginErr");
   if(!t||PWD[t]!==p){e.style.display="block";return;}
   e.style.display="none";
+  if(t==="GERENCIA"){ gerenteMode=true; abrirVendedor(); return; }
+  gerenteMode=false;
   curTienda=t;
   document.getElementById("dispTienda").textContent=t;
   document.getElementById("loginScreen").classList.remove("active");
@@ -166,9 +195,10 @@ function doLogin(){
 }
 
 function doLogout(){
-  curTienda="";
+  curTienda="";gerenteMode=false;
   document.getElementById("passIn").value="";
   document.getElementById("tiendaSel").value="";
+  document.getElementById("vendedorScreen").classList.remove("active");
   document.getElementById("mainScreen").classList.remove("active");
   document.getElementById("loginScreen").classList.add("active");
   document.getElementById("tableSection").innerHTML="";
