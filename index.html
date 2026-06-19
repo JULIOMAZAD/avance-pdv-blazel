@@ -107,6 +107,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
           <option value="Tienda - Santa Anita">Tienda - Santa Anita</option>
           <option value="Call Center">Call Center</option>
           <option value="GERENCIA">🔑 Gerencia — Todas las tiendas</option>
+          <option value="AMPARO">🔑 Amparo — RECAR-MM (Multimarca)</option>
         </select>
       </div>
       <div class="fg">
@@ -145,7 +146,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
     <div class="top-bar">
       <div class="top-left">
         <h2>Gerencia — Consolidado de Tiendas</h2>
-        <div class="pdv">Toca "Todas" para el global, o marca una o varias tiendas para sumarlas · <strong>v12</strong></div>
+        <div class="pdv">Toca "Todas" para el global, o marca una o varias tiendas para sumarlas · <strong>v13</strong></div>
       </div>
       <div class="top-actions">
         <button class="btn-vend" onclick="abrirVendedor()">📊 Ver por vendedor</button>
@@ -161,6 +162,21 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
     <div id="gerKpis" class="kpis"></div>
     <div id="gerLoadMsg"></div>
     <div id="gerTableSection"></div>
+  </div>
+</div>
+
+<!-- ============ RECAR-MM (Amparo) ============ -->
+<div id="recarScreen" class="screen">
+  <div class="main-wrap">
+    <div class="top-bar">
+      <div class="top-left"><h2>RECAR-MM — Multimarca / Recargas</h2><div class="pdv">Avance por responsable y asesor</div></div>
+      <div class="top-actions"><button class="btn-out" onclick="doLogout()">Cerrar sesión</button></div>
+    </div>
+    <div class="mes-tabs" id="recarMesTabs"></div>
+    <div id="recarInfo" class="info-row"></div>
+    <div id="recarKpis" class="kpis"></div>
+    <div id="recarMsg"></div>
+    <div id="recarTable"></div>
   </div>
 </div>
 
@@ -187,7 +203,8 @@ const PWD={
   "Tienda - Rambla Brasil":"Brasil7998",
   "Tienda - Santa Anita":"SAnita9995",
   "Call Center":"Callcen-2026",
-  "GERENCIA":"Gerencia-2026"
+  "GERENCIA":"Gerencia-2026",
+  "AMPARO":"Amparo2026"
 };
 
 // Nombre de hoja por tienda (debe coincidir EXACTO con la pestaña del Google Sheet)
@@ -246,6 +263,13 @@ function doLogin(){
     loadGerencia();
     return;
   }
+  if(t==="AMPARO"){
+    gerenteMode=false;
+    showScreen("recarScreen");
+    renderRecarMes();
+    loadRecar();
+    return;
+  }
   gerenteMode=false;
   curTienda=t;
   document.getElementById("dispTienda").textContent=t;
@@ -267,7 +291,7 @@ function doLogout(){
 }
 
 function showScreen(id){
-  ["loginScreen","mainScreen","gerScreen","vendedorScreen"].forEach(s=>{
+  ["loginScreen","mainScreen","gerScreen","vendedorScreen","recarScreen"].forEach(s=>{
     document.getElementById(s).classList.toggle("active", s===id);
   });
 }
@@ -656,22 +680,36 @@ function renderAsesores(recs){
     const proy=factor>0?cf.av*factor:cf.av; const pct=cf.ob>0?proy/cf.ob:0; const cumpl=cf.ob>0?cf.av/cf.ob:0;
     return {n,tipo:rs[0].t,cf,proy,pct,cumpl,estado:estadoFromPct(pct),rs};
   }).sort((a,b)=>b.pct-a.pct);
-  let html=`<div class="ases-head">👥 Asesores de ${STORE_TO_TI[curTienda]} <span style="font-weight:400;color:#888;font-size:12px">· ${_asesorRows.length} asesores · toca uno para ver su detalle</span></div>`;
-  html+=`<div class="table-card"><div class="table-wrap"><table><thead><tr>
+  let html=`<div class="ases-head">👥 Asesores de ${STORE_TO_TI[curTienda]} <span style="font-weight:400;color:#888;font-size:12px">· ${_asesorRows.length} asesores</span></div>`;
+  // Filtro por vendedor (chips)
+  html+=`<div class="ger-pick"><h3>Filtrar por vendedor</h3><div class="ger-chips" id="asesChips">`;
+  html+=`<div class="tchip all on" onclick="pickAsesor(-1)">Ver ranking</div>`;
+  _asesorRows.forEach((v,i)=>{ html+=`<div class="tchip" onclick="pickAsesor(${i})">${v.n}</div>`; });
+  html+=`</div></div>`;
+  html+=`<div id="asesPanel"></div>`;
+  // Ranking
+  html+=`<div id="asesRanking"><div class="table-card"><div class="table-wrap"><table><thead><tr>
     <th style="text-align:left">#</th><th style="text-align:left;min-width:170px">Asesor</th><th>Tipo</th>
     <th>Avance CF (S/)</th><th>Cuota CF (S/)</th><th>Cumpl.</th><th>Proyección</th><th>Estado</th></tr></thead><tbody>`;
   _asesorRows.forEach((v,i)=>{
     const t=getTag(v.estado);
-    html+=`<tr class="ases-row" style="cursor:pointer" onclick="toggleAsesor(${i})">
+    html+=`<tr class="ases-row" style="cursor:pointer" onclick="pickAsesor(${i})">
       <td style="text-align:left">${i+1}</td>
       <td style="text-align:left">▸ ${v.n}</td><td>${v.tipo}</td>
       <td>${fmt(v.cf.av)}</td><td>${fmt(v.cf.ob)}</td><td>${fmtPct(v.cumpl)}</td>
       <td><span style="display:inline-flex;align-items:center;gap:4px"><span class="dot ${t.dot}"></span>${fmtPct(v.pct)}</span></td>
-      <td><span class="tag ${t.cls}">${t.lbl}</span></td></tr>
-    <tr id="asdet-${i}" style="display:none"><td colspan="8" style="background:#f7f8fa;padding:14px"></td></tr>`;
+      <td><span class="tag ${t.cls}">${t.lbl}</span></td></tr>`;
   });
-  html+=`</tbody></table></div></div>`;
+  html+=`</tbody></table></div></div></div>`;
   document.getElementById("asesoresSection").innerHTML=html;
+}
+function pickAsesor(i){
+  document.querySelectorAll("#asesChips .tchip").forEach((c,idx)=>c.classList.toggle("on", idx===(i+1)));
+  const panel=document.getElementById("asesPanel"), rank=document.getElementById("asesRanking");
+  if(i<0){ panel.innerHTML=""; rank.style.display=""; return; }
+  rank.style.display="none";
+  const v=_asesorRows[i];
+  panel.innerHTML=`<div class="ases-head" style="margin-top:6px">📋 ${v.n} <span style="font-weight:400;color:#888;font-size:12px">· ${v.tipo} · ${STORE_TO_TI[curTienda]}</span></div>`+buildAsesorDetail(v);
 }
 function toggleAsesor(i){
   const det=document.getElementById('asdet-'+i); if(!det) return;
@@ -704,6 +742,65 @@ function buildAsesorDetail(v){
     `<div class="kpi ${cls}"><div class="lbl">Estado</div><span class="tag ${t.cls}" style="margin-top:8px;font-size:15px;padding:7px 14px"><span class="dot ${t.dot}"></span>${t.lbl}</span></div>`+
     `</div>`;
   return k+buildTableHtml(struct,totalRow,true);
+}
+
+
+/* ===================== RECAR-MM (usuario Amparo) ===================== */
+let recarMes="junio";
+function renderRecarMes(){ document.getElementById("recarMesTabs").innerHTML=MESES.map(m=>`<button class="mes-tab${m.key===recarMes?' active':''}" onclick="selRecarMes('${m.key}')">${m.label}</button>`).join(""); }
+function selRecarMes(m){recarMes=m;renderRecarMes();loadRecar();}
+async function loadRecar(){
+  const msg=document.getElementById("recarMsg"),tab=document.getElementById("recarTable"),kp=document.getElementById("recarKpis"),info=document.getElementById("recarInfo");
+  msg.innerHTML='<div class="loading"><div class="spinner"></div><br>Cargando RECAR-MM...</div>'; tab.innerHTML="";kp.innerHTML="";info.innerHTML="";
+  try{
+    const j=await aFetchJSON(SCRIPT_URL+(SCRIPT_URL.includes('?')?'&':'?')+'tienda='+encodeURIComponent('RECAR-MM')+'&mes='+recarMes);
+    const rows=(j&&j.data)||[];
+    if(!rows.length) throw new Error('sin datos');
+    renderRecar(rows); msg.innerHTML="";
+  }catch(e){ msg.innerHTML='<div class="load-err">No se pudo cargar RECAR-MM. Verifica que la pestaña se llame exactamente "RECAR-MM" y que el Apps Script la entregue.</div>'; }
+}
+function renderRecar(rows){
+  let dia="";
+  for(let i=0;i<5;i++){ const r=rows[i]||[]; for(const c of r){ const m=String(c||'').match(/(\d+)\s+(JUNIO|MAYO|ENERO|FEBRERO|MARZO|ABRIL|JULIO|AGOSTO|SEPTIEMBRE|OCTUBRE|NOVIEMBRE|DICIEMBRE)/i); if(m){dia=m[1];break;} } if(dia)break; }
+  let hr=-1,respCol=-1,asesCol=-1,avCol=-1,obCol=-1,proyCol=-1,faltCol=-1;
+  for(let i=0;i<rows.length;i++){ const r=rows[i]||[]; let found=false;
+    for(let j=0;j<r.length;j++){ if(String(r[j]||'').trim().toUpperCase()==='RESPONSABLE'){hr=i;respCol=j;found=true;} }
+    if(found){ for(let j=0;j<r.length;j++){ const v=String(r[j]||'').trim().toUpperCase();
+      if(v.startsWith('ASESOR'))asesCol=j; else if(v.startsWith('AVANCE'))avCol=j; else if(v.startsWith('OBJETIVO'))obCol=j; else if(v.startsWith('PROYEC'))proyCol=j; else if(v.startsWith('FALTA'))faltCol=j; }
+      break; } }
+  if(hr<0||avCol<0||obCol<0){ document.getElementById("recarTable").innerHTML='<div class="load-err">No encontré la cabecera RESPONSABLE/AVANCE/OBJETIVO en RECAR-MM.</div>'; return; }
+  if(asesCol<0) asesCol=respCol+1;
+  let data=[],totAv=0,totOb=0;
+  for(let i=hr+1;i<rows.length;i++){ const r=rows[i]||[];
+    const resp=String(r[respCol]||'').trim(), ases=String(r[asesCol]||'').trim();
+    if(resp.toUpperCase()==='TOTAL'||ases.toUpperCase()==='TOTAL') continue;
+    const av=parseFloat(r[avCol]), ob=parseFloat(r[obCol]);
+    if(!resp&&!ases) continue;
+    if(isNaN(av)&&isNaN(ob)) continue;
+    const avn=isNaN(av)?0:av, obn=isNaN(ob)?0:ob;
+    totAv+=avn; totOb+=obn;
+    data.push({resp,ases:ases||'-',av:avn,ob:obn});
+  }
+  const diaN=parseInt(dia)||0,dm=30,factor=diaN>0?dm/diaN:0;
+  const proyG=factor>0?totAv*factor:totAv,pctG=totOb>0?proyG/totOb:0,faltaG=totOb-totAv,vdG=(faltaG>0&&dm>diaN)?faltaG/(dm-diaN):0;
+  document.getElementById("recarInfo").innerHTML=`<div class="chip">Avance día: <strong>${dia||'-'}</strong></div><div class="chip">Mes: <strong>${recarMes.toUpperCase()}</strong></div><div class="chip">Registros: <strong>${data.length}</strong></div>`;
+  const tg=getTag(estadoFromPct(pctG));
+  document.getElementById("recarKpis").innerHTML=
+    `<div class="kpi"><div class="lbl">Avance total</div><div class="val">${fmt(totAv)}</div></div>`+
+    `<div class="kpi"><div class="lbl">Objetivo total</div><div class="val">${fmt(totOb)}</div><div class="sub">${fmtPct(totOb>0?totAv/totOb:0)} avanzado</div></div>`+
+    `<div class="kpi ${clsByPct(pctG)}"><div class="lbl">Proyección</div><div class="val">${fmtPct(pctG)}</div></div>`+
+    `<div class="kpi ${faltaG>0?'red':'green'}"><div class="lbl">Falta</div><div class="val">${fmt(faltaG>0?faltaG:0)}</div><div class="sub">${faltaG>0?('≈ '+fmt(vdG)+' / día'):'Cubierto ✅'}</div></div>`+
+    `<div class="kpi ${clsByPct(pctG)}"><div class="lbl">Estado</div><span class="tag ${tg.cls}" style="margin-top:8px;font-size:15px;padding:7px 14px"><span class="dot ${tg.dot}"></span>${tg.lbl}</span></div>`;
+  let html=`<div class="table-card"><div class="table-wrap"><table><thead><tr><th style="text-align:left">Responsable</th><th style="text-align:left">Asesor</th><th>Avance</th><th>Objetivo</th><th>Proyección</th><th>Falta</th><th>Estado</th></tr></thead><tbody>`;
+  data.forEach(d=>{ const av=d.av,ob=d.ob,proy=factor>0?av*factor:av,pct=ob>0?proy/ob:0,falta=ob-av;
+    const t=getTag(estadoFromPct(pct)),fc=falta<=0?'falta-g':'falta-r';
+    html+=`<tr><td style="text-align:left">${d.resp}</td><td style="text-align:left">${d.ases}</td><td>${fmt(av)}</td><td>${fmt(ob)}</td>
+      <td><span style="display:inline-flex;align-items:center;gap:4px"><span class="dot ${t.dot}"></span>${fmtPct(pct)}</span></td>
+      <td class="${fc}">${fmt(falta)}</td><td><span class="tag ${t.cls}">${t.lbl}</span></td></tr>`; });
+  const t=getTag(estadoFromPct(pctG));
+  html+=`<tr class="total-row"><td style="text-align:left">TOTAL</td><td></td><td>${fmt(totAv)}</td><td>${fmt(totOb)}</td><td>${fmtPct(pctG)}</td><td>${fmt(faltaG)}</td><td><span class="tag ${t.cls}">${t.lbl}</span></td></tr>`;
+  html+=`</tbody></table></div></div>`;
+  document.getElementById("recarTable").innerHTML=html;
 }
 
 </script>
