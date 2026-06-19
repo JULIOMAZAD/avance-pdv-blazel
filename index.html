@@ -426,6 +426,20 @@ function toggleAllTiendas(){
   renderGerChips(); loadGerencia();
 }
 
+async function fetchInBatches(items, size, fn){
+  const out=[];
+  for(let i=0;i<items.length;i+=size){
+    const batch=items.slice(i,i+size);
+    const r=await Promise.all(batch.map(fn));
+    out.push(...r);
+    const done=Math.min(i+size,items.length);
+    if(done<items.length){
+      document.getElementById("gerLoadMsg").innerHTML='<div class="loading"><div class="spinner"></div><br>Sumando '+done+' de '+items.length+' tiendas...</div>';
+    }
+  }
+  return out;
+}
+
 async function loadGerencia(){
   const sel=[...gerSel];
   const km=document.getElementById("gerKpis");
@@ -437,13 +451,23 @@ async function loadGerencia(){
     ts.innerHTML=`<div class="load-err">Marca al menos una tienda para ver el consolidado.</div>`;
     return;
   }
-  document.getElementById("gerLoadMsg").innerHTML='<div class="loading"><div class="spinner"></div><br>Sumando '+sel.length+' tienda(s)...</div>';
   info.innerHTML=""; km.innerHTML=""; ts.innerHTML="";
+  document.getElementById("gerLoadMsg").innerHTML='<div class="loading"><div class="spinner"></div><br>Sumando '+sel.length+' tienda(s)...</div>';
   try{
-    const results=await Promise.all(sel.map(t=>fetchTienda(SHEET_NAME[t]||"", gerMes)
-      .then(d=>({t,d})).catch(()=>({t,d:null}))));
-    const ok=results.filter(r=>r.d);
-    if(!ok.length) throw new Error("No se pudo cargar ninguna de las tiendas seleccionadas.");
+    // Pedir en tandas pequeñas: el Apps Script falla si se le piden todas a la vez
+    const results=await fetchInBatches(sel, 3, t=>fetchTienda(SHEET_NAME[t]||"", gerMes)
+      .then(d=>({t,d})).catch(e=>({t,d:null,err:(e&&e.message)||"error"})));
+    let ok=results.filter(r=>r.d);
+    let failed=results.filter(r=>!r.d);
+    // Reintento de las que fallaron, una por una (más confiable)
+    if(failed.length){
+      document.getElementById("gerLoadMsg").innerHTML='<div class="loading"><div class="spinner"></div><br>Reintentando '+failed.length+' tienda(s)...</div>';
+      const retry=await fetchInBatches(failed.map(r=>r.t), 1, t=>fetchTienda(SHEET_NAME[t]||"", gerMes)
+        .then(d=>({t,d})).catch(e=>({t,d:null,err:(e&&e.message)||"error"})));
+      ok=ok.concat(retry.filter(r=>r.d));
+      failed=retry.filter(r=>!r.d);
+    }
+    if(!ok.length) throw new Error("No se pudo cargar ninguna de las tiendas seleccionadas. Reintenta en unos segundos.");
 
     // día de avance / días del mes (se toman de la primera tienda con datos)
     let avDia=0, diasMes=0, mesLabel="";
@@ -506,7 +530,9 @@ async function loadGerencia(){
       kpiCard("Falta", fmt(totFalta>0?totFalta:0), totFalta>0?("≈ "+fmt(totVd)+" / día"):"Cuota cubierta ✅", totFalta>0?"red":"green") +
       kpiCard("Estado", "", estadoFromPct(totPct), clsByPct(totPct), getTag(estadoFromPct(totPct)));
 
-    document.getElementById("gerLoadMsg").innerHTML="";
+    document.getElementById("gerLoadMsg").innerHTML = failed.length
+      ? `<div class="load-err">⚠️ No cargaron ${failed.length} tienda(s): <strong>${failed.map(r=>TIENDA_LABEL[r.t]).join(", ")}</strong>. El total de abajo NO las incluye. <button class="btn-out" style="margin-left:8px" onclick="loadGerencia()">Reintentar</button></div>`
+      : "";
     document.getElementById("gerTableSection").innerHTML=buildTableHtml(struct,totalRow,true);
   }catch(ex){
     document.getElementById("gerLoadMsg").innerHTML="";
