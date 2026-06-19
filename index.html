@@ -50,11 +50,11 @@ td{padding:9px 12px;text-align:center;color:#333}
 td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
 .total-row td{background:#1a1a2e;color:#fff;font-weight:700}
 .total-row td:first-child{padding-left:16px}
-.tag{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
+.tag{display:inline-flex;align-items:center;gap:5px;padding:5px 13px;border-radius:20px;font-size:13px;font-weight:700;white-space:nowrap}
 .t-exc{background:#e6f4ea;color:#1a7a33}
 .t-reg{background:#fff8e1;color:#b07000}
 .t-pun{background:#fdecea;color:#cc0000}
-.dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
 .dg{background:#22c55e}.dy{background:#f59e0b}.dr{background:#ef4444}
 .falta-r{color:#cc0000;font-weight:600}.falta-g{color:#22a843;font-weight:600}
 .loading{text-align:center;padding:3rem;color:#888;font-size:14px}
@@ -77,6 +77,9 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
 .kpi .sub{font-size:12px;color:#666;margin-top:2px}
 .kpi.green{border-left-color:#22a843}.kpi.amber{border-left-color:#e0a82e}.kpi.red{border-left-color:#cc0000}
 @media(max-width:600px){.main-wrap{padding:1rem .5rem}td,th{padding:7px 8px;font-size:12px}.kpi .val{font-size:20px}}
+.ases-head{font-size:15px;font-weight:700;color:#1a1a2e;margin:0 0 10px}
+.ases-row:hover{background:#fff3f3 !important}
+.ases-row td{font-weight:500}
 </style>
 </head>
 <body>
@@ -132,6 +135,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
     <div id="infoRow" class="info-row"></div>
     <div id="loadMsg"></div>
     <div id="tableSection"></div>
+    <div id="asesoresSection" style="margin-top:1.25rem"></div>
   </div>
 </div>
 
@@ -141,7 +145,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
     <div class="top-bar">
       <div class="top-left">
         <h2>Gerencia — Consolidado de Tiendas</h2>
-        <div class="pdv">Toca "Todas" para el global, o marca una o varias tiendas para sumarlas · <strong>v8</strong></div>
+        <div class="pdv">Toca "Todas" para el global, o marca una o varias tiendas para sumarlas · <strong>v12</strong></div>
       </div>
       <div class="top-actions">
         <button class="btn-vend" onclick="abrirVendedor()">📊 Ver por vendedor</button>
@@ -259,6 +263,7 @@ function doLogout(){
   document.getElementById("infoRow").innerHTML="";
   document.getElementById("gerTableSection").innerHTML="";
   document.getElementById("gerKpis").innerHTML="";
+  var as=document.getElementById("asesoresSection"); if(as) as.innerHTML="";
 }
 
 function showScreen(id){
@@ -270,7 +275,7 @@ function showScreen(id){
 /* ====================== VENDEDOR (iframe) ====================== */
 function abrirVendedor(){
   var f=document.getElementById('vFrame');
-  if(!f.getAttribute('src')) f.setAttribute('src','vendedor.html?v=8');
+  if(!f.getAttribute('src')) f.setAttribute('src','vendedor.html?v=11');
   showScreen("vendedorScreen");
 }
 function salirVendedor(){
@@ -399,6 +404,7 @@ function showTable(data){
      <div class="chip">Días del mes: <strong>${data.dias||"-"}</strong></div>
      <div class="chip">PDV: <strong>${data.pdvLabel||curTienda}</strong></div>`;
   document.getElementById("tableSection").innerHTML=buildTableHtml(data.struct,data.totalRow,false);
+  loadAsesores();
 }
 
 /* ====================== GERENCIA (consolidado) ====================== */
@@ -546,7 +552,7 @@ async function loadGerencia(){
 
 function clsByPct(p){return p>=1?"green":(p>=0.8?"amber":"red");}
 function kpiCard(lbl,val,sub,cls,tag){
-  const tagHtml = tag ? `<span class="tag ${tag.cls}" style="margin-top:6px"><span class="dot ${tag.dot}"></span>${tag.lbl}</span>` : "";
+  const tagHtml = tag ? `<span class="tag ${tag.cls}" style="margin-top:8px;font-size:18px;padding:10px 18px"><span class="dot ${tag.dot}" style="width:11px;height:11px"></span>${tag.lbl}</span>` : "";
   return `<div class="kpi ${cls||""}">
     <div class="lbl">${lbl}</div>
     ${val!==""?`<div class="val">${val}</div>`:""}
@@ -596,6 +602,110 @@ function buildTableHtml(struct,totalRow,recalc){
   html+=`</tbody></table></div></div>`;
   return html;
 }
+
+/* ===================== ASESORES POR TIENDA (en vivo, modo=vendedor) ===================== */
+const MES_MAP={'enero':1,'febrero':2,'marzo':3,'abril':4,'mayo':5,'junio':6,'julio':7,'agosto':8,'septiembre':9,'setiembre':9,'octubre':10,'noviembre':11,'diciembre':12};
+const DIAS_MES={1:31,2:28,3:31,4:30,5:31,6:30,7:31,8:31,9:30,10:31,11:30,12:31};
+const CAT_MAP={'alta prepago':'Alta Prepago','portab. prepago':'Portabilidad Prepago','portabilidad prepago':'Portabilidad Prepago','packs prepago':'Packs Prepago','portab. postpago':'Portabilidad Postpago','portabilidad postpago':'Portabilidad Postpago','altas postpago':'Altas Postpago','packs postpago':'Packs Postpago','lineas adic. postpago':'Líneas Adicionales Postpago','líneas adicionales postpago':'Líneas Adicionales Postpago','lineas adicionales postpago':'Líneas Adicionales Postpago','hfc':'HFC','ugis inalambricos':'UGIS Inalámbricos','ugis inalámbricos':'UGIS Inalámbricos','cargo fijo promedio':'Promedio Cargo Fijo','promedio cargo fijo':'Promedio Cargo Fijo','avance cargo fijo':'Avance Cargo Fijo','olo':'OLO','accesorios':'Accesorios','portab. cf >=95.50':'Portabilidad CF >=95.50','portabilidad cf >=95.50':'Portabilidad CF >=95.50'};
+function aToNum(x){if(typeof x==='number')return x;if(x==null)return 0;let v=String(x).replace(/s\/\.?/ig,'').replace(/%/g,'').replace(/\s/g,'').replace(/,/g,'');v=v.replace(/[^0-9.\-]/g,'');const n=parseFloat(v);return isNaN(n)?0:n;}
+function aCanonCat(s){s=(s||'').trim();return CAT_MAP[s.toLowerCase()]||s;}
+function aCanonTienda(s){s=(s||'').trim().replace(/^(Tienda|PDV)\s*-\s*/i,'').trim();const fix={'Mall del Sur 1':'Mall del Sur I','Mall del Sur 2':'Mall del Sur II','Rambla Brasil':'La Rambla'};return fix[s]||s;}
+function aParse(rows,mes,anio){
+  let dias=aToNum((rows[2]||[])[6])||31;
+  if(!mes){ mes=MES_MAP[String((rows[2]||[])[7]||'').toLowerCase()]||0; }
+  const recs=[]; let curCat=null;
+  for(let i=0;i<rows.length;i++){
+    const r=rows[i]||[]; const b=r[1],c=r[2],d=r[3];
+    const ds=(d==null)?'':String(d).trim();
+    if(ds && (b==null||b==='')&&(c==null||c==='')&&ds!=='TOTAL'){ curCat=aCanonCat(ds); continue; }
+    const tipo=r[1], pdv=r[2], ases=r[3];
+    if(!curCat||tipo==null||tipo==='')continue;
+    const tu=String(tipo).toUpperCase(); if(tu==='TOTAL'||tu==='TIPO')continue;
+    if(typeof ases!=='string'||!ases.trim())continue;
+    recs.push({d:dias,dm:DIAS_MES[mes]||30,c:curCat,t:String(tipo).trim(),ti:aCanonTienda(pdv),n:ases.trim(),av:aToNum(r[4]),ob:aToNum(r[5])});
+  }
+  return recs;
+}
+async function aFetchJSON(u){const r=await fetch(u);if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}
+const STORE_TO_TI={"Tienda - Mall Bellavista":"Mall Bellavista","Tienda - Mall del Sur 1":"Mall del Sur I","Tienda - Mall del Sur 2":"Mall del Sur II","Tienda - Mega Plaza":"Mega Plaza","Tienda - Plaza Norte":"Plaza Norte","Tienda - Primavera":"Primavera","Tienda - Rambla Brasil":"La Rambla","Tienda - Santa Anita":"Santa Anita"};
+let asesorCache={};
+async function getAsesorData(mesKey){
+  if(asesorCache[mesKey]) return asesorCache[mesKey];
+  const sep=SCRIPT_URL.includes('?')?'&':'?';
+  const j=await aFetchJSON(SCRIPT_URL+sep+'modo=vendedor&mes='+encodeURIComponent(mesKey));
+  const recs=(j&&j.data)?aParse(j.data,MES_MAP[mesKey]||0,parseInt(j.anio)||2026):[];
+  asesorCache[mesKey]=recs; return recs;
+}
+let _asesorRows=[];
+async function loadAsesores(){
+  const cont=document.getElementById("asesoresSection"); if(!cont) return;
+  const ti=STORE_TO_TI[curTienda];
+  if(!ti){ cont.innerHTML=""; return; }
+  cont.innerHTML='<div class="loading"><div class="spinner"></div><br>Cargando asesores...</div>';
+  try{
+    const recs=(await getAsesorData(curMes)).filter(r=>r.ti===ti);
+    if(!recs.length){ cont.innerHTML='<div class="load-err">Aún no hay datos de asesores para esta tienda este mes.</div>'; return; }
+    renderAsesores(recs);
+  }catch(e){ cont.innerHTML='<div class="load-err">No se pudo cargar el avance de los asesores.</div>'; }
+}
+function renderAsesores(recs){
+  const byV={}; recs.forEach(r=>{(byV[r.n]=byV[r.n]||[]).push(r);});
+  const dia=recs[0].d, dm=recs[0].dm, factor=dia>0?dm/dia:0;
+  _asesorRows=Object.keys(byV).map(n=>{
+    const rs=byV[n]; const cf=rs.find(x=>x.c==='Avance Cargo Fijo')||{av:0,ob:0};
+    const proy=factor>0?cf.av*factor:cf.av; const pct=cf.ob>0?proy/cf.ob:0; const cumpl=cf.ob>0?cf.av/cf.ob:0;
+    return {n,tipo:rs[0].t,cf,proy,pct,cumpl,estado:estadoFromPct(pct),rs};
+  }).sort((a,b)=>b.pct-a.pct);
+  let html=`<div class="ases-head">👥 Asesores de ${STORE_TO_TI[curTienda]} <span style="font-weight:400;color:#888;font-size:12px">· ${_asesorRows.length} asesores · toca uno para ver su detalle</span></div>`;
+  html+=`<div class="table-card"><div class="table-wrap"><table><thead><tr>
+    <th style="text-align:left">#</th><th style="text-align:left;min-width:170px">Asesor</th><th>Tipo</th>
+    <th>Avance CF (S/)</th><th>Cuota CF (S/)</th><th>Cumpl.</th><th>Proyección</th><th>Estado</th></tr></thead><tbody>`;
+  _asesorRows.forEach((v,i)=>{
+    const t=getTag(v.estado);
+    html+=`<tr class="ases-row" style="cursor:pointer" onclick="toggleAsesor(${i})">
+      <td style="text-align:left">${i+1}</td>
+      <td style="text-align:left">▸ ${v.n}</td><td>${v.tipo}</td>
+      <td>${fmt(v.cf.av)}</td><td>${fmt(v.cf.ob)}</td><td>${fmtPct(v.cumpl)}</td>
+      <td><span style="display:inline-flex;align-items:center;gap:4px"><span class="dot ${t.dot}"></span>${fmtPct(v.pct)}</span></td>
+      <td><span class="tag ${t.cls}">${t.lbl}</span></td></tr>
+    <tr id="asdet-${i}" style="display:none"><td colspan="8" style="background:#f7f8fa;padding:14px"></td></tr>`;
+  });
+  html+=`</tbody></table></div></div>`;
+  document.getElementById("asesoresSection").innerHTML=html;
+}
+function toggleAsesor(i){
+  const det=document.getElementById('asdet-'+i); if(!det) return;
+  const cell=det.querySelector('td');
+  if(det.style.display==='none'){
+    if(!det.dataset.loaded){ cell.innerHTML=buildAsesorDetail(_asesorRows[i]); det.dataset.loaded='1'; }
+    det.style.display='';
+  } else det.style.display='none';
+}
+function buildAsesorDetail(v){
+  const rs=v.rs, dia=rs[0].d, dm=rs[0].dm, factor=dia>0?dm/dia:0, diasRest=dm>dia?dm-dia:0;
+  const byC={}; rs.forEach(r=>byC[r.c]=r);
+  const GR=[["prepago","Prepago",["Alta Prepago","Portabilidad Prepago","Packs Prepago"]],
+            ["postpago","Postpago",["Altas Postpago","Portabilidad Postpago","Packs Postpago","Líneas Adicionales Postpago"]],
+            ["residencial","Residencial",["HFC","UGIS Inalámbricos"]],
+            ["otros","Otros",["OLO","Accesorios","Portabilidad CF >=95.50"]]];
+  const struct={prepago:[],postpago:[],residencial:[],otros:[]};
+  for(const g of GR){ for(const p of g[2]){ const r=byC[p]; if(!r) continue;
+    const meta=r.ob,av=r.av,proy=factor>0?av*factor:av,pct=meta>0?proy/meta:0,falta=meta-av,vd=(falta>0&&diasRest>0)?falta/diasRest:0;
+    struct[g[0]].push({name:p,meta,av,pct,falta,vd,pf:proy,estado:estadoFromPct(pct)});
+  }}
+  const cf=v.cf, cfFalta=cf.ob-cf.av, cfVd=(cfFalta>0&&diasRest>0)?cfFalta/diasRest:0;
+  const totalRow={meta:cf.ob,av:cf.av,pct:v.pct,falta:cfFalta,vd:cfVd,pf:v.proy,estado:v.estado};
+  const t=getTag(v.estado), cls=v.pct>=1?'green':(v.pct>=0.8?'amber':'red');
+  let k=`<div class="kpis" style="margin:0 0 10px">`+
+    `<div class="kpi"><div class="lbl">Cuota CF (S/)</div><div class="val">${fmt(cf.ob)}</div></div>`+
+    `<div class="kpi"><div class="lbl">Avance CF (S/)</div><div class="val">${fmt(cf.av)}</div><div class="sub">${fmtPct(v.cumpl)} de la cuota</div></div>`+
+    `<div class="kpi ${cls}"><div class="lbl">Proyección</div><div class="val">${fmtPct(v.pct)}</div></div>`+
+    `<div class="kpi ${cfFalta>0?'red':'green'}"><div class="lbl">Falta (S/)</div><div class="val">${fmt(cfFalta>0?cfFalta:0)}</div><div class="sub">${cfFalta>0?('≈ '+fmt(cfVd)+' / día'):'Cubierta ✅'}</div></div>`+
+    `<div class="kpi ${cls}"><div class="lbl">Estado</div><span class="tag ${t.cls}" style="margin-top:8px;font-size:15px;padding:7px 14px"><span class="dot ${t.dot}"></span>${t.lbl}</span></div>`+
+    `</div>`;
+  return k+buildTableHtml(struct,totalRow,true);
+}
+
 </script>
 </body>
 </html>
