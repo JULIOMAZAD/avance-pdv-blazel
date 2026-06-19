@@ -141,7 +141,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
     <div class="top-bar">
       <div class="top-left">
         <h2>Gerencia — Consolidado de Tiendas</h2>
-        <div class="pdv">Toca "Todas" para el global, o marca una o varias tiendas para sumarlas · <strong>v7</strong></div>
+        <div class="pdv">Toca "Todas" para el global, o marca una o varias tiendas para sumarlas · <strong>v8</strong></div>
       </div>
       <div class="top-actions">
         <button class="btn-vend" onclick="abrirVendedor()">📊 Ver por vendedor</button>
@@ -270,7 +270,7 @@ function showScreen(id){
 /* ====================== VENDEDOR (iframe) ====================== */
 function abrirVendedor(){
   var f=document.getElementById('vFrame');
-  if(!f.getAttribute('src')) f.setAttribute('src','vendedor.html?v=7');
+  if(!f.getAttribute('src')) f.setAttribute('src','vendedor.html?v=8');
   showScreen("vendedorScreen");
 }
 function salirVendedor(){
