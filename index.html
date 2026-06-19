@@ -21,12 +21,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;ba
 .btn-login{width:100%;padding:13px;background:#cc0000;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;margin-top:1.5rem}
 .btn-login:hover{background:#aa0000}
 .err{color:#cc0000;font-size:12px;margin-top:8px;display:none}
-.main-wrap{max-width:980px;margin:0 auto;padding:1.5rem 1rem}
+.main-wrap{max-width:1100px;margin:0 auto;padding:1.5rem 1rem}
 .top-bar{background:#fff;border-radius:14px;padding:1rem 1.5rem;display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.75rem}
 .top-left h2{font-size:19px;font-weight:700;color:#cc0000}
 .top-left .pdv{font-size:13px;color:#666;margin-top:2px}
+.top-actions{display:flex;gap:8px;flex-wrap:wrap}
 .btn-out{padding:8px 16px;background:#fff;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;color:#444}
 .btn-out:hover{border-color:#cc0000;color:#cc0000}
+.btn-vend{padding:8px 16px;background:#1a1a2e;border:1.5px solid #1a1a2e;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;color:#fff}
+.btn-vend:hover{background:#2d3561}
 .mes-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1rem}
 .mes-tab{padding:6px 16px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid #e0e0e0;background:#fff;color:#555}
 .mes-tab.active{border-color:#cc0000;background:#cc0000;color:#fff}
@@ -58,11 +61,27 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
 .spinner{display:inline-block;width:32px;height:32px;border:3px solid #eee;border-top-color:#cc0000;border-radius:50%;animation:spin .8s linear infinite;margin-bottom:12px}
 @keyframes spin{to{transform:rotate(360deg)}}
 .load-err{background:#fff5f5;border:1px solid #fcc;border-radius:10px;padding:1rem;color:#cc0000;font-size:13px;margin-bottom:1rem}
-@media(max-width:600px){.main-wrap{padding:1rem .5rem}td,th{padding:7px 8px;font-size:12px}}
+/* ===== Gerencia: selector de tiendas ===== */
+.ger-pick{background:#fff;border-radius:14px;padding:1rem 1.25rem;margin-bottom:1rem}
+.ger-pick h3{font-size:13px;font-weight:700;color:#1a1a2e;margin-bottom:.75rem;text-transform:uppercase;letter-spacing:.5px}
+.ger-chips{display:flex;gap:8px;flex-wrap:wrap}
+.tchip{padding:7px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid #e0e0e0;background:#fafafa;color:#555;user-select:none}
+.tchip.on{border-color:#cc0000;background:#cc0000;color:#fff}
+.tchip.all{border-color:#1a1a2e;color:#1a1a2e}
+.tchip.all.on{background:#1a1a2e;border-color:#1a1a2e;color:#fff}
+/* ===== KPIs ===== */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:1rem}
+.kpi{background:#fff;border-radius:14px;padding:1rem 1.25rem;border-left:4px solid #cc0000}
+.kpi .lbl{font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px}
+.kpi .val{font-size:24px;font-weight:800;color:#1a1a2e;margin-top:4px}
+.kpi .sub{font-size:12px;color:#666;margin-top:2px}
+.kpi.green{border-left-color:#22a843}.kpi.amber{border-left-color:#e0a82e}.kpi.red{border-left-color:#cc0000}
+@media(max-width:600px){.main-wrap{padding:1rem .5rem}td,th{padding:7px 8px;font-size:12px}.kpi .val{font-size:20px}}
 </style>
 </head>
 <body>
 
+<!-- ============ LOGIN ============ -->
 <div id="loginScreen" class="screen active">
   <div class="login-wrap">
     <div class="login-card">
@@ -98,6 +117,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
   </div>
 </div>
 
+<!-- ============ TIENDA (vista por punto de venta) ============ -->
 <div id="mainScreen" class="screen">
   <div class="main-wrap">
     <div class="top-bar">
@@ -105,7 +125,9 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
         <h2>Avance por Punto de Venta</h2>
         <div class="pdv" id="dispTienda"></div>
       </div>
-      <button class="btn-out" onclick="doLogout()">Cerrar sesión</button>
+      <div class="top-actions">
+        <button class="btn-out" onclick="doLogout()">Cerrar sesión</button>
+      </div>
     </div>
     <div class="mes-tabs" id="mesTabs"></div>
     <div id="infoRow" class="info-row"></div>
@@ -114,32 +136,42 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
   </div>
 </div>
 
+<!-- ============ GERENCIA (consolidado de tiendas) ============ -->
+<div id="gerScreen" class="screen">
+  <div class="main-wrap">
+    <div class="top-bar">
+      <div class="top-left">
+        <h2>Gerencia — Consolidado de Tiendas</h2>
+        <div class="pdv">Marca una o varias tiendas para sumar cuota y avance</div>
+      </div>
+      <div class="top-actions">
+        <button class="btn-vend" onclick="abrirVendedor()">📊 Ver por vendedor</button>
+        <button class="btn-out" onclick="doLogout()">Cerrar sesión</button>
+      </div>
+    </div>
+    <div class="mes-tabs" id="gerMesTabs"></div>
+    <div class="ger-pick">
+      <h3>Tiendas</h3>
+      <div class="ger-chips" id="gerChips"></div>
+    </div>
+    <div id="gerInfoRow" class="info-row"></div>
+    <div id="gerKpis" class="kpis"></div>
+    <div id="gerLoadMsg"></div>
+    <div id="gerTableSection"></div>
+  </div>
+</div>
+
+<!-- ============ VENDEDOR (iframe al dashboard por vendedor) ============ -->
 <div id="vendedorScreen" class="screen">
   <div style="background:#1a1a2e;padding:10px 16px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:10">
-    <button class="btn-out" id="vBackBtn" onclick="salirVendedor()">← Volver a Tienda</button>
+    <button class="btn-out" id="vBackBtn" onclick="salirVendedor()">← Volver</button>
     <span style="color:#fff;font-weight:600;font-size:14px">Avance por Vendedor</span>
   </div>
   <iframe id="vFrame" style="width:100%;height:calc(100vh - 53px);border:none;display:block;background:#0a0b0d"></iframe>
 </div>
 
 <script>
-let gerenteMode=false;
-function abrirVendedor(){
-  var f=document.getElementById('vFrame');
-  if(!f.getAttribute('src')) f.setAttribute('src','vendedor.html');
-  document.getElementById('loginScreen').classList.remove('active');
-  document.getElementById('mainScreen').classList.remove('active');
-  document.getElementById('vendedorScreen').classList.add('active');
-  document.getElementById('vBackBtn').textContent = gerenteMode ? '⎋ Cerrar sesión' : '← Volver a Tienda';
-}
-function salirVendedor(){
-  if(gerenteMode){ doLogout(); return; }
-  document.getElementById('vendedorScreen').classList.remove('active');
-  document.getElementById('mainScreen').classList.add('active');
-}
-</script>
-
-<script>
+/* ====================== CONFIG ====================== */
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxlm0VRD8L88rtmDJStmEM1JkcOvO3DbZIQAM8VcVBbRF5nwbS_HpH35QsvNPK-RK9H/exec";
 
 const PWD={
@@ -156,7 +188,7 @@ const PWD={
   "GERENCIA":"Gerencia-2026"
 };
 
-// Sheet name per tienda
+// Nombre de hoja por tienda (debe coincidir EXACTO con la pestaña del Google Sheet)
 const SHEET_NAME={
   "Tienda - Mall Bellavista":"mall bellavista",
   "Tienda - Mall del Sur 1":"mall del sur 1",
@@ -169,27 +201,49 @@ const SHEET_NAME={
   "Tienda - Santa Anita 2":"santa anita2",
   "Call Center":"call center"
 };
+// Etiqueta corta para los chips de Gerencia
+const TIENDA_LABEL={
+  "Tienda - Mall Bellavista":"Bellavista",
+  "Tienda - Mall del Sur 1":"Sur 1",
+  "Tienda - Mall del Sur 2":"Sur 2",
+  "Tienda - Mega Plaza":"Mega Plaza",
+  "Tienda - Plaza Norte":"Plaza Norte",
+  "Tienda - Primavera":"Primavera",
+  "Tienda - Rambla Brasil":"Rambla",
+  "Tienda - Santa Anita":"Santa Anita",
+  "Tienda - Santa Anita 2":"Santa Anita 2",
+  "Call Center":"Call Center"
+};
+const GER_TIENDAS=Object.keys(SHEET_NAME); // todas menos GERENCIA
 
-// Months config - add new months here
 const MESES=[
   {label:"Mayo 2026", key:"mayo"},
   {label:"Junio 2026", key:"junio"}
 ];
 
 let curTienda="", curMes="junio", cache={};
+let gerenteMode=false, gerMes="junio", gerSel=new Set(GER_TIENDAS); // por defecto: todas
 
+/* ====================== LOGIN ====================== */
 function doLogin(){
   const t=document.getElementById("tiendaSel").value;
   const p=document.getElementById("passIn").value;
   const e=document.getElementById("loginErr");
   if(!t||PWD[t]!==p){e.style.display="block";return;}
   e.style.display="none";
-  if(t==="GERENCIA"){ gerenteMode=true; abrirVendedor(); return; }
+
+  if(t==="GERENCIA"){
+    gerenteMode=true;
+    showScreen("gerScreen");
+    renderGerMesTabs();
+    renderGerChips();
+    loadGerencia();
+    return;
+  }
   gerenteMode=false;
   curTienda=t;
   document.getElementById("dispTienda").textContent=t;
-  document.getElementById("loginScreen").classList.remove("active");
-  document.getElementById("mainScreen").classList.add("active");
+  showScreen("mainScreen");
   renderTabs();
   loadData(curMes);
 }
@@ -198,61 +252,68 @@ function doLogout(){
   curTienda="";gerenteMode=false;
   document.getElementById("passIn").value="";
   document.getElementById("tiendaSel").value="";
-  document.getElementById("vendedorScreen").classList.remove("active");
-  document.getElementById("mainScreen").classList.remove("active");
-  document.getElementById("loginScreen").classList.add("active");
+  showScreen("loginScreen");
   document.getElementById("tableSection").innerHTML="";
   document.getElementById("infoRow").innerHTML="";
+  document.getElementById("gerTableSection").innerHTML="";
+  document.getElementById("gerKpis").innerHTML="";
+}
+
+function showScreen(id){
+  ["loginScreen","mainScreen","gerScreen","vendedorScreen"].forEach(s=>{
+    document.getElementById(s).classList.toggle("active", s===id);
+  });
+}
+
+/* ====================== VENDEDOR (iframe) ====================== */
+function abrirVendedor(){
+  var f=document.getElementById('vFrame');
+  if(!f.getAttribute('src')) f.setAttribute('src','vendedor.html');
+  showScreen("vendedorScreen");
+}
+function salirVendedor(){
+  showScreen(gerenteMode ? "gerScreen" : "mainScreen");
 }
 
 document.getElementById("passIn").addEventListener("keydown",e=>{if(e.key==="Enter")doLogin();});
 
+/* ====================== TIENDA (una sola) ====================== */
 function renderTabs(){
   document.getElementById("mesTabs").innerHTML=MESES.map(m=>
     `<button class="mes-tab${m.key===curMes?" active":""}" onclick="selectMes('${m.key}')">${m.label}</button>`
   ).join("");
 }
-
-function selectMes(mes){
-  curMes=mes;
-  renderTabs();
-  loadData(mes);
-}
+function selectMes(mes){curMes=mes;renderTabs();loadData(mes);}
 
 async function loadData(mes){
   const cacheKey=curTienda+"_"+mes;
   if(cache[cacheKey]){showTable(cache[cacheKey]);return;}
-
   document.getElementById("loadMsg").innerHTML='<div class="loading"><div class="spinner"></div><br>Cargando datos...</div>';
   document.getElementById("tableSection").innerHTML="";
   document.getElementById("infoRow").innerHTML="";
-
-  const sheet=SHEET_NAME[curTienda]||"";
-  const url=`${SCRIPT_URL}?tienda=${encodeURIComponent(sheet)}&mes=${mes}`;
-
   try{
-    const res=await fetch(url);
-    const json=await res.json();
-    if(json.error){
-      showError("Error: "+json.error);
-      return;
-    }
-    const data=parseRows(json.data);
+    const data=await fetchTienda(SHEET_NAME[curTienda]||"", mes);
     cache[cacheKey]=data;
     showTable(data);
   }catch(ex){
-    showError("No se pudo cargar los datos. Intenta de nuevo.");
+    document.getElementById("loadMsg").innerHTML=`<div class="load-err">${ex.message||"No se pudo cargar los datos. Intenta de nuevo."}</div>`;
   }
 }
 
-function showError(msg){
-  document.getElementById("loadMsg").innerHTML=`<div class="load-err">${msg}</div>`;
+/* ====================== FETCH + PARSE (compartido) ====================== */
+async function fetchTienda(sheet, mes){
+  const cacheKey="raw_"+sheet+"_"+mes;
+  if(cache[cacheKey]) return parseRows(cache[cacheKey]);
+  const url=`${SCRIPT_URL}?tienda=${encodeURIComponent(sheet)}&mes=${mes}`;
+  const res=await fetch(url);
+  const json=await res.json();
+  if(json.error) throw new Error("Error: "+json.error);
+  cache[cacheKey]=json.data;
+  return parseRows(json.data);
 }
 
 function parseRows(rows){
   let avance="", mes="", dias="", pdvLabel="";
-
-  // Find AVANCE/MES/DIAS
   for(let i=0;i<3;i++){
     const r=rows[i]||[];
     for(let j=0;j<r.length;j++){
@@ -262,8 +323,6 @@ function parseRows(rows){
       if(v==="DIAS"&&rows[i+1]) dias=String(rows[i+1][j]||"").trim();
     }
   }
-
-  // Find PDV label
   for(let i=2;i<6;i++){
     const r=rows[i]||[];
     for(let j=0;j<r.length;j++){
@@ -275,12 +334,9 @@ function parseRows(rows){
       }
     }
   }
-
   const CATS=["prepago","postpago","residencial","otros"];
   const struct={prepago:[],postpago:[],residencial:[],otros:[]};
   let curCat="prepago", totalRow=null;
-
-  // Find name column dynamically from header row (has "Meta","Avance")
   let nameCol=2, metaCol=3, avCol=4, pctCol=5, faltaCol=6, vdCol=7, pfCol=8, estadoCol=9;
   for(let i=5;i<15;i++){
     const r=rows[i]||[];
@@ -290,51 +346,49 @@ function parseRows(rows){
     }
     if(metaCol!==3) break;
   }
-
   for(let i=10;i<rows.length;i++){
     const r=rows[i]||[];
     const name=String(r[nameCol]||"").trim();
     if(!name) continue;
     const nl=name.toLowerCase().trim();
-
-    if(CATS.includes(nl)||nl.startsWith("residencial")){
-      curCat=nl.startsWith("residencial")?"residencial":nl;
-      continue;
-    }
+    if(CATS.includes(nl)||nl.startsWith("residencial")){curCat=nl.startsWith("residencial")?"residencial":nl;continue;}
     if(nl.startsWith("total")){
       totalRow={meta:r[metaCol],av:r[avCol],pct:r[pctCol],falta:r[faltaCol],vd:r[vdCol],pf:r[pfCol],estado:String(r[estadoCol]||"")};
       continue;
     }
     if(nl.includes("coordinador")||nl.includes("jefe")||nl.includes("gerente")) continue;
     if(typeof r[metaCol]!=="number"&&typeof r[avCol]!=="number") continue;
-
     struct[curCat].push({name,meta:r[metaCol],av:r[avCol],pct:r[pctCol],falta:r[faltaCol],vd:r[vdCol],pf:r[pfCol],estado:String(r[estadoCol]||"")});
   }
-
   return{struct,avance,mes,dias,pdvLabel,totalRow};
 }
 
+/* ====================== FORMATO + TAGS ====================== */
 function fmtPct(v){
   if(v===""||v===undefined||v===null||v===" ") return "-";
   const n=parseFloat(String(v));
   if(isNaN(n)) return "-";
   return (n*100).toFixed(1)+"%";
 }
-
 function fmt(v){
   if(v===""||v===undefined||v===null||v===" ") return "-";
   const n=parseFloat(String(v));
   if(isNaN(n)) return String(v);
   return n%1===0?n.toLocaleString("es-PE"):n.toLocaleString("es-PE",{maximumFractionDigits:2});
 }
-
 function getTag(estado){
   const e=String(estado||"").toLowerCase();
   if(e.includes("excelente")) return{cls:"t-exc",dot:"dg",lbl:"Excelente ✅"};
   if(e.includes("regular")) return{cls:"t-reg",dot:"dy",lbl:"Vamos regular 🟡"};
   return{cls:"t-pun",dot:"dr",lbl:"Ponle punche 🔴"};
 }
+function estadoFromPct(pct){
+  if(pct>=1) return "Excelente";
+  if(pct>=0.8) return "Vamos regular";
+  return "Ponle punche";
+}
 
+/* ====================== TABLA (una tienda) ====================== */
 function showTable(data){
   document.getElementById("loadMsg").innerHTML="";
   document.getElementById("infoRow").innerHTML=
@@ -342,7 +396,136 @@ function showTable(data){
      <div class="chip">Mes: <strong>${data.mes||"-"}</strong></div>
      <div class="chip">Días del mes: <strong>${data.dias||"-"}</strong></div>
      <div class="chip">PDV: <strong>${data.pdvLabel||curTienda}</strong></div>`;
+  document.getElementById("tableSection").innerHTML=buildTableHtml(data.struct,data.totalRow,false);
+}
 
+/* ====================== GERENCIA (consolidado) ====================== */
+function renderGerMesTabs(){
+  document.getElementById("gerMesTabs").innerHTML=MESES.map(m=>
+    `<button class="mes-tab${m.key===gerMes?" active":""}" onclick="selectGerMes('${m.key}')">${m.label}</button>`
+  ).join("");
+}
+function selectGerMes(mes){gerMes=mes;renderGerMesTabs();loadGerencia();}
+
+function renderGerChips(){
+  const all = gerSel.size===GER_TIENDAS.length;
+  let html=`<div class="tchip all${all?" on":""}" onclick="toggleAllTiendas()">${all?"✓ ":""}Todas</div>`;
+  html+=GER_TIENDAS.map(t=>{
+    const on=gerSel.has(t);
+    return `<div class="tchip${on?" on":""}" onclick="toggleTienda('${t.replace(/'/g,"\\'")}')">${on?"✓ ":""}${TIENDA_LABEL[t]}</div>`;
+  }).join("");
+  document.getElementById("gerChips").innerHTML=html;
+}
+function toggleTienda(t){
+  if(gerSel.has(t)) gerSel.delete(t); else gerSel.add(t);
+  renderGerChips(); loadGerencia();
+}
+function toggleAllTiendas(){
+  if(gerSel.size===GER_TIENDAS.length) gerSel.clear();
+  else gerSel=new Set(GER_TIENDAS);
+  renderGerChips(); loadGerencia();
+}
+
+async function loadGerencia(){
+  const sel=[...gerSel];
+  const km=document.getElementById("gerKpis");
+  const ts=document.getElementById("gerTableSection");
+  const info=document.getElementById("gerInfoRow");
+  if(!sel.length){
+    document.getElementById("gerLoadMsg").innerHTML="";
+    info.innerHTML=""; km.innerHTML="";
+    ts.innerHTML=`<div class="load-err">Marca al menos una tienda para ver el consolidado.</div>`;
+    return;
+  }
+  document.getElementById("gerLoadMsg").innerHTML='<div class="loading"><div class="spinner"></div><br>Sumando '+sel.length+' tienda(s)...</div>';
+  info.innerHTML=""; km.innerHTML=""; ts.innerHTML="";
+  try{
+    const results=await Promise.all(sel.map(t=>fetchTienda(SHEET_NAME[t]||"", gerMes)
+      .then(d=>({t,d})).catch(()=>({t,d:null}))));
+    const ok=results.filter(r=>r.d);
+    if(!ok.length) throw new Error("No se pudo cargar ninguna de las tiendas seleccionadas.");
+
+    // día de avance / días del mes (se toman de la primera tienda con datos)
+    let avDia=0, diasMes=0, mesLabel="";
+    for(const r of ok){
+      const a=parseInt(r.d.avance), dm=parseInt(r.d.dias);
+      if(!isNaN(a)&&a>0){avDia=a; mesLabel=r.d.mes||mesLabel;}
+      if(!isNaN(dm)&&dm>0) diasMes=dm;
+      if(avDia&&diasMes) break;
+    }
+
+    // === sumar meta + avance por (categoría + producto) ===
+    const acc={prepago:{}, postpago:{}, residencial:{}, otros:{}};
+    const order={prepago:[], postpago:[], residencial:[], otros:[]};
+    for(const r of ok){
+      for(const cat of ["prepago","postpago","residencial","otros"]){
+        for(const p of (r.d.struct[cat]||[])){
+          const key=p.name.toLowerCase().trim();
+          if(!acc[cat][key]){acc[cat][key]={name:p.name,meta:0,av:0};order[cat].push(key);}
+          const m=parseFloat(p.meta), a=parseFloat(p.av);
+          if(!isNaN(m)) acc[cat][key].meta+=m;
+          if(!isNaN(a)) acc[cat][key].av+=a;
+        }
+      }
+    }
+
+    // === recalcular proyección / falta / venta diaria / estado ===
+    const factor = (avDia>0) ? (diasMes/avDia) : 0;          // (avance ÷ día actual) × días del mes
+    const diasRest = (diasMes>avDia) ? (diasMes-avDia) : 0;
+    const struct={prepago:[], postpago:[], residencial:[], otros:[]};
+    let totMeta=0, totAv=0;
+    for(const cat of ["prepago","postpago","residencial","otros"]){
+      for(const key of order[cat]){
+        const it=acc[cat][key];
+        const meta=it.meta, av=it.av;
+        const proy = factor>0 ? av*factor : av;             // unidades proyectadas a fin de mes
+        const pct  = meta>0 ? proy/meta : 0;                // proyección %
+        const falta= meta-av;
+        const vd   = (falta>0 && diasRest>0) ? falta/diasRest : 0;
+        struct[cat].push({name:it.name, meta, av, pct, falta, vd, pf:proy, estado:estadoFromPct(pct)});
+        totMeta+=meta; totAv+=av;
+      }
+    }
+    const totProy = factor>0 ? totAv*factor : totAv;
+    const totPct  = totMeta>0 ? totProy/totMeta : 0;
+    const totFalta= totMeta-totAv;
+    const totVd   = (totFalta>0 && diasRest>0) ? totFalta/diasRest : 0;
+    const totalRow={meta:totMeta, av:totAv, pct:totPct, falta:totFalta, vd:totVd, pf:totProy, estado:estadoFromPct(totPct)};
+
+    // === pintar ===
+    const avancePct = totMeta>0 ? totAv/totMeta : 0;
+    info.innerHTML=
+      `<div class="chip">Tiendas: <strong>${ok.length}${results.length>ok.length?(" de "+results.length):""}</strong></div>
+       <div class="chip">Avance día: <strong>${avDia||"-"}</strong></div>
+       <div class="chip">Mes: <strong>${mesLabel||gerMes}</strong></div>
+       <div class="chip">Días del mes: <strong>${diasMes||"-"}</strong></div>`;
+    document.getElementById("gerKpis").innerHTML=
+      kpiCard("Cuota total", fmt(totMeta), "Meta sumada") +
+      kpiCard("Avance total", fmt(totAv), fmtPct(avancePct)+" de la cuota") +
+      kpiCard("Proyección", fmtPct(totPct), "a cierre de mes", clsByPct(totPct)) +
+      kpiCard("Falta", fmt(totFalta>0?totFalta:0), totFalta>0?("≈ "+fmt(totVd)+" / día"):"Cuota cubierta ✅", totFalta>0?"red":"green") +
+      kpiCard("Estado", "", estadoFromPct(totPct), clsByPct(totPct), getTag(estadoFromPct(totPct)));
+
+    document.getElementById("gerLoadMsg").innerHTML="";
+    document.getElementById("gerTableSection").innerHTML=buildTableHtml(struct,totalRow,true);
+  }catch(ex){
+    document.getElementById("gerLoadMsg").innerHTML="";
+    document.getElementById("gerTableSection").innerHTML=`<div class="load-err">${ex.message||"Error al consolidar."}</div>`;
+  }
+}
+
+function clsByPct(p){return p>=1?"green":(p>=0.8?"amber":"red");}
+function kpiCard(lbl,val,sub,cls,tag){
+  const tagHtml = tag ? `<span class="tag ${tag.cls}" style="margin-top:6px"><span class="dot ${tag.dot}"></span>${tag.lbl}</span>` : "";
+  return `<div class="kpi ${cls||""}">
+    <div class="lbl">${lbl}</div>
+    ${val!==""?`<div class="val">${val}</div>`:""}
+    ${tag?tagHtml:`<div class="sub">${sub}</div>`}
+  </div>`;
+}
+
+/* ====================== TABLA (compartida: tienda y gerencia) ====================== */
+function buildTableHtml(struct,totalRow,recalc){
   const CATNAMES={prepago:"Prepago",postpago:"Postpago",residencial:"Residencial",otros:"Otros"};
   let html=`<div class="table-card"><div class="table-wrap"><table>
     <thead><tr>
@@ -351,9 +534,8 @@ function showTable(data){
       <th>Falta</th><th>Venta Diaria<br>Para Llegar</th>
       <th>Proyección Final</th><th>Estado</th>
     </tr></thead><tbody>`;
-
   for(const cat of ["prepago","postpago","residencial","otros"]){
-    const prods=data.struct[cat];
+    const prods=struct[cat];
     if(!prods||!prods.length) continue;
     html+=`<tr class="cat-row"><td colspan="8">${CATNAMES[cat]}</td></tr>`;
     for(const p of prods){
@@ -370,20 +552,19 @@ function showTable(data){
       </tr>`;
     }
   }
-
-  if(data.totalRow){
-    const t=getTag(data.totalRow.estado);
+  if(totalRow){
+    const t=getTag(totalRow.estado);
     html+=`<tr class="total-row">
       <td>TOTAL</td>
-      <td>${fmt(data.totalRow.meta)}</td><td>${fmt(data.totalRow.av)}</td>
-      <td>${fmtPct(data.totalRow.pct)}</td>
-      <td>${fmt(data.totalRow.falta)}</td><td>${fmt(data.totalRow.vd)}</td>
-      <td>${fmt(data.totalRow.pf)}</td>
+      <td>${fmt(totalRow.meta)}</td><td>${fmt(totalRow.av)}</td>
+      <td>${fmtPct(totalRow.pct)}</td>
+      <td>${fmt(totalRow.falta)}</td><td>${fmt(totalRow.vd)}</td>
+      <td>${fmt(totalRow.pf)}</td>
       <td><span class="tag ${t.cls}">${t.lbl}</span></td>
     </tr>`;
   }
   html+=`</tbody></table></div></div>`;
-  document.getElementById("tableSection").innerHTML=html;
+  return html;
 }
 </script>
 </body>
