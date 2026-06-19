@@ -80,6 +80,12 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
 .ases-head{font-size:15px;font-weight:700;color:#1a1a2e;margin:0 0 10px}
 .ases-row:hover{background:#fff3f3 !important}
 .ases-row td{font-weight:500}
+.gauges{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;background:#fff;border-radius:14px;padding:16px;margin-bottom:1rem}
+.gauge{text-align:center;background:#fafbfc;border:1px solid #eef0f3;border-radius:12px;padding:14px 8px}
+.glbl{font-size:13px;font-weight:700;color:#1a1a2e;margin-top:-2px}
+.mnums{font-size:11px;color:#666;margin-top:4px}
+.mnums b{color:#1a1a2e}
+@media(max-width:600px){.gauges{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
 <body>
@@ -106,8 +112,8 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
           <option value="Tienda - Rambla Brasil">Tienda - Rambla Brasil</option>
           <option value="Tienda - Santa Anita">Tienda - Santa Anita</option>
           <option value="Call Center">Call Center</option>
-          <option value="GERENCIA">🔑 Gerencia — Todas las tiendas</option>
-          <option value="AMPARO">🔑 Amparo — RECAR-MM (Multimarca)</option>
+          <option value="GERENCIA">🔑 JEFATURA</option>
+          <option value="AMPARO">🔑 MULTIMARCA</option>
         </select>
       </div>
       <div class="fg">
@@ -134,9 +140,10 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
     </div>
     <div class="mes-tabs" id="mesTabs"></div>
     <div id="infoRow" class="info-row"></div>
+    <div id="storeVendFilter" style="margin-bottom:1rem"></div>
     <div id="loadMsg"></div>
+    <div id="storeKpis"></div>
     <div id="tableSection"></div>
-    <div id="asesoresSection" style="margin-top:1.25rem"></div>
   </div>
 </div>
 
@@ -145,8 +152,8 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
   <div class="main-wrap">
     <div class="top-bar">
       <div class="top-left">
-        <h2>Gerencia — Consolidado de Tiendas</h2>
-        <div class="pdv">Toca "Todas" para el global, o marca una o varias tiendas para sumarlas · <strong>v13</strong></div>
+        <h2>JEFATURA — Consolidado de Tiendas</h2>
+        <div class="pdv">Toca "Todas" para el global, o marca una o varias tiendas para sumarlas · <strong>v20</strong></div>
       </div>
       <div class="top-actions">
         <button class="btn-vend" onclick="abrirVendedor()">📊 Ver por vendedor</button>
@@ -159,7 +166,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
       <div class="ger-chips" id="gerChips"></div>
     </div>
     <div id="gerInfoRow" class="info-row"></div>
-    <div id="gerKpis" class="kpis"></div>
+    <div id="gerKpis"></div>
     <div id="gerLoadMsg"></div>
     <div id="gerTableSection"></div>
   </div>
@@ -169,7 +176,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
 <div id="recarScreen" class="screen">
   <div class="main-wrap">
     <div class="top-bar">
-      <div class="top-left"><h2>RECAR-MM — Multimarca / Recargas</h2><div class="pdv">Avance por responsable y asesor</div></div>
+      <div class="top-left"><h2>MULTIMARCA — RECAR-MM</h2><div class="pdv">Avance por responsable y asesor</div></div>
       <div class="top-actions"><button class="btn-out" onclick="doLogout()">Cerrar sesión</button></div>
     </div>
     <div class="mes-tabs" id="recarMesTabs"></div>
@@ -299,7 +306,7 @@ function showScreen(id){
 /* ====================== VENDEDOR (iframe) ====================== */
 function abrirVendedor(){
   var f=document.getElementById('vFrame');
-  if(!f.getAttribute('src')) f.setAttribute('src','vendedor.html?v=11');
+  if(!f.getAttribute('src')) f.setAttribute('src','vendedor.html?v=15');
   showScreen("vendedorScreen");
 }
 function salirVendedor(){
@@ -422,13 +429,14 @@ function estadoFromPct(pct){
 /* ====================== TABLA (una tienda) ====================== */
 function showTable(data){
   document.getElementById("loadMsg").innerHTML="";
+  storeStruct=data.struct; storeTotal=data.totalRow;
   document.getElementById("infoRow").innerHTML=
     `<div class="chip">Avance día: <strong>${data.avance||"-"}</strong></div>
      <div class="chip">Mes: <strong>${data.mes||"-"}</strong></div>
      <div class="chip">Días del mes: <strong>${data.dias||"-"}</strong></div>
      <div class="chip">PDV: <strong>${data.pdvLabel||curTienda}</strong></div>`;
-  document.getElementById("tableSection").innerHTML=buildTableHtml(data.struct,data.totalRow,false);
-  loadAsesores();
+  loadStoreVendors();
+  renderStoreView(-1);
 }
 
 /* ====================== GERENCIA (consolidado) ====================== */
@@ -557,12 +565,17 @@ async function loadGerencia(){
        <div class="chip">Avance día: <strong>${avDia||"-"}</strong></div>
        <div class="chip">Mes: <strong>${mesLabel||gerMes}</strong></div>
        <div class="chip">Días del mes: <strong>${diasMes||"-"}</strong></div>`;
-    document.getElementById("gerKpis").innerHTML=
+    const storeStats=ok.map(r=>{const tr=r.d.totalRow||{};const m=parseFloat(tr.meta)||0,a=parseFloat(tr.av)||0;const proy=factor>0?a*factor:a;return {ti:r.t,pct:m>0?proy/m:0};}).sort((x,y)=>y.pct-x.pct);
+    const tEnMeta=storeStats.filter(x=>x.pct>=1).length, best=storeStats[0];
+    const jefInd=`<div class="kpi ${tEnMeta/ok.length>=0.5?'green':(tEnMeta>0?'amber':'red')}"><div class="lbl">Tiendas en meta</div><div class="val">${tEnMeta} / ${ok.length}</div><div class="sub">proyectadas</div></div>`+
+      (best?`<div class="kpi green"><div class="lbl">Mejor tienda</div><div class="val" style="font-size:16px;margin-top:6px">${TIENDA_LABEL[best.ti]||best.ti}</div><div class="sub">${fmtPct(best.pct)} proyección</div></div>`:"");
+    document.getElementById("gerKpis").innerHTML= gaugesRow(struct,totalRow) + '<div class="kpis">' +
       kpiCard("Cuota total (S/)", fmt(totMeta), "Suma del TOTAL de cada tienda") +
       kpiCard("Avance total (S/)", fmt(totAv), fmtPct(avancePct)+" de la cuota") +
       kpiCard("Proyección", fmtPct(totPct), "a cierre de mes", clsByPct(totPct)) +
       kpiCard("Falta (S/)", fmt(totFalta>0?totFalta:0), totFalta>0?("≈ "+fmt(totVd)+" / día"):"Cuota cubierta ✅", totFalta>0?"red":"green") +
-      kpiCard("Estado", "", estadoFromPct(totPct), clsByPct(totPct), getTag(estadoFromPct(totPct)));
+      kpiCard("Estado", "", estadoFromPct(totPct), clsByPct(totPct), getTag(estadoFromPct(totPct))) +
+      jefInd + '</div>';
 
     document.getElementById("gerLoadMsg").innerHTML = failed.length
       ? `<div class="load-err">⚠️ No cargaron ${failed.length} tienda(s): <strong>${failed.map(r=>TIENDA_LABEL[r.t]).join(", ")}</strong>. El total de abajo NO las incluye. <button class="btn-out" style="margin-left:8px" onclick="loadGerencia()">Reintentar</button></div>`
@@ -576,7 +589,7 @@ async function loadGerencia(){
 
 function clsByPct(p){return p>=1?"green":(p>=0.8?"amber":"red");}
 function kpiCard(lbl,val,sub,cls,tag){
-  const tagHtml = tag ? `<span class="tag ${tag.cls}" style="margin-top:8px;font-size:18px;padding:10px 18px"><span class="dot ${tag.dot}" style="width:11px;height:11px"></span>${tag.lbl}</span>` : "";
+  const tagHtml = tag ? `<span class="tag ${tag.cls}" style="margin-top:8px;font-size:14px;padding:6px 12px;max-width:100%"><span class="dot ${tag.dot}"></span>${tag.lbl}</span>` : "";
   return `<div class="kpi ${cls||""}">
     <div class="lbl">${lbl}</div>
     ${val!==""?`<div class="val">${val}</div>`:""}
@@ -760,30 +773,40 @@ async function loadRecar(){
   }catch(e){ msg.innerHTML='<div class="load-err">No se pudo cargar RECAR-MM. Verifica que la pestaña se llame exactamente "RECAR-MM" y que el Apps Script la entregue.</div>'; }
 }
 function renderRecar(rows){
-  let dia="";
-  for(let i=0;i<5;i++){ const r=rows[i]||[]; for(const c of r){ const m=String(c||'').match(/(\d+)\s+(JUNIO|MAYO|ENERO|FEBRERO|MARZO|ABRIL|JULIO|AGOSTO|SEPTIEMBRE|OCTUBRE|NOVIEMBRE|DICIEMBRE)/i); if(m){dia=m[1];break;} } if(dia)break; }
-  let hr=-1,respCol=-1,asesCol=-1,avCol=-1,obCol=-1,proyCol=-1,faltCol=-1;
-  for(let i=0;i<rows.length;i++){ const r=rows[i]||[]; let found=false;
-    for(let j=0;j<r.length;j++){ if(String(r[j]||'').trim().toUpperCase()==='RESPONSABLE'){hr=i;respCol=j;found=true;} }
-    if(found){ for(let j=0;j<r.length;j++){ const v=String(r[j]||'').trim().toUpperCase();
-      if(v.startsWith('ASESOR'))asesCol=j; else if(v.startsWith('AVANCE'))avCol=j; else if(v.startsWith('OBJETIVO'))obCol=j; else if(v.startsWith('PROYEC'))proyCol=j; else if(v.startsWith('FALTA'))faltCol=j; }
-      break; } }
-  if(hr<0||avCol<0||obCol<0){ document.getElementById("recarTable").innerHTML='<div class="load-err">No encontré la cabecera RESPONSABLE/AVANCE/OBJETIVO en RECAR-MM.</div>'; return; }
-  if(asesCol<0) asesCol=respCol+1;
-  let data=[],totAv=0,totOb=0;
-  for(let i=hr+1;i<rows.length;i++){ const r=rows[i]||[];
-    const resp=String(r[respCol]||'').trim(), ases=String(r[asesCol]||'').trim();
-    if(resp.toUpperCase()==='TOTAL'||ases.toUpperCase()==='TOTAL') continue;
-    const av=parseFloat(r[avCol]), ob=parseFloat(r[obCol]);
-    if(!resp&&!ases) continue;
-    if(isNaN(av)&&isNaN(ob)) continue;
-    const avn=isNaN(av)?0:av, obn=isNaN(ob)?0:ob;
-    totAv+=avn; totOb+=obn;
-    data.push({resp,ases:ases||'-',av:avn,ob:obn});
+  let dia=""; for(let i=0;i<6;i++){const r=rows[i]||[];for(const c of r){const m=String(c||'').match(/(\d+)\s+(JUNIO|MAYO|ENERO|FEBRERO|MARZO|ABRIL|JULIO|AGOSTO|SEPTIEMBRE|OCTUBRE|NOVIEMBRE|DICIEMBRE)/i);if(m){dia=m[1];break;}}if(dia)break;}
+  // 1) ubicar TODAS las cabeceras RESPONSABLE
+  const heads=[];
+  for(let i=0;i<rows.length;i++){ const r=rows[i]||[];
+    for(let j=0;j<r.length;j++){ if(String(r[j]||'').trim().toUpperCase()==='RESPONSABLE'){
+      let asesCol=-1,avCol=-1,obCol=-1,proyCol=-1,faltCol=-1;
+      for(let k=0;k<r.length;k++){ if(k===j) continue; const v=String(r[k]||'').trim().toUpperCase();
+        if(v.startsWith('ASESOR'))asesCol=k; else if(v.startsWith('AVANCE'))avCol=k; else if(v.startsWith('OBJETIVO'))obCol=k; else if(v.startsWith('PROYEC'))proyCol=k; else if(v.startsWith('FALTA'))faltCol=k; }
+      heads.push({i,respCol:j,asesCol:asesCol<0?j+1:asesCol,avCol,obCol,proyCol,faltCol}); break; } }
   }
+  function parseSection(h){
+    let data=[],totAv=0,totOb=0;
+    for(let i=h.i+1;i<rows.length;i++){ const r=rows[i]||[];
+      const resp=String(r[h.respCol]||'').trim(), ases=String(r[h.asesCol]||'').trim();
+      if(resp.toUpperCase()==='RESPONSABLE') break;
+      if(resp.toUpperCase()==='TOTAL'||ases.toUpperCase()==='TOTAL') break;
+      const av=parseFloat(r[h.avCol]), ob=parseFloat(r[h.obCol]);
+      if(!resp&&!ases){ if(data.length) break; else continue; }
+      if(isNaN(av)&&isNaN(ob)) continue;
+      const a=isNaN(av)?0:av,o=isNaN(ob)?0:ob; data.push({resp,ases:ases||'-',av:a,ob:o}); totAv+=a; totOb+=o; }
+    return {data,totAv,totOb};
+  }
+  if(!heads.length){ document.getElementById("recarTable").innerHTML='<div class="load-err">No encontré tablas (RESPONSABLE) en RECAR-MM.</div>'; return; }
+  // 2) elegir la sección de MULTIMARCA (la de Amparo). Si no, tras "HFC TOTAL". Si no, la primera.
+  let chosen=null, note="";
+  for(const h of heads){ if(h.avCol<0||h.obCol<0) continue; const sec=parseSection(h);
+    if(sec.data.some(d=>d.resp.toUpperCase()==='MULTIMARCA')){ chosen=sec; break; } }
+  if(!chosen){ let hfc=-1; for(let i=0;i<rows.length;i++){ if((rows[i]||[]).some(c=>/HFC\s*TOTAL/i.test(String(c||'')))){hfc=i;break;} }
+    if(hfc>=0){ const h=heads.find(x=>x.i>hfc&&x.avCol>=0); if(h) chosen=parseSection(h); } }
+  if(!chosen){ const h=heads.find(x=>x.avCol>=0&&x.obCol>=0)||heads[0]; chosen=parseSection(h); note='<div class="chip" style="color:#cc0000">No ubiqué la tabla de MULTIMARCA; muestro la primera. Avísame.</div>'; }
+  const data=chosen.data, totAv=chosen.totAv, totOb=chosen.totOb;
   const diaN=parseInt(dia)||0,dm=30,factor=diaN>0?dm/diaN:0;
   const proyG=factor>0?totAv*factor:totAv,pctG=totOb>0?proyG/totOb:0,faltaG=totOb-totAv,vdG=(faltaG>0&&dm>diaN)?faltaG/(dm-diaN):0;
-  document.getElementById("recarInfo").innerHTML=`<div class="chip">Avance día: <strong>${dia||'-'}</strong></div><div class="chip">Mes: <strong>${recarMes.toUpperCase()}</strong></div><div class="chip">Registros: <strong>${data.length}</strong></div>`;
+  document.getElementById("recarInfo").innerHTML=`<div class="chip">Avance día: <strong>${dia||'-'}</strong></div><div class="chip">Mes: <strong>${recarMes.toUpperCase()}</strong></div><div class="chip">Registros: <strong>${data.length}</strong></div>`+note;
   const tg=getTag(estadoFromPct(pctG));
   document.getElementById("recarKpis").innerHTML=
     `<div class="kpi"><div class="lbl">Avance total</div><div class="val">${fmt(totAv)}</div></div>`+
@@ -801,6 +824,101 @@ function renderRecar(rows){
   html+=`<tr class="total-row"><td style="text-align:left">TOTAL</td><td></td><td>${fmt(totAv)}</td><td>${fmt(totOb)}</td><td>${fmtPct(pctG)}</td><td>${fmt(faltaG)}</td><td><span class="tag ${t.cls}">${t.lbl}</span></td></tr>`;
   html+=`</tbody></table></div></div>`;
   document.getElementById("recarTable").innerHTML=html;
+}
+
+
+/* ===================== VISTA UNIFICADA TIENDA/VENDEDOR ===================== */
+let storeStruct=null, storeTotal=null;
+function storeKpiCards(total){
+  const meta=parseFloat(total.meta)||0, av=parseFloat(total.av)||0, pct=parseFloat(total.pct)||0, falta=parseFloat(total.falta)||0, vd=parseFloat(total.vd)||0;
+  const est=total.estado||estadoFromPct(pct); const t=getTag(est); const cls=pct>=1?'green':(pct>=0.8?'amber':'red');
+  return kpiCard("Cuota CF (S/)",fmt(meta),"objetivo cargo fijo")+
+    kpiCard("Avance CF (S/)",fmt(av),fmtPct(meta>0?av/meta:0)+" de la cuota")+
+    kpiCard("Proyección",fmtPct(pct),"a cierre de mes",cls)+
+    kpiCard("Falta (S/)",fmt(falta>0?falta:0),falta>0?('≈ '+fmt(vd)+' / día'):'Cubierta ✅',falta>0?'red':'green')+
+    kpiCard("Estado","",est,cls,t);
+}
+function buildVendorStructTotal(v){
+  const rs=v.rs, dia=rs[0].d, dm=rs[0].dm, factor=dia>0?dm/dia:0, diasRest=dm>dia?dm-dia:0;
+  const byC={}; rs.forEach(r=>byC[r.c]=r);
+  const GR=[["prepago",["Alta Prepago","Portabilidad Prepago","Packs Prepago"]],["postpago",["Altas Postpago","Portabilidad Postpago","Packs Postpago","Líneas Adicionales Postpago"]],["residencial",["HFC","UGIS Inalámbricos"]],["otros",["OLO","Accesorios","Portabilidad CF >=95.50"]]];
+  const struct={prepago:[],postpago:[],residencial:[],otros:[]};
+  for(const g of GR){ for(const p of g[1]){ const r=byC[p]; if(!r) continue;
+    const meta=r.ob,av=r.av,proy=factor>0?av*factor:av,pct=meta>0?proy/meta:0,falta=meta-av,vd=(falta>0&&diasRest>0)?falta/diasRest:0;
+    struct[g[0]].push({name:p,meta,av,pct,falta,vd,pf:proy,estado:estadoFromPct(pct)}); }}
+  const cf=v.cf, cfFalta=cf.ob-cf.av, cfVd=(cfFalta>0&&diasRest>0)?cfFalta/diasRest:0;
+  const total={meta:cf.ob,av:cf.av,pct:v.pct,falta:cfFalta,vd:cfVd,pf:v.proy,estado:v.estado};
+  return {struct,total};
+}
+function renderStoreView(sel){
+  document.querySelectorAll("#storeVendFilter .tchip").forEach((c,idx)=>c.classList.toggle("on", idx===(sel+1)));
+  let struct,total;
+  if(sel<0 || !_asesorRows[sel]){ struct=storeStruct; total=storeTotal; }
+  else { const b=buildVendorStructTotal(_asesorRows[sel]); struct=b.struct; total=b.total; }
+  if(!total) return;
+  const team = (sel<0) ? teamKpis() : "";
+  document.getElementById("storeKpis").innerHTML = gaugesRow(struct,total) + '<div class="kpis">' + storeKpiCards(total) + team + '</div>';
+  document.getElementById("tableSection").innerHTML=buildTableHtml(struct,total,true);
+}
+async function loadStoreVendors(){
+  const cont=document.getElementById("storeVendFilter"); const ti=STORE_TO_TI[curTienda];
+  _asesorRows=[];
+  if(!ti){ cont.innerHTML=""; return; }
+  cont.innerHTML='<div style="color:#888;font-size:12px;padding:4px 2px">Cargando vendedores…</div>';
+  try{
+    const recs=(await getAsesorData(curMes)).filter(r=>r.ti===ti);
+    if(!recs.length){ cont.innerHTML=""; return; }
+    const byV={}; recs.forEach(r=>{(byV[r.n]=byV[r.n]||[]).push(r);});
+    const dia=recs[0].d,dm=recs[0].dm,factor=dia>0?dm/dia:0;
+    _asesorRows=Object.keys(byV).map(n=>{const rs=byV[n];const cf=rs.find(x=>x.c==='Avance Cargo Fijo')||{av:0,ob:0};const proy=factor>0?cf.av*factor:cf.av;const pct=cf.ob>0?proy/cf.ob:0;const cumpl=cf.ob>0?cf.av/cf.ob:0;return {n,tipo:rs[0].t,cf,proy,pct,cumpl,estado:estadoFromPct(pct),rs};}).sort((a,b)=>b.pct-a.pct);
+    let html=`<div class="ases-head" style="margin-bottom:6px">👁️ Ver avance de: <span style="font-weight:400;color:#888;font-size:12px">toca un vendedor y cambia todo (KPI + tabla)</span></div><div class="ger-chips">`;
+    html+=`<div class="tchip all on" onclick="renderStoreView(-1)">🏬 Toda la tienda</div>`;
+    _asesorRows.forEach((v,i)=>{ html+=`<div class="tchip" onclick="renderStoreView(${i})">${v.n}</div>`; });
+    html+=`</div>`;
+    cont.innerHTML=html;
+  }catch(e){ cont.innerHTML=""; }
+}
+
+
+/* ===================== GAUGES (estilo imagen 5) + INDICADORES ===================== */
+function gauge(label,pct,meta,av){
+  pct=isFinite(pct)?pct:0; const f=Math.max(0,Math.min(1,pct));
+  const cl=pct>=1?'#22a843':(pct>=0.8?'#e0a82e':'#cc0000');
+  const r=34,c=2*Math.PI*r,dash=c*f;
+  const nums=(meta!==undefined)?`<div class="mnums">Cuota <b>${fmt(meta)}</b> · Av <b>${fmt(av)}</b></div>`:'';
+  return `<div class="gauge"><svg viewBox="0 0 90 90" width="84" height="84">
+    <circle cx="45" cy="45" r="${r}" fill="none" stroke="#eceff3" stroke-width="9"/>
+    <circle cx="45" cy="45" r="${r}" fill="none" stroke="${cl}" stroke-width="9" stroke-linecap="round" stroke-dasharray="${dash.toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 45 45)"/>
+    <text x="45" y="42" text-anchor="middle" font-size="17" font-weight="800" fill="#1a1a2e">${(pct*100).toFixed(0)}%</text>
+    <text x="45" y="58" text-anchor="middle" font-size="8" fill="#999">proy</text>
+  </svg><div class="glbl">${label}</div>${nums}</div>`;
+}
+function findProd(struct,names){
+  const want=names.map(n=>n.toLowerCase().trim());
+  for(const cat in struct){ for(const p of (struct[cat]||[])){ const nm=String(p.name).toLowerCase().trim(); if(want.some(w=>nm===w||nm.startsWith(w))) return p; } }
+  return null;
+}
+function medidor(label,p){
+  if(!p) return gauge(label,0,0,0);
+  const meta=parseFloat(p.meta)||0, av=parseFloat(p.av)||0, pct=parseFloat(p.pct)||0;
+  return gauge(label,pct,meta,av);
+}
+function gaugesRow(struct,total){
+  return `<div class="gauges">`+
+    medidor('Portab. Prepago',findProd(struct,['Portabilidad Prepago'])) +
+    medidor('Portab. Postpago',findProd(struct,['Portabilidad Postpago'])) +
+    medidor('Packs Postpago',findProd(struct,['Packs Postpago'])) +
+    medidor('HFC',findProd(struct,['HFC'])) +
+  `</div>`;
+}
+function teamKpis(){
+  if(!_asesorRows.length) return "";
+  const total=_asesorRows.length, enMeta=_asesorRows.filter(v=>v.pct>=1).length, top=_asesorRows[0];
+  const prom=_asesorRows.reduce((a,v)=>a+v.pct,0)/total;
+  const ec=enMeta/total>=0.5?'green':(enMeta>0?'amber':'red');
+  return `<div class="kpi ${ec}"><div class="lbl">Asesores en meta</div><div class="val">${enMeta} / ${total}</div><div class="sub">${fmtPct(total>0?enMeta/total:0)} del equipo</div></div>`+
+    `<div class="kpi green"><div class="lbl">Mejor vendedor</div><div class="val" style="font-size:15px;line-height:1.2;margin-top:6px">${top.n}</div><div class="sub">${fmtPct(top.pct)} proyección</div></div>`+
+    `<div class="kpi ${clsByPct(prom)}"><div class="lbl">Promedio equipo</div><div class="val">${fmtPct(prom)}</div><div class="sub">proyección</div></div>`;
 }
 
 </script>
