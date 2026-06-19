@@ -142,7 +142,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
     <div class="top-bar">
       <div class="top-left">
         <h2>Gerencia — Consolidado de Tiendas</h2>
-        <div class="pdv">Marca una o varias tiendas para sumar cuota y avance</div>
+        <div class="pdv">Toca una tienda para verla sola, o "Todas — Cuota Global" para el consolidado</div>
       </div>
       <div class="top-actions">
         <button class="btn-vend" onclick="abrirVendedor()">📊 Ver por vendedor</button>
@@ -214,7 +214,13 @@ const TIENDA_LABEL={
   "Tienda - Santa Anita 2":"Santa Anita 2",
   "Call Center":"Call Center"
 };
-const GER_TIENDAS=Object.keys(SHEET_NAME); // todas menos GERENCIA
+const GER_ALL=Object.keys(SHEET_NAME); // 10 tiendas (para ver una por una)
+// Cuota global oficial = 9 tiendas (Santa Anita 2 NO suma: repite a Santa Anita)
+const GER_GLOBAL=[
+  "Tienda - Mall Bellavista","Tienda - Mall del Sur 1","Tienda - Mall del Sur 2",
+  "Tienda - Mega Plaza","Tienda - Plaza Norte","Tienda - Primavera",
+  "Tienda - Rambla Brasil","Tienda - Santa Anita","Call Center"
+];
 
 const MESES=[
   {label:"Mayo 2026", key:"mayo"},
@@ -222,7 +228,7 @@ const MESES=[
 ];
 
 let curTienda="", curMes="junio", cache={};
-let gerenteMode=false, gerMes="junio", gerSel=new Set(GER_TIENDAS); // por defecto: todas
+let gerenteMode=false, gerMes="junio", gerActive="__ALL__"; // pestaña activa: __ALL__ o una tienda
 
 /* ====================== LOGIN ====================== */
 function doLogin(){
@@ -408,23 +414,16 @@ function renderGerMesTabs(){
 function selectGerMes(mes){gerMes=mes;renderGerMesTabs();loadGerencia();}
 
 function renderGerChips(){
-  const all = gerSel.size===GER_TIENDAS.length;
-  let html=`<div class="tchip all${all?" on":""}" onclick="toggleAllTiendas()">${all?"✓ ":""}Todas</div>`;
-  html+=GER_TIENDAS.map(t=>{
-    const on=gerSel.has(t);
-    return `<div class="tchip${on?" on":""}" onclick="toggleTienda('${t.replace(/'/g,"\\'")}')">${on?"✓ ":""}${TIENDA_LABEL[t]}</div>`;
+  const isAll = gerActive==="__ALL__";
+  let html=`<div class="tchip all${isAll?" on":""}" onclick="pickAll()">${isAll?"✓ ":""}Todas — Cuota Global</div>`;
+  html+=GER_ALL.map(t=>{
+    const on=gerActive===t;
+    return `<div class="tchip${on?" on":""}" onclick="pickTienda('${t.replace(/'/g,"\\'")}')">${on?"✓ ":""}${TIENDA_LABEL[t]}</div>`;
   }).join("");
   document.getElementById("gerChips").innerHTML=html;
 }
-function toggleTienda(t){
-  if(gerSel.has(t)) gerSel.delete(t); else gerSel.add(t);
-  renderGerChips(); loadGerencia();
-}
-function toggleAllTiendas(){
-  if(gerSel.size===GER_TIENDAS.length) gerSel.clear();
-  else gerSel=new Set(GER_TIENDAS);
-  renderGerChips(); loadGerencia();
-}
+function pickAll(){ gerActive="__ALL__"; renderGerChips(); loadGerencia(); }
+function pickTienda(t){ gerActive=t; renderGerChips(); loadGerencia(); }
 
 async function fetchInBatches(items, size, fn){
   const out=[];
@@ -441,7 +440,7 @@ async function fetchInBatches(items, size, fn){
 }
 
 async function loadGerencia(){
-  const sel=[...gerSel];
+  const sel = gerActive==="__ALL__" ? GER_GLOBAL.slice() : [gerActive];
   const km=document.getElementById("gerKpis");
   const ts=document.getElementById("gerTableSection");
   const info=document.getElementById("gerInfoRow");
