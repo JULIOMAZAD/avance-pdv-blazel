@@ -164,7 +164,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
 <!-- ============ VENDEDOR (iframe al dashboard por vendedor) ============ -->
 <div id="vendedorScreen" class="screen">
   <div style="background:#1a1a2e;padding:10px 16px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:10">
-    <button class="btn-out" id="vBackBtn" onclick="salirVendedor()">← Volver</button>
+    <button class="btn-out" id="vBackBtn" onclick="salirVendedor()">🏬 Tiendas</button>
     <span style="color:#fff;font-weight:600;font-size:14px">Avance por Vendedor</span>
   </div>
   <iframe id="vFrame" style="width:100%;height:calc(100vh - 53px);border:none;display:block;background:#0a0b0d"></iframe>
@@ -497,7 +497,6 @@ async function loadGerencia(){
     const factor = (avDia>0) ? (diasMes/avDia) : 0;          // (avance ÷ día actual) × días del mes
     const diasRest = (diasMes>avDia) ? (diasMes-avDia) : 0;
     const struct={prepago:[], postpago:[], residencial:[], otros:[]};
-    let totMeta=0, totAv=0;
     for(const cat of ["prepago","postpago","residencial","otros"]){
       for(const key of order[cat]){
         const it=acc[cat][key];
@@ -507,8 +506,14 @@ async function loadGerencia(){
         const falta= meta-av;
         const vd   = (falta>0 && diasRest>0) ? falta/diasRest : 0;
         struct[cat].push({name:it.name, meta, av, pct, falta, vd, pf:proy, estado:estadoFromPct(pct)});
-        totMeta+=meta; totAv+=av;
       }
+    }
+    // TOTAL global = suma de la fila TOTAL real de cada tienda (cargo fijo en soles)
+    let totMeta=0, totAv=0;
+    for(const r of ok){
+      const m=parseFloat(r.d.totalRow&&r.d.totalRow.meta), a=parseFloat(r.d.totalRow&&r.d.totalRow.av);
+      if(!isNaN(m)) totMeta+=m;
+      if(!isNaN(a)) totAv+=a;
     }
     const totProy = factor>0 ? totAv*factor : totAv;
     const totPct  = totMeta>0 ? totProy/totMeta : 0;
@@ -524,10 +529,10 @@ async function loadGerencia(){
        <div class="chip">Mes: <strong>${mesLabel||gerMes}</strong></div>
        <div class="chip">Días del mes: <strong>${diasMes||"-"}</strong></div>`;
     document.getElementById("gerKpis").innerHTML=
-      kpiCard("Cuota total", fmt(totMeta), "Meta sumada") +
-      kpiCard("Avance total", fmt(totAv), fmtPct(avancePct)+" de la cuota") +
+      kpiCard("Cuota total (S/)", fmt(totMeta), "Suma del TOTAL de cada tienda") +
+      kpiCard("Avance total (S/)", fmt(totAv), fmtPct(avancePct)+" de la cuota") +
       kpiCard("Proyección", fmtPct(totPct), "a cierre de mes", clsByPct(totPct)) +
-      kpiCard("Falta", fmt(totFalta>0?totFalta:0), totFalta>0?("≈ "+fmt(totVd)+" / día"):"Cuota cubierta ✅", totFalta>0?"red":"green") +
+      kpiCard("Falta (S/)", fmt(totFalta>0?totFalta:0), totFalta>0?("≈ "+fmt(totVd)+" / día"):"Cuota cubierta ✅", totFalta>0?"red":"green") +
       kpiCard("Estado", "", estadoFromPct(totPct), clsByPct(totPct), getTag(estadoFromPct(totPct)));
 
     document.getElementById("gerLoadMsg").innerHTML = failed.length
