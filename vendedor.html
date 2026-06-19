@@ -128,6 +128,7 @@ tbody tr:nth-child(even){background:rgba(255,255,255,.012)}
 .dot{width:10px;height:10px;border-radius:3px}
 .note{font-size:10.5px;color:var(--mut2);margin-top:10px;line-height:1.5}
 input[type=file]{display:none}
+.actions,.cfg-pop{display:none!important}
 </style>
 </head>
 <body>
@@ -317,7 +318,7 @@ function applyMsel(def,ms){
 document.addEventListener('click',()=>{document.querySelectorAll('.msel').forEach(x=>x.classList.remove('open'));const cp=document.getElementById('cfgPop');if(cp)cp.classList.remove('open');});
 
 /* ---------- RENDER ---------- */
-function renderAll(){ renderResumen(); renderRanking(); renderTienda(); renderProducto(); renderDetalle(); }
+function renderAll(){ [renderResumen,renderRanking,renderTienda,renderProducto,renderDetalle].forEach(function(f){ try{ f(); }catch(e){ console.error('render',e); } }); }
 
 function destroy(id){ if(charts[id]){charts[id].destroy(); delete charts[id];} }
 
@@ -666,19 +667,11 @@ function latestMonthSet(){
   return {a:maxA,m:maxM};
 }
 function init(){
-  const stored=localStorage.getItem(LS_DATA);
-  if(stored){ try{DATA=JSON.parse(stored);}catch(e){DATA=EMBEDDED.map(r=>({...r}));} }
-  else DATA=EMBEDDED.map(r=>({...r}));
-  if(!Array.isArray(DATA)||!DATA.length) DATA=EMBEDDED.map(r=>({...r}));
-  const hadFilters=!!localStorage.getItem(LS_FILT);
-  loadFilters();
-  if(!hadFilters){ const lm=latestMonthSet(); if(lm){FILT.a=new Set([lm.a]);FILT.m=new Set([lm.m]);} }
-  document.getElementById('dstamp').textContent=localStorage.getItem(LS_STAMP)||'Datos originales (Mayo + Junio)';
+  DATA=EMBEDDED.map(r=>({...r}));
+  for(const k in FILT) FILT[k].clear();
+  const lm=latestMonthSet(); if(lm){FILT.a=new Set([lm.a]);FILT.m=new Set([lm.m]);}
+  var ds=document.getElementById('dstamp'); if(ds) ds.textContent='Datos a Mayo + Junio';
   buildFilters(); renderAll();
-  // auto-conecta a la URL del Apps Script (o la guardada)
-  const useUrl=localStorage.getItem(LS_URL)||DEFAULT_URL;
-  document.getElementById('cfgUrl').value=useUrl;
-  if(useUrl){ cargarEnLinea(useUrl); }
 }
 init();
 </script>
