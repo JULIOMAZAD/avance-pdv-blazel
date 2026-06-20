@@ -61,7 +61,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
 <div class="wrap">
   <div class="head">
     <h2>Avance por Vendedor</h2>
-    <div class="sub">Elige la tienda y toca un vendedor para ver su cuota · <strong>v16</strong> · <span id="liveStatus" style="color:#22a843;font-weight:700">cargando…</span></div>
+    <div class="sub">Elige la tienda y toca un vendedor para ver su cuota · <strong>v17</strong> · <span id="liveStatus" style="color:#22a843;font-weight:700">cargando…</span></div>
   </div>
   <div class="mes-tabs" id="mesTabs"></div>
   <div class="pick">
@@ -131,6 +131,7 @@ const GROUPS=[
 ];
 const CF_AVANCE="Avance Cargo Fijo", CF_PROM="Promedio Cargo Fijo";
 
+function cleanName(n){ return String(n).replace(/Portabiilidad/gi,"Portabilidad").replace(/Portabilidaad/gi,"Portabilidad"); }
 function fmt(v){const n=parseFloat(v);if(isNaN(n))return "-";return n%1===0?n.toLocaleString("es-PE"):n.toLocaleString("es-PE",{maximumFractionDigits:2});}
 function fmtPct(v){const n=parseFloat(v);if(isNaN(n))return "-";return (n*100).toFixed(1)+"%";}
 function estadoFromPct(p){if(p>=1)return"Excelente";if(p>=0.8)return"Vamos regular";return"Ponle punche";}
@@ -209,7 +210,7 @@ function render(){
       const proy=factor>0?av*factor:av, pct=meta>0?proy/meta:0, falta=meta-av, vd=(falta>0&&diasRest>0)?falta/diasRest:0;
       const tg=getTag(estadoFromPct(pct)); const fc=falta<=0?"falta-g":"falta-r";
       tMeta+=meta;tAv+=av;
-      html+=`<tr><td>${p}</td><td>${fmt(meta)}</td><td>${fmt(av)}</td>
+      html+=`<tr><td>${cleanName(p)}</td><td>${fmt(meta)}</td><td>${fmt(av)}</td>
         <td><span style="display:inline-flex;align-items:center;gap:4px"><span class="dot ${tg.dot}"></span>${fmtPct(pct)}</span></td>
         <td class="${fc}">${fmt(falta)}</td><td>${fmt(vd)}</td><td>${fmt(proy)}</td>
         <td><span class="tag ${tg.cls}">${tg.lbl}</span></td></tr>`;
