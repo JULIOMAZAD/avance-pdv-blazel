@@ -153,7 +153,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
     <div class="top-bar">
       <div class="top-left">
         <h2>JEFATURA — Consolidado de Tiendas</h2>
-        <div class="pdv">Toca "Todas" para el global, o marca una o varias tiendas para sumarlas · <strong>v23</strong></div>
+        <div class="pdv">Toca "Todas" para el global, o marca una o varias tiendas para sumarlas · <strong>v25</strong></div>
       </div>
       <div class="top-actions">
         <button class="btn-vend" onclick="abrirVendedor()">📊 Ver por vendedor</button>
@@ -306,7 +306,7 @@ function showScreen(id){
 /* ====================== VENDEDOR (iframe) ====================== */
 function abrirVendedor(){
   var f=document.getElementById('vFrame');
-  if(!f.getAttribute('src')) f.setAttribute('src','vendedor.html?v=16');
+  if(!f.getAttribute('src')) f.setAttribute('src','vendedor.html?v=17');
   showScreen("vendedorScreen");
 }
 function salirVendedor(){
@@ -598,6 +598,7 @@ function kpiCard(lbl,val,sub,cls,tag){
 }
 
 /* ====================== TABLA (compartida: tienda y gerencia) ====================== */
+function cleanName(n){ return String(n).replace(/Portabiilidad/gi,"Portabilidad").replace(/Portabilidaad/gi,"Portabilidad"); }
 function buildTableHtml(struct,totalRow,recalc){
   const CATNAMES={prepago:"Prepago",postpago:"Postpago",residencial:"Residencial",otros:"Otros"};
   let html=`<div class="table-card"><div class="table-wrap"><table>
@@ -616,7 +617,7 @@ function buildTableHtml(struct,totalRow,recalc){
       const fv=parseFloat(p.falta);
       const fc=(!isNaN(fv)&&fv<=0)?"falta-g":"falta-r";
       html+=`<tr>
-        <td>${p.name}</td>
+        <td>${cleanName(p.name)}</td>
         <td>${fmt(p.meta)}</td><td>${fmt(p.av)}</td>
         <td><span style="display:inline-flex;align-items:center;gap:4px"><span class="dot ${t.dot}"></span>${fmtPct(p.pct)}</span></td>
         <td class="${fc}">${fmt(p.falta)}</td>
@@ -773,7 +774,10 @@ async function loadRecar(){
   }catch(e){ msg.innerHTML='<div class="load-err">No se pudo cargar RECAR-MM. Verifica que la pesta\u00f1a exista en el archivo.</div>'; }
 }
 function renderRecar(rows){
-  let dia=""; for(let i=0;i<6;i++){const r=rows[i]||[];for(const c of r){const m=String(c||'').match(/(\d+)\s+(JUNIO|MAYO|ENERO|FEBRERO|MARZO|ABRIL|JULIO|AGOSTO|SEPTIEMBRE|OCTUBRE|NOVIEMBRE|DICIEMBRE)/i);if(m){dia=m[1];break;}}if(dia)break;}
+  let dia="";
+  const reEs=/(\d{1,2})\s*(?:de\s+)?(ENERO|FEBRERO|MARZO|ABRIL|MAYO|JUNIO|JULIO|AGOSTO|SEPTIEMBRE|SETIEMBRE|OCTUBRE|NOVIEMBRE|DICIEMBRE)/i;
+  for(let i=0;i<rows.length && !dia;i++){ for(const c of (rows[i]||[])){ const m=String(c||'').match(reEs); if(m){dia=String(parseInt(m[1],10));break;} } }
+  if(!dia){ for(let i=0;i<rows.length && !dia;i++){ for(const c of (rows[i]||[])){ const m=String(c||'').match(/\d{4}-(\d{2})-(\d{2})T\d{2}:/); if(m){dia=String(parseInt(m[2],10));break;} } } }
   // 1) ubicar TODAS las cabeceras RESPONSABLE
   const heads=[];
   for(let i=0;i<rows.length;i++){ const r=rows[i]||[];
