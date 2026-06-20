@@ -153,7 +153,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
     <div class="top-bar">
       <div class="top-left">
         <h2>JEFATURA — Consolidado de Tiendas</h2>
-        <div class="pdv">Toca "Todas" para el global, o marca una o varias tiendas para sumarlas · <strong>v25</strong></div>
+        <div class="pdv">Toca "Todas" para el global, o marca una o varias tiendas para sumarlas · <strong>v26</strong></div>
       </div>
       <div class="top-actions">
         <button class="btn-vend" onclick="abrirVendedor()">📊 Ver por vendedor</button>
@@ -774,11 +774,8 @@ async function loadRecar(){
   }catch(e){ msg.innerHTML='<div class="load-err">No se pudo cargar RECAR-MM. Verifica que la pesta\u00f1a exista en el archivo.</div>'; }
 }
 function renderRecar(rows){
-  let dia="";
-  const reEs=/(\d{1,2})\s*(?:de\s+)?(ENERO|FEBRERO|MARZO|ABRIL|MAYO|JUNIO|JULIO|AGOSTO|SEPTIEMBRE|SETIEMBRE|OCTUBRE|NOVIEMBRE|DICIEMBRE)/i;
-  for(let i=0;i<rows.length && !dia;i++){ for(const c of (rows[i]||[])){ const m=String(c||'').match(reEs); if(m){dia=String(parseInt(m[1],10));break;} } }
-  if(!dia){ for(let i=0;i<rows.length && !dia;i++){ for(const c of (rows[i]||[])){ const m=String(c||'').match(/\d{4}-(\d{2})-(\d{2})T\d{2}:/); if(m){dia=String(parseInt(m[2],10));break;} } } }
-  // 1) ubicar TODAS las cabeceras RESPONSABLE
+  const dm=DIAS_MES[MES_MAP[recarMes]||6]||30;
+  function parsePct(x){ if(x==null||x==='')return null; const str=String(x); const hasPct=str.includes('%'); let n=parseFloat(str.replace(/[^0-9.\-]/g,'')); if(isNaN(n))return null; if(hasPct)return n/100; return n>1.5?n/100:n; }
   const heads=[];
   for(let i=0;i<rows.length;i++){ const r=rows[i]||[];
     for(let j=0;j<r.length;j++){ if(String(r[j]||'').trim().toUpperCase()==='RESPONSABLE'){
@@ -787,45 +784,48 @@ function renderRecar(rows){
         if(asesCol<0&&v.startsWith('ASESOR'))asesCol=k; else if(avCol<0&&v.startsWith('AVANCE'))avCol=k; else if(obCol<0&&v.startsWith('OBJETIVO'))obCol=k; else if(proyCol<0&&v.startsWith('PROYEC'))proyCol=k; else if(faltCol<0&&v.startsWith('FALTA'))faltCol=k; }
       heads.push({i,respCol:j,asesCol:asesCol<0?j+1:asesCol,avCol,obCol,proyCol,faltCol}); break; } }
   }
-  function parseSection(h){
-    let data=[],totAv=0,totOb=0;
+  if(!heads.length){ document.getElementById("recarTable").innerHTML='<div class="load-err">No encontré tablas (RESPONSABLE) en RECAR-MM.</div>'; document.getElementById("recarInfo").innerHTML="";document.getElementById("recarKpis").innerHTML=""; return; }
+  function parseSection(h){ let data=[];
     for(let i=h.i+1;i<rows.length;i++){ const r=rows[i]||[];
       const resp=String(r[h.respCol]||'').trim(), ases=String(r[h.asesCol]||'').trim();
       if(resp.toUpperCase()==='RESPONSABLE') break;
       if(resp.toUpperCase()==='TOTAL'||ases.toUpperCase()==='TOTAL') break;
-      const av=parseFloat(r[h.avCol]), ob=parseFloat(r[h.obCol]);
       if(!resp&&!ases){ if(data.length) break; else continue; }
-      if(isNaN(av)&&isNaN(ob)) continue;
-      const a=isNaN(av)?0:av,o=isNaN(ob)?0:ob; data.push({resp,ases:ases||'-',av:a,ob:o}); totAv+=a; totOb+=o; }
-    return {data,totAv,totOb};
+      const av=aToNum(r[h.avCol]), ob=aToNum(r[h.obCol]);
+      const proy=h.proyCol>=0?parsePct(r[h.proyCol]):null;
+      const falt=h.faltCol>=0?aToNum(r[h.faltCol]):(ob-av);
+      data.push({resp,ases:ases||'-',av,ob,proy,falt});
+    }
+    return data;
   }
-  if(!heads.length){ document.getElementById("recarTable").innerHTML='<div class="load-err">No encontré tablas (RESPONSABLE) en RECAR-MM.</div>'; return; }
-  // 2) elegir la sección de MULTIMARCA (la de Amparo). Si no, tras "HFC TOTAL". Si no, la primera.
-  let chosen=null, note="";
-  for(const h of heads){ if(h.avCol<0||h.obCol<0) continue; const sec=parseSection(h);
-    if(sec.data.some(d=>d.resp.toUpperCase()==='MULTIMARCA')){ chosen=sec; break; } }
-  if(!chosen){ let hfc=-1; for(let i=0;i<rows.length;i++){ if((rows[i]||[]).some(c=>/HFC\s*TOTAL/i.test(String(c||'')))){hfc=i;break;} }
-    if(hfc>=0){ const h=heads.find(x=>x.i>hfc&&x.avCol>=0); if(h) chosen=parseSection(h); } }
-  if(!chosen){ const h=heads.find(x=>x.avCol>=0&&x.obCol>=0)||heads[0]; chosen=parseSection(h); note='<div class="chip" style="color:#cc0000">No ubiqué la tabla de MULTIMARCA; muestro la primera. Avísame.</div>'; }
-  const data=chosen.data, totAv=chosen.totAv, totOb=chosen.totOb;
-  const diaN=parseInt(dia)||0,dm=30,factor=diaN>0?dm/diaN:0;
-  const proyG=factor>0?totAv*factor:totAv,pctG=totOb>0?proyG/totOb:0,faltaG=totOb-totAv,vdG=(faltaG>0&&dm>diaN)?faltaG/(dm-diaN):0;
-  document.getElementById("recarInfo").innerHTML=`<div class="chip">Avance día: <strong>${dia||'-'}</strong></div><div class="chip">Mes: <strong>${recarMes.toUpperCase()}</strong></div><div class="chip">Registros: <strong>${data.length}</strong></div>`+note;
+  let chosen=null;
+  for(const h of heads){ if(h.avCol<0||h.obCol<0) continue; const d=parseSection(h); if(d.some(x=>x.resp.toUpperCase()==='MULTIMARCA')){ chosen=d; break; } }
+  if(!chosen){ let hfc=-1; for(let i=0;i<rows.length;i++){ if((rows[i]||[]).some(c=>/HFC\s*TOTAL/i.test(String(c||'')))){hfc=i;break;} } if(hfc>=0){ const h=heads.find(x=>x.i>hfc&&x.avCol>=0); if(h) chosen=parseSection(h); } }
+  if(!chosen){ const h=heads.find(x=>x.avCol>=0&&x.obCol>=0)||heads[0]; chosen=parseSection(h); }
+  const data=chosen;
+  let totAv=0,totOb=0; data.forEach(d=>{totAv+=d.av;totOb+=d.ob;});
+  let dia=0;
+  for(const d of data){ if(d.av>0&&d.ob>0&&d.proy&&d.proy>0){ const dd=Math.round(d.av*dm/(d.proy*d.ob)); if(dd>0&&dd<=dm){dia=dd;break;} } }
+  if(!dia){ const reEs=/(\d{1,2})\s*(?:de\s+)?(ENERO|FEBRERO|MARZO|ABRIL|MAYO|JUNIO|JULIO|AGOSTO|SEPTIEMBRE|SETIEMBRE|OCTUBRE|NOVIEMBRE|DICIEMBRE)/i;
+    for(let i=0;i<rows.length&&!dia;i++){ for(const c of (rows[i]||[])){ const m=String(c||'').match(reEs); if(m){dia=parseInt(m[1],10);break;} } } }
+  const factor=dia>0?dm/dia:0, diasRest=dia>0&&dm>dia?dm-dia:0;
+  const proyG=factor>0?totAv*factor:totAv, pctG=totOb>0?proyG/totOb:0, faltaG=totOb-totAv, vdG=(faltaG>0&&diasRest>0)?faltaG/diasRest:0;
+  document.getElementById("recarInfo").innerHTML=`<div class="chip">Avance día: <strong>${dia||'-'}</strong>${dia?(' / '+dm):''}</div><div class="chip">Mes: <strong>${recarMes.toUpperCase()}</strong></div><div class="chip">Registros: <strong>${data.length}</strong></div>`;
   const tg=getTag(estadoFromPct(pctG));
   document.getElementById("recarKpis").innerHTML=
     `<div class="kpi"><div class="lbl">Avance total</div><div class="val">${fmt(totAv)}</div></div>`+
     `<div class="kpi"><div class="lbl">Objetivo total</div><div class="val">${fmt(totOb)}</div><div class="sub">${fmtPct(totOb>0?totAv/totOb:0)} avanzado</div></div>`+
     `<div class="kpi ${clsByPct(pctG)}"><div class="lbl">Proyección</div><div class="val">${fmtPct(pctG)}</div></div>`+
-    `<div class="kpi ${faltaG>0?'red':'green'}"><div class="lbl">Falta</div><div class="val">${fmt(faltaG>0?faltaG:0)}</div><div class="sub">${faltaG>0?('≈ '+fmt(vdG)+' / día'):'Cubierto ✅'}</div></div>`+
+    `<div class="kpi ${faltaG>0?'red':'green'}"><div class="lbl">Falta</div><div class="val">${fmt(faltaG>0?faltaG:0)}</div><div class="sub">${faltaG>0&&vdG?('≈ '+fmt(vdG)+' / día'):'—'}</div></div>`+
     `<div class="kpi ${clsByPct(pctG)}"><div class="lbl">Estado</div><span class="tag ${tg.cls}" style="margin-top:8px;font-size:15px;padding:7px 14px"><span class="dot ${tg.dot}"></span>${tg.lbl}</span></div>`;
   let html=`<div class="table-card"><div class="table-wrap"><table><thead><tr><th style="text-align:left">Responsable</th><th style="text-align:left">Asesor</th><th>Avance</th><th>Objetivo</th><th>Proyección</th><th>Falta</th><th>Estado</th></tr></thead><tbody>`;
-  data.forEach(d=>{ const av=d.av,ob=d.ob,proy=factor>0?av*factor:av,pct=ob>0?proy/ob:0,falta=ob-av;
-    const t=getTag(estadoFromPct(pct)),fc=falta<=0?'falta-g':'falta-r';
-    html+=`<tr><td style="text-align:left">${d.resp}</td><td style="text-align:left">${d.ases}</td><td>${fmt(av)}</td><td>${fmt(ob)}</td>
+  data.forEach(d=>{ const pct=(d.proy!=null)?d.proy:(d.ob>0?((factor>0?d.av*factor:d.av)/d.ob):0);
+    const falta=(d.falt!=null)?d.falt:(d.ob-d.av); const t=getTag(estadoFromPct(pct)),fc=falta<=0?'falta-g':'falta-r';
+    html+=`<tr><td style="text-align:left">${d.resp}</td><td style="text-align:left">${d.ases}</td><td>${fmt(d.av)}</td><td>${fmt(d.ob)}</td>
       <td><span style="display:inline-flex;align-items:center;gap:4px"><span class="dot ${t.dot}"></span>${fmtPct(pct)}</span></td>
       <td class="${fc}">${fmt(falta)}</td><td><span class="tag ${t.cls}">${t.lbl}</span></td></tr>`; });
-  const t=getTag(estadoFromPct(pctG));
-  html+=`<tr class="total-row"><td style="text-align:left">TOTAL</td><td></td><td>${fmt(totAv)}</td><td>${fmt(totOb)}</td><td>${fmtPct(pctG)}</td><td>${fmt(faltaG)}</td><td><span class="tag ${t.cls}">${t.lbl}</span></td></tr>`;
+  const t2=getTag(estadoFromPct(pctG));
+  html+=`<tr class="total-row"><td style="text-align:left">TOTAL</td><td></td><td>${fmt(totAv)}</td><td>${fmt(totOb)}</td><td>${fmtPct(pctG)}</td><td>${fmt(faltaG)}</td><td><span class="tag ${t2.cls}">${t2.lbl}</span></td></tr>`;
   html+=`</tbody></table></div></div>`;
   document.getElementById("recarTable").innerHTML=html;
 }
