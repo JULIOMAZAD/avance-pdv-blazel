@@ -20,7 +20,7 @@ header{background:linear-gradient(90deg,#1a0c0b 0%,#2b0f0d 40%,#161b22 100%);bor
 .logo b{color:var(--rojo2)}
 .logo small{display:block;font-size:10px;letter-spacing:3px;color:var(--mut);font-weight:600}
 .filtros{display:flex;gap:10px;margin-left:auto;flex-wrap:wrap;align-items:center}
-.filtros label{font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:3px}
+.filtros label,#filtroDiaCont label,#projAvCont label{font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:3px}
 select{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:13px;min-width:110px;cursor:pointer}
 select:focus{outline:none;border-color:var(--rojo)}
 /* multiselect */
@@ -115,7 +115,7 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
       <label>PROYECTAR · DÍA AVANCE</label>
       <input id="projAvInput" type="number" min="1" max="31" placeholder="auto"
         title="Día hasta el que cargaste data. Calcula la proyección sin tocar el cargo."
-        style="width:120px;background:#0d1117;border:1px solid #2a3344;color:#e6edf3;border-radius:8px;padding:9px;font-size:13px;outline:none">
+        style="background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:13px;width:120px;outline:none">
     </div>
   </div>
   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
