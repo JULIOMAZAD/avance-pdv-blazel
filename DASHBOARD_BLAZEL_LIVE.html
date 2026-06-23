@@ -97,7 +97,7 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
   </div>
 </div>
 <header>
-  <div class="logo">BLA<b>ZEL</b><small>CREADO POR JULIO MAZA D.</small></div>
+  <div class="logo">BLA<b>ZEL</b><small>CREADO POR JULIO MAZA D. · v2 (día sincronizado)</small></div>
   <div class="filtros" id="filtrosCont"></div>
   <div id="filtroDiaCont" style="display:none">
     <div>
@@ -1701,12 +1701,28 @@ function actualizarProjBox(){
   const show = esMesActualSolo();
   projCont.style.display = show ? 'block' : 'none';
   if(!show){ F.proj = 0; }
+  // si el campo es visible y tiene un valor válido pero F.proj quedó en 0
+  // (p.ej. al volver al mes actual), restauramos F.proj desde el campo
+  if(show && F.proj===0){
+    const vv = parseInt(projInput.value, 10);
+    if(vv>=1 && vv<=31) F.proj = vv;
+  }
   if(!projInput.dataset.wired){
     projInput.dataset.wired = '1';
     projInput.addEventListener('input', ()=>{
       const v = parseInt(projInput.value, 10);
       F.proj = (v>=1 && v<=31) ? v : 0;
       render();
+      // guarda el día para que viaje a las demás máquinas (no bloquea la UI)
+      if(F.proj>=1) guardarDiaCompartido(F.proj);
+    });
+    // al cargar por primera vez, traemos el día guardado en la nube y lo precargamos
+    fetchDiaGuardado().then(d=>{
+      if(d){
+        projInput.value = d;
+        if(esMesActualSolo()) F.proj = d;
+        render();
+      }
     });
   }
 }
@@ -1807,6 +1823,33 @@ function initUpload(){
 // Pega aquí la URL de tu Apps Script Web App (termina en /exec).
 // Si la dejas vacía (''), el dashboard usa solo los datos embebidos / cargados por Excel.
 const CUOTAS_API_URL = '';
+
+// ===== DÍA DE AVANCE COMPARTIDO ENTRE MÁQUINAS (Apps Script PropertiesService) =====
+// Misma Web App /exec del backend BLAZEL-PDV. Lee/guarda el "día de avance" por mes+año,
+// de modo que si lo cambias en una PC, aparece igual en cualquier otra al abrir el tablero.
+const DIA_API_URL = 'https://script.google.com/macros/s/AKfycbxlm0VRD8L88rtmDJStmEM1JkcOvO3DbZIQAM8VcVBbRF5nwbS_HpH35QsvNPK-RK9H/exec';
+
+function _diaKeyMes(){ return (MESES_FULL[DATA.mesActual-1]||'').toLowerCase(); }
+
+async function fetchDiaGuardado(){
+  if(!DIA_API_URL) return null;
+  try{
+    const url = DIA_API_URL + '?modo=getdias&mes=' + encodeURIComponent(_diaKeyMes()) + '&anio=' + DATA.anioActual;
+    const resp = await fetch(url, {cache:'no-store'});
+    if(!resp.ok) return null;
+    const j = await resp.json();
+    const d = (j && j.dias!=null) ? parseInt(j.dias,10) : NaN;
+    return (d>=1 && d<=31) ? d : null;
+  }catch(e){ console.warn('No se pudo leer el día compartido:', e); return null; }
+}
+
+async function guardarDiaCompartido(dias){
+  if(!DIA_API_URL) return;
+  try{
+    const url = DIA_API_URL + '?modo=setdias&mes=' + encodeURIComponent(_diaKeyMes()) + '&anio=' + DATA.anioActual + '&dias=' + encodeURIComponent(dias);
+    await fetch(url, {cache:'no-store'});
+  }catch(e){ console.warn('No se pudo guardar el día compartido:', e); }
+}
 
 const MESES_FULL = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SETIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
 
