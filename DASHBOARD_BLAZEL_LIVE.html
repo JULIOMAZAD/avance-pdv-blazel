@@ -1338,11 +1338,26 @@ function renderHfc(){
     return `<b class="${up?'up':'dn'}">${up?'▲':'▼'} ${Math.abs(d).toFixed(1)}%</b> vs mes ant.`;
   }
 
+  // Comparación a DÍAS IGUALES: mes anterior hasta el mismo día de avance (usa cargoDia)
+  function hfcMesAlDia(mes, diaCut){
+    let s=0; for(const r of DATA.cargoDia){ if(r[0]===mes && r[1]<=diaCut && inPdv(r[2])) s+=r[4]; } return s;
+  }
+  const cmpDia = filtroDiaActivo();           // el casillero DÍA está activo => comparación a días iguales
+  const hfcPrevAlDia = cmpDia ? hfcMesAlDia(pm, F.dia) : null;
+  function deltaIgual(cur,prev){
+    if(prev==null||prev===0) return '';
+    const d=(cur-prev)/prev*100, up=d>=0;
+    return `<b class="${up?'up':'dn'}">${up?'▲':'▼'} ${Math.abs(d).toFixed(1)}%</b> vs ${MESES[pm-1]} al día ${F.dia}`;
+  }
+
   document.getElementById('kpisHfc').innerHTML =
-    kpiHTML('HFC '+periodoLabel()+diaLabel,fmt(hfc), hfcPrev!=null? deltaUnidades(hfc,hfcPrev):'') +
+    kpiHTML('HFC '+periodoLabel()+diaLabel,fmt(hfc), cmpDia? deltaIgual(hfc,hfcPrevAlDia) : (hfcPrev!=null? deltaUnidades(hfc,hfcPrev):'')) +
     kpiHTML('Proyección cierre',fmt(Math.round(proyectadoHfc)), (esMesActualSolo()||filtroDiaActivo())? `con ${avanceDias} días de avance`:'periodo cerrado','a') +
-    kpiHTML('Mes anterior',fmt(hfcPrev||0), hfcPrev!=null? deltaUnidades(hfc,hfcPrev):MESES[pm-1]+' '+pa,'az') +
-    kpiHTML('Acumulado '+refA,fmt(acumHfc),'enero a '+MESES[refM-1],'v');
+    (cmpDia
+      ? kpiHTML(`${MESES[pm-1]} al día ${F.dia}`, fmt(hfcPrevAlDia), deltaIgual(hfc,hfcPrevAlDia)===''?'sin dato':`mismo día · ${MESES[pm-1]}`,'az')
+        + kpiHTML(`Cierre ${MESES[pm-1]}`, fmt(hfcPrev||0), hfcPrev? `proyectas cerrar ${fmt(Math.round(proyectadoHfc))}`:'mes anterior','v')
+      : kpiHTML('Mes anterior',fmt(hfcPrev||0), hfcPrev!=null? deltaUnidades(hfc,hfcPrev):MESES[pm-1]+' '+pa,'az')) +
+    kpiHTML('Acumulado '+refA,fmt(acumHfc),'enero a '+MESES[refM-1],'c');
 
   // HFC mensual 2023 -> 2026 (respeta tienda si hay una sola seleccionada)
   document.getElementById('tHfcEvo').textContent = pdvUnico? `HFC mensual 2023 → 2026 · ${pdvShort(pdvUnico)}` : 'HFC mensual 2023 → 2026';
