@@ -101,13 +101,21 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
   <div class="filtros" id="filtrosCont"></div>
   <div id="filtroDiaCont" style="display:none">
     <div>
-      <label>DÍAS DE AVANCE</label>
+      <label>Día</label>
       <div class="msel" id="msel-dia">
-        <div class="msel-btn"><span class="msel-label">Automático</span><span class="car">▾</span></div>
+        <div class="msel-btn"><span class="msel-label">Todos los días</span><span class="car">▾</span></div>
         <div class="msel-panel" id="msel-dia-panel">
           <div class="msel-actions"><span data-dia-act="all">Todos</span><span data-dia-act="none">Ninguno</span></div>
         </div>
       </div>
+    </div>
+  </div>
+  <div id="projAvCont" style="display:none">
+    <div>
+      <label>PROYECTAR · DÍA AVANCE</label>
+      <input id="projAvInput" type="number" min="1" max="31" placeholder="auto"
+        title="Día hasta el que cargaste data. Calcula la proyección sin tocar el cargo."
+        style="width:120px;background:#0d1117;border:1px solid #2a3344;color:#e6edf3;border-radius:8px;padding:9px;font-size:13px;outline:none">
     </div>
   </div>
   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
@@ -778,7 +786,7 @@ const charts = {};
 
 // F.anio / F.mes / F.pdv / F.prod son arrays. Array vacío = "todos".
 // F.dia: número de día (1-31) para corte de día, 0 = sin filtro de día
-let F = { anio: [], mes: [], pdv: [], prod: [], dia: 0 };
+let F = { anio: [], mes: [], pdv: [], prod: [], dia: 0, proj: 0 };
 
 function setActiveData(data){
   DATA = data;
@@ -844,6 +852,7 @@ const filtroDiaActivo = () => F.dia > 0 && esMesActualSolo() && DATA.cargoDia &&
 
 // Días de avance efectivos para proyección (con o sin filtro de día)
 function diasAvanceEfectivo(){
+  if(F.proj > 0 && esMesActualSolo()) return F.proj;
   if(filtroDiaActivo()) return F.dia;
   return esMesActualSolo()? DATA.maxDia : (F.mes.length===1? diasMes(F.mes[0]) : 30);
 }
@@ -1032,7 +1041,7 @@ function actualizarFiltroDia(){
     return;
   }
 
-  const hayDatos = DATA.cargoDia && DATA.cargoDia.length > 0;
+  const hayDatos = true;
   cont.style.display = 'block';
 
   // Limpiar opciones previas (mantener solo msel-actions)
@@ -1045,7 +1054,7 @@ function actualizarFiltroDia(){
     msg.style.cssText = 'padding:8px 12px;color:var(--mut);font-size:11px';
     msg.textContent = 'Sube el Excel de ventas para filtrar por día';
     panel.appendChild(msg);
-    msel.querySelector('.msel-label').textContent = 'Automático';
+    msel.querySelector('.msel-label').textContent = 'Todos los días';
     // deshabilitar botón visualmente
     msel.querySelector('.msel-btn').style.opacity = '0.5';
     msel.querySelector('.msel-btn').style.cursor = 'default';
@@ -1055,9 +1064,7 @@ function actualizarFiltroDia(){
   }
 
   // Obtener días disponibles
-  const diasDisp = [...new Set(
-    DATA.cargoDia.filter(r=>r[0]===DATA.mesActual).map(r=>r[1])
-  )].sort((a,b)=>a-b);
+  const diasDisp = Array.from({length: diasMes(DATA.mesActual)}, (_,i)=>i+1);
 
   msel.querySelector('.msel-btn').style.opacity = '1';
   msel.querySelector('.msel-btn').style.cursor = 'pointer';
@@ -1070,7 +1077,7 @@ function actualizarFiltroDia(){
   // "Todos los días" como primera opción checkbox
   const allOpt = document.createElement('label');
   allOpt.className = 'msel-opt';
-  allOpt.innerHTML = `<input type="checkbox" value="0"> <span>Automático (último día con datos)</span>`;
+  allOpt.innerHTML = `<input type="checkbox" value="0"> <span>Todos los días</span>`;
   panel.appendChild(allOpt);
 
   diasDisp.forEach(d=>{
@@ -1128,8 +1135,8 @@ function refreshFiltroDiaLabel(){
   const msel = document.getElementById('msel-dia');
   if(!msel) return;
   const lbl = msel.querySelector('.msel-label');
-  if(F.dia===0) lbl.textContent = 'Auto (al día '+((DATA&&DATA.maxDia)||'?')+')';
-  else lbl.textContent = 'Avance al día ' + F.dia;
+  if(F.dia===0) lbl.textContent = 'Todos los días';
+  else lbl.textContent = 'Hasta día ' + F.dia;
 }
 
 
@@ -1208,7 +1215,7 @@ function renderResumen(){
     kpiHTML('Cargo Fijo '+periodoLabel()+diaLabel,'S/ '+fmt(cf), cfPrev!=null? deltaHTML(cf,cfPrev):'') +
     kpiHTML('Proyección cierre','S/ '+fmt(proyectado), (esMesActualSolo()||filtroDiaActivo())? `con ${avanceDias} días de avance`:'periodo cerrado','a') +
     (function(){const mG=hfcMetaGlobal();const rm=refAnioMes()[1];const md=diasMes(rm);const sub=(esMesActualSolo()||filtroDiaActivo())? `ritmo ${(hfc/avanceDias).toFixed(1)}/día`+(mG?` · meta ${(mG/md).toFixed(1)}/día`:'') : '';const ok=(esMesActualSolo()||filtroDiaActivo())&&mG&&proyectadoHfc>=mG;return kpiHTML('HFC'+diaLabel,fmt(hfc),sub,ok?'v':'');})() +
-    kpiHTML('Proyección HFC',fmt(Math.round(proyectadoHfc)), (esMesActualSolo()||filtroDiaActivo())? `al cierre · ${fmt(hfc)} al día ${filtroDiaActivo()?F.dia:DATA.maxDia}` : 'periodo cerrado','az') +
+    kpiHTML('Proyección HFC',fmt(Math.round(proyectadoHfc)), (esMesActualSolo()||filtroDiaActivo())? `al cierre · ${fmt(hfc)} al día ${avanceDias}` : 'periodo cerrado','az') +
     kpiHTML('MIX FIJA', mix!=null?pct(mix):'—', 'HFC sobre porta+reno','c');
 
   // evolución: 13 meses hacia atrás desde el periodo de referencia
@@ -1241,7 +1248,7 @@ function renderResumen(){
     const mx=mixFijaPdv(p);
     return {p,c,h,post2,mx};
   }).filter(t=>t.c>0||t.post2>0).sort((x,y)=>y.c-x.c);
-  const daRef = filtroDiaActivo() ? F.dia : (esMesActualSolo()? DATA.maxDia : diasMes(F.mes.length===1?F.mes[0]:DATA.mesActual));
+  const daRef = diasAvanceEfectivo();
   list.forEach(t=>{
     const proyC = proyDia(t.c);
     const proyH = proyDia(t.h);
@@ -1288,7 +1295,7 @@ function renderCargo(){
     const cPdv = filtroDiaActivo() ? cargoSumDiaPdv(pdvUnicoCargo) : cargoSumPdv(pdvUnicoCargo);
     const proyPdv = proyDia(cPdv);
     const faltaPdv = Math.max(proyPdv-cPdv,0);
-    const lbl = filtroDiaActivo() ? `día ${F.dia}` : `día ${DATA.maxDia}`;
+    const lbl = `día ${avanceDias}`;
     document.getElementById('tCargoPdv').textContent=`Avance vs Proyección · ${pdvShort(pdvUnicoCargo)} · ${periodoLabel()}`;
     mkChart('chCargoPdv',{type:'doughnut',data:{labels:['Avance al '+lbl,'Falta para proyección'],datasets:[{data:[cPdv,faltaPdv],backgroundColor:['#e63329','#2a3344'],borderColor:'#161b22',borderWidth:3}]},
       options:{maintainAspectRatio:false,cutout:'62%',plugins:{legend:{position:'bottom',labels:{boxWidth:12,font:{size:11}}},tooltip:{callbacks:{label:c=>c.label+': S/ '+fmt(c.raw)}}}},
@@ -1672,7 +1679,23 @@ function renderDia(){
   } else cv.style.display='none';
 }
 
-function render(){renderResumen();renderCargo();renderHfc();renderMix();renderCuotas();renderAse();renderDia();var _e=document.getElementById('s-equipos');if(_e&&_e.classList.contains('act')&&window.renderEquipos)window.renderEquipos();}
+function actualizarProjBox(){
+  const projCont = document.getElementById('projAvCont');
+  const projInput = document.getElementById('projAvInput');
+  if(!projCont || !projInput) return;
+  const show = esMesActualSolo();
+  projCont.style.display = show ? 'block' : 'none';
+  if(!show){ F.proj = 0; }
+  if(!projInput.dataset.wired){
+    projInput.dataset.wired = '1';
+    projInput.addEventListener('input', ()=>{
+      const v = parseInt(projInput.value, 10);
+      F.proj = (v>=1 && v<=31) ? v : 0;
+      render();
+    });
+  }
+}
+function render(){actualizarProjBox();renderResumen();renderCargo();renderHfc();renderMix();renderCuotas();renderAse();renderDia();var _e=document.getElementById('s-equipos');if(_e&&_e.classList.contains('act')&&window.renderEquipos)window.renderEquipos();}
 
 // ===================== CARGA DE EXCEL Y PERSISTENCIA =====================
 function saveDataToStorage(data, key){
