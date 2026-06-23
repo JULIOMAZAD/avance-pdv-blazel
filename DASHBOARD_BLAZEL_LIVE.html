@@ -101,9 +101,9 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
   <div class="filtros" id="filtrosCont"></div>
   <div id="filtroDiaCont" style="display:none">
     <div>
-      <label>Día</label>
+      <label>DÍAS DE AVANCE</label>
       <div class="msel" id="msel-dia">
-        <div class="msel-btn"><span class="msel-label">Todos los días</span><span class="car">▾</span></div>
+        <div class="msel-btn"><span class="msel-label">Automático</span><span class="car">▾</span></div>
         <div class="msel-panel" id="msel-dia-panel">
           <div class="msel-actions"><span data-dia-act="all">Todos</span><span data-dia-act="none">Ninguno</span></div>
         </div>
@@ -1045,7 +1045,7 @@ function actualizarFiltroDia(){
     msg.style.cssText = 'padding:8px 12px;color:var(--mut);font-size:11px';
     msg.textContent = 'Sube el Excel de ventas para filtrar por día';
     panel.appendChild(msg);
-    msel.querySelector('.msel-label').textContent = 'Todos los días';
+    msel.querySelector('.msel-label').textContent = 'Automático';
     // deshabilitar botón visualmente
     msel.querySelector('.msel-btn').style.opacity = '0.5';
     msel.querySelector('.msel-btn').style.cursor = 'default';
@@ -1070,7 +1070,7 @@ function actualizarFiltroDia(){
   // "Todos los días" como primera opción checkbox
   const allOpt = document.createElement('label');
   allOpt.className = 'msel-opt';
-  allOpt.innerHTML = `<input type="checkbox" value="0"> <span>Todos los días</span>`;
+  allOpt.innerHTML = `<input type="checkbox" value="0"> <span>Automático (último día con datos)</span>`;
   panel.appendChild(allOpt);
 
   diasDisp.forEach(d=>{
@@ -1128,8 +1128,8 @@ function refreshFiltroDiaLabel(){
   const msel = document.getElementById('msel-dia');
   if(!msel) return;
   const lbl = msel.querySelector('.msel-label');
-  if(F.dia===0) lbl.textContent = 'Todos los días';
-  else lbl.textContent = 'Hasta día ' + F.dia;
+  if(F.dia===0) lbl.textContent = 'Auto (al día '+((DATA&&DATA.maxDia)||'?')+')';
+  else lbl.textContent = 'Avance al día ' + F.dia;
 }
 
 
@@ -1901,7 +1901,7 @@ const EQUIPOS_DATA = {"rows": [[2025, 1, "Santa Anita", "SIN MARCA", "Sin modelo
   function go(){
     var u=(document.getElementById('lgUser').value||'').trim().toLowerCase();
     var p=document.getElementById('lgPass').value||'';
-    if(u==='julio maza' && p==='bonito31'){ document.getElementById('loginGate').style.display='none'; }
+    if(u==='jmaza' && p==='jmaza'){ document.getElementById('loginGate').style.display='none'; }
     else { document.getElementById('lgErr').textContent='Usuario o contraseña incorrectos'; }
   }
   function wire(){
