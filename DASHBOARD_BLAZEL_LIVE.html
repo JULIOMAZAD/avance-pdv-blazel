@@ -97,7 +97,7 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
   </div>
 </div>
 <header>
-  <div class="logo">BLA<b>ZEL</b><small>CREADO POR JULIO MAZA D. · v4 (por producto corregido)</small></div>
+  <div class="logo">BLA<b>ZEL</b><small>CREADO POR JULIO MAZA D. · v5 (filtro producto + equipos comparativo)</small></div>
   <div class="filtros" id="filtrosCont"></div>
   <div id="filtroDiaCont" style="display:none">
     <div>
@@ -211,6 +211,7 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
   </div>
   <div class="card"><h3>Marca líder por Tienda</h3><div class="tscroll"><table id="tEqLider"></table></div>
     <div style="font-size:11px;color:var(--mut);margin-top:10px" id="eqNote"></div></div>
+  <div class="card"><h3>Equipos por marca · Mes anterior vs Mes actual</h3><div id="eqCmpNota" style="font-size:12px;color:var(--mut);padding:2px 0 8px"></div><div class="tscroll"><table id="tEqCmpMarca"></table></div></div>
 </section>
 <div class="foot">BLAZEL A&M Ventas Corporativas · Fuente: PRUEBAS DE LINK · Datos al día <span id="fcorte"></span></div>
 </main>
@@ -412,10 +413,6 @@ function buildDataFromBase(rowsWithHeader){
       if(modalidad === 'postpago') asesMap[k].cf += cargoFijo;
       if(tipoOp === 'HFC') asesMap[k].hfc += 1;
 
-      // ---- producto × asesor (ambos meses) ----
-      const kap = anio+APSEP+mes+APSEP+pdv+APSEP+vendedor+APSEP+tipoOp;
-      aseProdMap[kap] = (aseProdMap[kap]||0) + 1;
-
       // ---- dias (mm-dd, pdv) ----
       if(dia){
         const mm = String(mes).padStart(2,'0'), dd = String(dia).padStart(2,'0');
@@ -424,7 +421,13 @@ function buildDataFromBase(rowsWithHeader){
         // ---- junv ----
         const kj = anio+'|'+mes+'|'+dia+'|'+vendedor+'|'+pdv;
         junvMap[kj] = (junvMap[kj]||0) + 1;
-        // ---- producto × asesor × día (todos los meses, para cruzar día entre meses) ----
+      }
+    }
+    // ---- producto × asesor (TODOS los productos: incluye accesorios, chips, etc.) ----
+    if(tipoOp && vendedor){
+      const kap = anio+APSEP+mes+APSEP+pdv+APSEP+vendedor+APSEP+tipoOp;
+      aseProdMap[kap] = (aseProdMap[kap]||0) + 1;
+      if(dia){
         const kapd = anio+APSEP+mes+APSEP+dia+APSEP+pdv+APSEP+vendedor+APSEP+tipoOp;
         aseProdDiaMap[kapd] = (aseProdDiaMap[kapd]||0) + 1;
       }
@@ -1714,7 +1717,7 @@ function renderAseProd(){
     if(usaDia){ [a,m,d,pdv,vend,op,c]=r; if(d!==dia) continue; }
     else { [a,m,pdv,vend,op,c]=r; }
     if(!inAnio(a)||!inMes(m)||!inPdv(pdv)) continue;
-    // NOTA: este cuadro muestra TODOS los productos como columnas, no depende del filtro PRODUCTO de arriba
+    if(F.prod.length && !F.prod.includes(op)) continue;
     if(!map[vend]) map[vend]={pdv, prods:{}, total:0};
     map[vend].prods[op]=(map[vend].prods[op]||0)+c;
     map[vend].total+=c;
@@ -1726,7 +1729,7 @@ function renderAseProd(){
   const mesesSel = (F.mes.length?F.mes:[DATA.mesActual]).slice().sort((a,b)=>a-b).map(m=>MESES[m-1]).join(', ');
 
   if(nota) nota.innerHTML = `<div style="color:var(--mut);font-size:12px;padding:2px 0 8px">`
-    + `<b>Muestra todos los productos</b> (no depende del filtro PRODUCTO de arriba). `
+    + (F.prod.length ? `Filtrado a: <b>${F.prod.join(', ')}</b>. ` : `Mostrando <b>todos</b> los productos. `)
     + (usaDia
         ? `Sumando el <b>día ${dia}</b> de: <b>${mesesSel}</b> (la lógica separa qué venta es de cada mes y las suma).`
         : `Periodo: <b>${periodoLabel()}</b>. Pon un número en el filtro <b>DÍA</b> para sumar ese mismo día en todos los meses seleccionados.`)
@@ -1770,6 +1773,7 @@ function renderAseHist(){
   for(const r of DATA.aseProd){
     const [a,m,pdv,vend,op,c]=r;
     if(!inPdv(pdv)) continue;
+    if(F.prod.length && !F.prod.includes(op)) continue;
     const isPrev=(a===pa&&m===pm), isCur=(a===refA&&m===refM);
     if(!isPrev&&!isCur) continue;
     const k=vend+'\u0001'+op;
@@ -2142,6 +2146,31 @@ const EQUIPOS_DATA = {"rows": [[2025, 1, "Santa Anita", "SIN MARCA", "Sin modelo
         const cel=m=>m?m[0]+' <span style="color:#8a97ab">('+pct(m[1],o.tot)+')</span>':'<span style="color:#8a97ab">—</span>';
         return '<tr><td>'+t.replace('PDV - ','')+'</td><td style="text-align:right"><b>'+fmt(o.tot)+'</b></td><td>'+cel(ms[0])+'</td><td>'+cel(ms[1])+'</td><td>'+cel(ms[2])+'</td></tr>';}).join('');
     document.getElementById('eqNote').textContent='Solo ventas de equipos (excluye chips, HFC y accesorios). Periodo disponible: 2025–2026. Fuente: BASE de PRUEBAS DE LINK.';
+
+    // ---- Comparativo por marca: mes anterior vs mes actual (reactivo al día de avance) ----
+    try{
+      const ram=refAnioMes(); const refA=ram[0], refM=ram[1];
+      const pm=prevMes(refA,refM); const pmA=pm[0], pmM=pm[1];
+      const esAct=(typeof DATA!=='undefined' && refA===DATA.anioActual && refM===DATA.mesActual);
+      const da=diasAvanceEfectivo(); const dm=diasMes(refM);
+      const pdvs=F.pdv.length?new Set(F.pdv.map(x=>String(x).toLowerCase())):null;
+      const cur={}, prev={};
+      D.rows.forEach(r=>{
+        if(pdvs&&!pdvs.has(String(r[2]).toLowerCase()))return;
+        if(r[3]==='SIN MARCA')return;
+        if(r[0]===refA&&r[1]===refM) cur[r[3]]=(cur[r[3]]||0)+r[6];
+        if(r[0]===pmA&&r[1]===pmM) prev[r[3]]=(prev[r[3]]||0)+r[6];
+      });
+      const marcas=[...new Set([...Object.keys(cur),...Object.keys(prev)])];
+      const arr=marcas.map(m=>{const c=cur[m]||0,p=prev[m]||0;const proy=esAct&&da>0?Math.round(c/da*dm):c;return{m,c,p,proy};})
+        .filter(x=>x.c||x.p).sort((a,b)=>b.c-a.c);
+      const elN=document.getElementById('eqCmpNota');
+      if(elN) elN.innerHTML='Izquierda: <b>'+MESES[pmM-1]+' '+pmA+'</b> (cierre). Derecha: <b>'+MESES[refM-1]+' '+refA+'</b> (avance'+(esAct?' · proyección con <b>'+da+'</b> días':'')+'). La data de equipos no tiene vendedor, por eso es por marca y no por asesor.';
+      let h='<tr><th>#</th><th>Marca</th><th style="text-align:right">'+MESES[pmM-1]+'</th><th style="text-align:right">'+MESES[refM-1]+'</th><th style="text-align:right">Proyección</th><th style="text-align:right">Δ vs mes ant.</th></tr>';
+      arr.forEach((x,i)=>{let d='—';if(x.p>0){const v=(x.proy-x.p)/x.p*100,up=v>=0;d='<b style="color:'+(up?'#22c55e':'#ef4444')+'">'+(up?'▲':'▼')+' '+Math.abs(v).toFixed(0)+'%</b>';}
+        h+='<tr><td style="color:#8a97ab">'+(i+1)+'</td><td><b>'+x.m+'</b></td><td style="text-align:right">'+fmt(x.p)+'</td><td style="text-align:right"><b>'+fmt(x.c)+'</b></td><td style="text-align:right">'+fmt(x.proy)+'</td><td style="text-align:right">'+d+'</td></tr>';});
+      const elT=document.getElementById('tEqCmpMarca'); if(elT) elT.innerHTML=arr.length?h:'<tr><td style="color:#8a97ab;padding:10px">Sin datos para comparar en el periodo.</td></tr>';
+    }catch(e){}
   }
   window.renderEquipos=function(){ draw(); };
 })();
