@@ -97,7 +97,7 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
   </div>
 </div>
 <header>
-  <div class="logo">BLA<b>ZEL</b><small>CREADO POR JULIO MAZA D. · v9 (fix data equipos vendedor)</small></div>
+  <div class="logo">BLA<b>ZEL</b><small>CREADO POR JULIO MAZA D. · v10 (modalidad afecta todo)</small></div>
   <div class="filtros" id="filtrosCont"></div>
   <div id="filtroDiaCont" style="display:none">
     <div>
@@ -843,10 +843,15 @@ const inMes  = m => selMeses().includes(m);
 const inPdv  = p => selPdvs().includes(p);
 const inProd = op => selProds().includes(op);
 
+// Modalidad: si SOLO está marcado Prepago, las métricas postpago (CF, HFC, Mix, Cuotas) van a 0.
+const prepagoSolo = () => F.moda && F.moda.length===1 && F.moda[0]==='Prepago';
+
 function cargoSum(){ // suma CF postpago según filtros activos
+  if(prepagoSolo()) return 0;
   let s=0; for(const r of DATA.cargo){ if(inAnio(r[0]) && inMes(r[1]) && inPdv(r[2])) s+=r[3]; } return s;
 }
 function opsCount(op){
+  if(op==='HFC' && prepagoSolo()) return 0; // HFC es postpago
   let s=0; for(const r of DATA.ops){ if(inAnio(r[0]) && inMes(r[1]) && r[3]===op && inPdv(r[2])) s+=r[4]; } return s;
 }
 function opsAll(){
@@ -856,12 +861,14 @@ function preCount(){ let s=0; for(const r of DATA.pre){ if(inAnio(r[0])&&inMes(r
 
 // Variantes "para una tienda específica" (usadas en tablas/semáforos que iteran por pdv)
 function cargoSumPdv(pdv){
+  if(prepagoSolo()) return 0;
   let s=0; for(const r of DATA.cargo){ if(inAnio(r[0]) && inMes(r[1]) && r[2]===pdv) s+=r[3]; } return s;
 }
 function opsAllPdv(pdv){
   const o={}; for(const r of DATA.ops){ if(inAnio(r[0]) && inMes(r[1]) && r[2]===pdv && inProd(r[3])) o[r[3]]=(o[r[3]]||0)+r[4]; } return o;
 }
 function opsCountPdv(op,pdv){
+  if(op==='HFC' && prepagoSolo()) return 0;
   let s=0; for(const r of DATA.ops){ if(inAnio(r[0]) && inMes(r[1]) && r[3]===op && r[2]===pdv) s+=r[4]; } return s;
 }
 
@@ -888,6 +895,7 @@ function diasAvanceEfectivo(){
 
 // cargoSum con corte de día (si filtroDiaActivo)
 function cargoSumDia(){
+  if(prepagoSolo()) return 0;
   if(!filtroDiaActivo()) return cargoSum();
   const m = F.mes[0];
   let s=0;
@@ -897,6 +905,7 @@ function cargoSumDia(){
   return s;
 }
 function cargoSumDiaPdv(pdv){
+  if(prepagoSolo()) return 0;
   if(!filtroDiaActivo()) return cargoSumPdv(pdv);
   const m = F.mes[0];
   let s=0;
@@ -904,6 +913,7 @@ function cargoSumDiaPdv(pdv){
   return s;
 }
 function hfcDia(){
+  if(prepagoSolo()) return 0;
   if(!filtroDiaActivo()) return opsCount('HFC');
   const m = F.mes[0];
   let s=0;
@@ -911,6 +921,7 @@ function hfcDia(){
   return s;
 }
 function hfcDiaPdv(pdv){
+  if(prepagoSolo()) return 0;
   if(!filtroDiaActivo()) return opsCountPdv('HFC',pdv);
   const m = F.mes[0];
   let s=0;
@@ -1568,6 +1579,13 @@ function renderCuotas(){
     etiqueta = pdvsConCuota.length===1? pdvShort(pdvsConCuota[0]) : pdvsConCuota.map(pdvShort).join(', ');
   }
 
+  // Modalidad Prepago: dejar solo categorías prepago y recalcular totales (postpago → 0)
+  if(prepagoSolo()){
+    cats = cats.filter(c=>/prepago/i.test(c.cat));
+    metaTotal = cats.reduce((s,c)=>s+(c.meta||0),0);
+    avanceTotal = cats.reduce((s,c)=>s+(c.avance||0),0);
+  }
+
   const diasRestantes = Math.max(C.dias_mes - C.avance_dia, 0);
   function estadoPill(meta,p){
     if(meta<=0) return '<span class="pill" style="background:#8b97a822;color:var(--mut)">—</span>';
@@ -1585,7 +1603,7 @@ function renderCuotas(){
     kpiHTML('Meta '+C.mes+' '+C.anio, hayMeta? 'S/ '+fmt(metaTotal) : '—', etiqueta) +
     kpiHTML('Avance', avanceTotal!=null? 'S/ '+fmt(avanceTotal) : '—', pctTotal!=null? `${pct(pctTotal)} de la meta · día ${C.avance_dia}` : `día ${C.avance_dia} de ${C.dias_mes}`, pctTotal!=null?(pctTotal>=1?'v':pctTotal>=0.7?'a':''):'') +
     kpiHTML('Proyección final', proyTotal!=null? 'S/ '+fmt(proyTotal) : '—', proyPctTotal!=null? `al cierre · ${pct(proyPctTotal)} de la meta` : 'al cierre','az') +
-    kpiHTML('Mix HFC', pct(C.mix_hfc), 'HFC sobre venta total','c');
+    kpiHTML('Mix HFC', pct(prepagoSolo()?0:C.mix_hfc), 'HFC sobre venta total','c');
 
   // tabla
   document.getElementById('tCuotas').textContent = `Cuotas vs Avance vs Proyección · ${etiqueta} · ${C.mes} ${C.anio}`;
