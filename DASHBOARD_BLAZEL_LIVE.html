@@ -97,7 +97,7 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
   </div>
 </div>
 <header>
-  <div class="logo">BLA<b>ZEL</b><small>CREADO POR JULIO MAZA D. · v8 (tipo+modalidad arriba · vendedores por tienda)</small></div>
+  <div class="logo">BLA<b>ZEL</b><small>CREADO POR JULIO MAZA D. · v9 (fix data equipos vendedor)</small></div>
   <div class="filtros" id="filtrosCont"></div>
   <div id="filtroDiaCont" style="display:none">
     <div>
@@ -1012,7 +1012,7 @@ function optionsFor(key){
   if(key==='mes')  return [1,2,3,4,5,6,7,8,9,10,11,12].map(m=>({value:m, label:MESES[m-1]}));
   if(key==='pdv')  return DATA.pdvs.map(p=>({value:p, label:pdvShort(p)}));
   if(key==='prod') return allProductos().map(p=>({value:p, label:p}));
-  if(key==='tipo') return (window.EQUIPOS_VEND?EQUIPOS_VEND.tipo:['Equipo','Chip','Accesorio','HFC']).map(t=>({value:t, label:t}));
+  if(key==='tipo') return ((typeof EQUIPOS_VEND!=='undefined')?EQUIPOS_VEND.tipo:['Equipo','Chip','Accesorio','HFC']).map(t=>({value:t, label:t}));
   if(key==='moda') return ['Postpago','Prepago'].map(m=>({value:m, label:m}));
 }
 
@@ -2190,7 +2190,7 @@ const EQUIPOS_DATA = {"rows": [[2025, 1, "Santa Anita", "SIN MARCA", "Sin modelo
   }
   function renderEquVendTienda(){
     try{
-      const EV=window.EQUIPOS_VEND; if(!EV||!EV.rows) return;
+      const EV=(typeof EQUIPOS_VEND!=='undefined')?EQUIPOS_VEND:null; if(!EV||!EV.rows) return;
       const tSet = (F.tipo&&F.tipo.length)? new Set(F.tipo.map(t=>EV.tipo.indexOf(t)).filter(i=>i>=0)) : null; // null = todos
       const mSet = (F.moda&&F.moda.length)? new Set(F.moda.map(m=>EV.moda.indexOf(m)).filter(i=>i>=0)) : null;
       const ram=refAnioMes(), refA=ram[0], refM=ram[1];
