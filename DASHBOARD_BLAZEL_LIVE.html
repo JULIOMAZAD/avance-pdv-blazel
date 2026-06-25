@@ -97,7 +97,7 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
   </div>
 </div>
 <header>
-  <div class="logo">BLA<b>ZEL</b><small>CREADO POR JULIO MAZA D. · v7 (equipos por asesor a días iguales)</small></div>
+  <div class="logo">BLA<b>ZEL</b><small>CREADO POR JULIO MAZA D. · v8 (tipo+modalidad arriba · vendedores por tienda)</small></div>
   <div class="filtros" id="filtrosCont"></div>
   <div id="filtroDiaCont" style="display:none">
     <div>
@@ -202,17 +202,7 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
   <div style="font-size:12px;color:var(--mut);margin-bottom:12px">Estudio de equipos · usa los filtros de arriba (Año / Mes / Tienda) · periodo disponible 2025–2026</div>
   <div class="kpis" id="eqKpis"></div>
   <div class="card">
-    <h3>Equipos por vendedor · Mes anterior vs Mes actual</h3>
-    <div style="display:flex;gap:14px;flex-wrap:wrap;margin:4px 0 8px;font-size:13px;color:var(--mut)">
-      <label>TIPO:
-        <select id="eqVendTipo" onchange="window.renderEquipos&&window.renderEquipos()" style="background:#0f1620;color:#e8edf6;border:1px solid #2a3344;border-radius:6px;padding:3px 8px">
-          <option value="Equipo">Equipo</option><option value="Accesorio">Accesorio</option><option value="Chip">Chip</option><option value="HFC">HFC</option><option value="">Todos</option>
-        </select></label>
-      <label>Modalidad:
-        <select id="eqVendModa" onchange="window.renderEquipos&&window.renderEquipos()" style="background:#0f1620;color:#e8edf6;border:1px solid #2a3344;border-radius:6px;padding:3px 8px">
-          <option value="">Todas</option><option value="Postpago">Postpago</option><option value="Prepago">Prepago</option>
-        </select></label>
-    </div>
+    <h3>Equipos por vendedor · consulta una tienda y verás a sus vendedores (mes ant. vs mes actual, mismo día)</h3>
     <div id="eqVendNota" style="font-size:12px;color:var(--mut);padding:2px 0 8px"></div>
     <div class="tscroll"><table id="tEqVend"></table></div>
   </div>
@@ -825,7 +815,7 @@ const charts = {};
 
 // F.anio / F.mes / F.pdv / F.prod son arrays. Array vacío = "todos".
 // F.dia: número de día (1-31) para corte de día, 0 = sin filtro de día
-let F = { anio: [], mes: [], pdv: [], prod: [], dia: 0, proj: 0 };
+let F = { anio: [], mes: [], pdv: [], prod: [], tipo: [], moda: [], dia: 0, proj: 0 };
 
 function setActiveData(data){
   DATA = data;
@@ -1013,6 +1003,8 @@ const FILTROS_DEF = [
   { key:'mes',  label:'Mes', allLabel:'Todos los meses' },
   { key:'pdv',  label:'Tienda', allLabel:'Todas las tiendas' },
   { key:'prod', label:'Producto', allLabel:'Todos los productos' },
+  { key:'tipo', label:'Tipo equipo', allLabel:'Todos los tipos' },
+  { key:'moda', label:'Modalidad', allLabel:'Todas' },
 ];
 
 function optionsFor(key){
@@ -1020,6 +1012,8 @@ function optionsFor(key){
   if(key==='mes')  return [1,2,3,4,5,6,7,8,9,10,11,12].map(m=>({value:m, label:MESES[m-1]}));
   if(key==='pdv')  return DATA.pdvs.map(p=>({value:p, label:pdvShort(p)}));
   if(key==='prod') return allProductos().map(p=>({value:p, label:p}));
+  if(key==='tipo') return (window.EQUIPOS_VEND?EQUIPOS_VEND.tipo:['Equipo','Chip','Accesorio','HFC']).map(t=>({value:t, label:t}));
+  if(key==='moda') return ['Postpago','Prepago'].map(m=>({value:m, label:m}));
 }
 
 function buildFiltroDOM(){
@@ -2197,10 +2191,8 @@ const EQUIPOS_DATA = {"rows": [[2025, 1, "Santa Anita", "SIN MARCA", "Sin modelo
   function renderEquVendTienda(){
     try{
       const EV=window.EQUIPOS_VEND; if(!EV||!EV.rows) return;
-      const tSelRaw=(document.getElementById('eqVendTipo')||{}).value;
-      const mSelRaw=(document.getElementById('eqVendModa')||{}).value;
-      const tSel = tSelRaw? EV.tipo.indexOf(tSelRaw) : -1;   // -1 = todos
-      const mSel = mSelRaw? EV.moda.indexOf(mSelRaw) : -1;
+      const tSet = (F.tipo&&F.tipo.length)? new Set(F.tipo.map(t=>EV.tipo.indexOf(t)).filter(i=>i>=0)) : null; // null = todos
+      const mSet = (F.moda&&F.moda.length)? new Set(F.moda.map(m=>EV.moda.indexOf(m)).filter(i=>i>=0)) : null;
       const ram=refAnioMes(), refA=ram[0], refM=ram[1];
       const pm=prevMes(refA,refM), pmA=pm[0], pmM=pm[1];
       const cutoff = F.dia>0 ? F.dia : diasAvanceEfectivo();   // día de corte (mismo día en ambos meses)
@@ -2210,15 +2202,17 @@ const EQUIPOS_DATA = {"rows": [[2025, 1, "Santa Anita", "SIN MARCA", "Sin modelo
       for(let i=0;i<EV.rows.length;i++){
         const r=EV.rows[i];
         const a=r[0],mo=r[1],d=r[2],pdvN=EV.pdv[r[3]],vend=EV.vend[r[4]],ti=r[5],mi=r[6],c=r[7];
-        if(tSel>=0 && ti!==tSel) continue;
-        if(mSel>=0 && mi!==mSel) continue;
+        if(tSet && !tSet.has(ti)) continue;
+        if(mSet && !mSet.has(mi)) continue;
         if(d>cutoff) continue;                                 // corte a días iguales
         if(pdvs&&!pdvs.has(String(pdvN).toLowerCase())) continue;
         if(a===refA&&mo===refM){ vendCur[vend]=(vendCur[vend]||0)+c; tCur[pdvN]=(tCur[pdvN]||0)+c; vendPdv[vend]=(vendPdv[vend]&&vendPdv[vend]!==pdvN)?'Varios':pdvN; }
         else if(a===pmA&&mo===pmM){ vendPrev[vend]=(vendPrev[vend]||0)+c; tPrev[pdvN]=(tPrev[pdvN]||0)+c; }
       }
       const completo = cutoff>=dm;
-      const nota='Tipo: <b>'+(tSelRaw||'Todos')+'</b>'+(mSelRaw?(' · '+mSelRaw):'')
+      const tipoLbl = (F.tipo&&F.tipo.length)? F.tipo.join(', ') : 'Todos';
+      const modaLbl = (F.moda&&F.moda.length)? (' · '+F.moda.join(', ')) : '';
+      const nota='Tipo: <b>'+tipoLbl+'</b>'+modaLbl
         +'. A días iguales: <b>hasta el día '+cutoff+'</b> de cada mes'+(completo?' (mes completo)':'')
         +'. <b>'+MESES[pmM-1]+' '+pmA+'</b> vs <b>'+MESES[refM-1]+' '+refA+'</b>.';
       const proyOf=c=> cutoff>0 ? Math.round(c/cutoff*dm) : c;
