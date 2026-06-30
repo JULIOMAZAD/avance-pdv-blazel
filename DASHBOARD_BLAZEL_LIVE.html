@@ -2264,6 +2264,7 @@ const EQUIPOS_DATA = {"rows": [[2025, 1, "Santa Anita", "SIN MARCA", "Sin modelo
     else { document.getElementById('lgErr').textContent='Usuario o contraseña incorrectos'; }
   }
   function wire(){
+    if(new URLSearchParams(location.search).get('embed')==='1'){ var g=document.getElementById('loginGate'); if(g){g.style.display='none';} }
     var b=document.getElementById('lgBtn'); if(b)b.onclick=go;
     ['lgPass','lgUser'].forEach(function(id){var el=document.getElementById(id); if(el)el.addEventListener('keydown',function(e){if(e.key==='Enter')go();});});
   }
