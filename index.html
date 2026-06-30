@@ -112,8 +112,9 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
           <option value="Tienda - Rambla Brasil">Tienda - Rambla Brasil</option>
           <option value="Tienda - Santa Anita">Tienda - Santa Anita</option>
           <option value="Call Center">Call Center</option>
-          <option value="GERENCIA">🔑 JEFATURA</option>
-          <option value="AMPARO">🔑 MULTIMARCA</option>
+          <option value="GERENCIA">🔑 COORD. TIENDAS</option>
+          <option value="AMPARO">🔑 COORD. CAMPO</option>
+          <option value="COMERCIAL">🔑 COMERCIAL</option>
         </select>
       </div>
       <div class="fg">
@@ -152,11 +153,13 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
   <div class="main-wrap">
     <div class="top-bar">
       <div class="top-left">
-        <h2>JEFATURA — Consolidado de Tiendas</h2>
-        <div class="pdv">Toca "Todas" para el global, o marca una o varias tiendas para sumarlas · <strong>v26</strong></div>
+        <h2>COORD. TIENDAS — Consolidado</h2>
+        <div class="pdv">Toca "Todas" para el global, o marca una o varias tiendas para sumarlas · <strong>v30</strong></div>
       </div>
       <div class="top-actions">
         <button class="btn-vend" onclick="abrirVendedor()">📊 Ver por vendedor</button>
+        <button class="btn-vend" id="btnMasivo" style="display:none" onclick="abrirMasivo()">📡 Masivo</button>
+        <button class="btn-vend" id="btnRecarga" style="display:none" onclick="abrirRecargaDash()">⚡ Recarga</button>
         <button class="btn-out" onclick="doLogout()">Cerrar sesión</button>
       </div>
     </div>
@@ -176,8 +179,8 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
 <div id="recarScreen" class="screen">
   <div class="main-wrap">
     <div class="top-bar">
-      <div class="top-left"><h2>MULTIMARCA — RECAR-MM</h2><div class="pdv">Avance por responsable y asesor</div></div>
-      <div class="top-actions"><button class="btn-out" onclick="doLogout()">Cerrar sesión</button></div>
+      <div class="top-left"><h2>COORD. CAMPO — Avance de Campo</h2><div class="pdv">Avance por responsable y asesor</div></div>
+      <div class="top-actions"><button class="btn-vend" id="btnRecarDash" style="display:none" onclick="abrirRecargaAmparo()">⚡ Recarga</button><button class="btn-out" onclick="doLogout()">Cerrar sesión</button></div>
     </div>
     <div class="mes-tabs" id="recarMesTabs"></div>
     <div id="recarInfo" class="info-row"></div>
@@ -196,6 +199,15 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
   <iframe id="vFrame" style="width:100%;height:calc(100vh - 53px);border:none;display:block;background:#0a0b0d"></iframe>
 </div>
 
+<!-- ============ EMBED (Masivo / Recarga dentro del mismo link) ============ -->
+<div id="embedScreen" class="screen">
+  <div style="background:#1a1a2e;padding:10px 16px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:10">
+    <button class="btn-out" onclick="salirEmbed()">← Volver</button>
+    <span id="embedTitle" style="color:#fff;font-weight:600;font-size:14px">—</span>
+  </div>
+  <iframe id="embedFrame" style="width:100%;height:calc(100vh - 53px);border:none;display:block;background:#0a0b0d"></iframe>
+</div>
+
 <script>
 /* ====================== CONFIG ====================== */
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxlm0VRD8L88rtmDJStmEM1JkcOvO3DbZIQAM8VcVBbRF5nwbS_HpH35QsvNPK-RK9H/exec";
@@ -210,8 +222,9 @@ const PWD={
   "Tienda - Rambla Brasil":"Brasil7998",
   "Tienda - Santa Anita":"SAnita9995",
   "Call Center":"Callcen-2026",
-  "GERENCIA":"Gerencia-2026",
-  "AMPARO":"Amparo2026"
+  "GERENCIA":"tiendas",
+  "AMPARO":"campo",
+  "COMERCIAL":"jmaza"
 };
 
 // Nombre de hoja por tienda (debe coincidir EXACTO con la pestaña del Google Sheet)
@@ -252,7 +265,7 @@ const MESES=[
 ];
 
 let curTienda="", curMes="junio", cache={};
-let gerenteMode=false, gerMes="junio", gerMode="all", gerSel=new Set(); // all = cuota global; custom = tiendas marcadas
+let gerenteMode=false, comercialMode=false, gerMes="junio", gerMode="all", gerSel=new Set(); // all = cuota global; custom = tiendas marcadas
 
 /* ====================== LOGIN ====================== */
 function doLogin(){
@@ -262,8 +275,21 @@ function doLogin(){
   if(!t||PWD[t]!==p){e.style.display="block";return;}
   e.style.display="none";
 
+  if(t==="COMERCIAL"){
+    gerenteMode=true; comercialMode=true;
+    document.getElementById("btnMasivo").style.display="";
+    document.getElementById("btnRecarga").style.display="";
+    var _gh=document.querySelector("#gerScreen h2"); if(_gh) _gh.textContent="COMERCIAL — Consolidado";
+    showScreen("gerScreen");
+    renderGerMesTabs();
+    renderGerChips();
+    loadGerencia();
+    return;
+  }
   if(t==="GERENCIA"){
     gerenteMode=true;
+    document.getElementById("btnMasivo").style.display="";
+    document.getElementById("btnRecarga").style.display="none";
     showScreen("gerScreen");
     renderGerMesTabs();
     renderGerChips();
@@ -272,6 +298,7 @@ function doLogin(){
   }
   if(t==="AMPARO"){
     gerenteMode=false;
+    document.getElementById("btnRecarDash").style.display="";
     showScreen("recarScreen");
     renderRecarMes();
     loadRecar();
@@ -285,8 +312,22 @@ function doLogin(){
   loadData(curMes);
 }
 
+let embedReturn="gerScreen";
+function openEmbed(url,title,ret){
+  embedReturn=ret||"gerScreen";
+  document.getElementById("embedTitle").textContent=title;
+  var fr=document.getElementById("embedFrame");
+  if(fr.getAttribute("data-src")!==url){ fr.src=url; fr.setAttribute("data-src",url); }
+  showScreen("embedScreen");
+}
+function salirEmbed(){ showScreen(embedReturn); }
+function abrirMasivo(){ openEmbed("DASHBOARD_BLAZEL_LIVE.html?embed=1","📡 Masivo · Centro de Mando","gerScreen"); }
+function abrirRecargaDash(){ openEmbed("DASHBOARD_RECARGAS_BLAZEL.html?embed=1&u=jmaza","⚡ Recarga","gerScreen"); }
+function abrirRecargaAmparo(){ openEmbed("DASHBOARD_RECARGAS_BLAZEL.html?embed=1&u=amparo","⚡ Recarga","recarScreen"); }
 function doLogout(){
-  curTienda="";gerenteMode=false;
+  curTienda="";gerenteMode=false;comercialMode=false;
+  ["btnMasivo","btnRecarga","btnRecarDash"].forEach(function(id){ var b=document.getElementById(id); if(b) b.style.display="none"; });
+  var _gh=document.querySelector("#gerScreen h2"); if(_gh) _gh.textContent="COORD. TIENDAS — Consolidado";
   document.getElementById("passIn").value="";
   document.getElementById("tiendaSel").value="";
   showScreen("loginScreen");
@@ -298,7 +339,7 @@ function doLogout(){
 }
 
 function showScreen(id){
-  ["loginScreen","mainScreen","gerScreen","vendedorScreen","recarScreen"].forEach(s=>{
+  ["loginScreen","mainScreen","gerScreen","vendedorScreen","recarScreen","embedScreen"].forEach(s=>{
     document.getElementById(s).classList.toggle("active", s===id);
   });
 }
