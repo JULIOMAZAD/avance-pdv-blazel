@@ -264,15 +264,10 @@
         <button class="success" onclick="createManualBackup()">Copia de seguridad</button>
         <button class="secondary" onclick="exportExcel()">Exportar Excel</button>
         <button class="secondary" onclick="exportPDF()">Exportar PDF</button>
-        <button class="secondary" onclick="exportJSON()">Exportar JSON</button>
         <label class="file-label secondary">Importar Excel<input id="importExcel" type="file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" /></label>
-        <label class="file-label secondary">Importar JSON / respaldo<input id="importJson" type="file" accept="application/json" /></label>
-        <button class="secondary" onclick="exportCSV('empleados')">CSV trabajadores</button>
-        <button class="secondary" onclick="exportCSV('postulantes')">CSV postulantes</button>
-        <button class="danger" onclick="resetAll()">Borrar todo</button>
+        <button class="danger" onclick="verCesados()">Ver cesados</button>
       </div>
       <div class="status-bar muted">
-        <div>Los datos se guardan en la nube (Google Sheets) y son compartidos entre Julio, Amparo y Gustavo. Usa "Actualizar desde la nube" si otro usuario acaba de editar.</div>
         <div id="lastSaveInfo">Sin guardar aún</div>
       </div>
     </div>
@@ -282,7 +277,6 @@
       <button class="tab" data-tab="consulta">Consulta</button>
       <button class="tab" data-tab="empleados">Trabajadores</button>
       <button class="tab" data-tab="postulantes">Postulantes</button>
-      <button class="tab" data-tab="respaldo">Respaldos</button>
     </div>
 
     <section id="tab-inicio" class="tab-panel">
@@ -294,34 +288,17 @@
         <div class="box"><div class="muted">No asistieron</div><div class="n" id="kpiNoAsistio">0</div></div>
       </div>
 
-      <div class="grid grid-2" style="margin-top:16px;">
-        <div class="card">
-          <h3>Funciones incorporadas</h3>
-          <div class="small">
-            <p>• Alta, edición y eliminación de trabajadores y postulantes.</p>
-            <p>• Consulta por DNI o CE con resumen del estado laboral o de postulación.</p>
-            <p>• Exportación a Excel, PDF, JSON y CSV.</p>
-            <p>• Importación desde Excel con columnas como Cargo, Datos, PDV, Time, Tipo de doc, N° y Fecha de ingreso.</p>
-            <p>• Copias de seguridad automáticas y manuales.</p>
-          </div>
-        </div>
-        <div class="card">
-          <h3>Recomendación de uso compartido</h3>
-          <p class="small">Si varias personas van a usar el sistema, definid una rutina simple: una persona exporta el respaldo JSON y la otra lo importa antes de seguir trabajando. Así evitáis perder cambios.</p>
-          <div class="info-box small">El botón <b>Exportar PDF</b> abre una versión lista para imprimir. Desde la ventana de impresión del navegador podéis elegir <b>Guardar como PDF</b>.</div>
-        </div>
-      </div>
     </section>
 
     <section id="tab-consulta" class="tab-panel hidden">
       <div class="card">
-        <h2>Consulta por DNI o CE</h2>
+        <h2>Consulta por DNI, CE o Nombre</h2>
         <div class="search-box">
-          <input id="searchDoc" placeholder="Escribe DNI o Carnet de Extranjería" />
+          <input id="searchDoc" placeholder="Escribe DNI, Carnet de Extranjería o Nombre" />
           <button class="primary" onclick="searchPerson()">Buscar</button>
           <button class="light" onclick="clearSearch()">Limpiar</button>
         </div>
-        <div id="searchResult" class="result-box">Introduce un documento para consultar.</div>
+        <div id="searchResult" class="result-box">Introduce un documento o Nombre para consultar.</div>
       </div>
     </section>
 
@@ -339,7 +316,8 @@
             <div class="col-6"><label>Nombres y apellidos</label><input id="empName" required /></div>
             <div class="col-3"><label>Teléfono</label><input id="empPhone" /></div>
             <div class="col-3"><label>Correo</label><input id="empEmail" type="email" /></div>
-            <div class="col-3"><label>Empresa o sede</label><input id="empCompany" /></div>
+            <div class="col-3"><label>Área</label><input id="empCompany" /></div>
+            <div class="col-3"><label>Tienda / PDV</label><select id="empTienda"></select></div>
             <div class="col-3"><label>Puesto o cargo</label><input id="empRole" /></div>
             <div class="col-3"><label>Jornada / Time</label><input id="empTime" placeholder="Ej. Full Time, Part Time" /></div>
             <div class="col-3"><label>Fecha de ingreso</label><input id="empStart" type="date" required /></div>
@@ -360,7 +338,12 @@
           <h2>Listado de trabajadores</h2>
           <span class="muted small">Incluye edición y eliminación.</span>
         </div>
-        <input id="employeeFilter" placeholder="Filtrar por documento, nombre, sede o puesto" oninput="renderEmployees()" />
+        <div class="inline-actions" style="margin-bottom:10px;">
+          <button class="tab active" id="empFilterAll" onclick="setEmployeeStatusFilter('todos')">Todos</button>
+          <button class="tab" id="empFilterActivos" onclick="setEmployeeStatusFilter('Activo')">Activos</button>
+          <button class="tab" id="empFilterCesados" onclick="setEmployeeStatusFilter('Cesado')">Cesados</button>
+        </div>
+        <input id="employeeFilter" placeholder="Filtrar por documento, nombre, área o puesto" oninput="renderEmployees()" />
         <div class="table-wrap">
           <table>
             <thead>
@@ -368,7 +351,8 @@
                 <th>Documento</th>
                 <th>Nombre</th>
                 <th>Teléfono / correo</th>
-                <th>Sede</th>
+                <th>Área</th>
+                <th>Tienda</th>
                 <th>Puesto</th>
                 <th>Jornada</th>
                 <th>Ingreso</th>
@@ -399,7 +383,8 @@
             <div class="col-6"><label>Nombres y apellidos</label><input id="appName" required /></div>
             <div class="col-3"><label>Teléfono</label><input id="appPhone" /></div>
             <div class="col-3"><label>Correo</label><input id="appEmail" type="email" /></div>
-            <div class="col-3"><label>Empresa o sede</label><input id="appCompany" /></div>
+            <div class="col-3"><label>Área</label><input id="appCompany" /></div>
+            <div class="col-3"><label>Tienda / PDV</label><select id="appTienda"></select></div>
             <div class="col-3"><label>Puesto o área postulada</label><input id="appArea" /></div>
             <div class="col-3"><label>Fecha de postulación</label><input id="appDate" type="date" required /></div>
             <div class="col-3"><label>Resultado</label><select id="appResult" onchange="toggleApplicantResult()"><option value="En evaluación">En evaluación</option><option value="Ingresó">Ingresó</option><option value="No ingresó">No ingresó</option><option value="No asistió">No asistió</option></select></div>
@@ -419,7 +404,7 @@
           <h2>Listado de postulantes</h2>
           <span class="muted small">Incluye edición y eliminación.</span>
         </div>
-        <input id="applicantFilter" placeholder="Filtrar por documento, nombre, sede o área" oninput="renderApplicants()" />
+        <input id="applicantFilter" placeholder="Filtrar por documento, nombre o área" oninput="renderApplicants()" />
         <div class="table-wrap">
           <table>
             <thead>
@@ -427,7 +412,8 @@
                 <th>Documento</th>
                 <th>Nombre</th>
                 <th>Teléfono / correo</th>
-                <th>Sede</th>
+                <th>Área</th>
+                <th>Tienda</th>
                 <th>Puesto / área</th>
                 <th>Postulación</th>
                 <th>Resultado</th>
@@ -441,38 +427,31 @@
         </div>
       </div>
     </section>
-
-    <section id="tab-respaldo" class="tab-panel hidden">
-      <div class="grid grid-2">
-        <div class="card">
-          <h2>Copias de seguridad</h2>
-          <div class="toolbar">
-            <button class="success" onclick="createManualBackup()">Crear copia ahora</button>
-            <button class="secondary" onclick="downloadLatestBackup()">Descargar última copia</button>
-            <button class="light" onclick="clearBackups()">Limpiar historial</button>
-          </div>
-          <div class="muted">Se guardan automáticamente hasta 20 copias locales con fecha y hora. También puedes exportar una copia en JSON para guardarla fuera del navegador.</div>
-          <div style="margin-top:10px;" id="backupSummary" class="small"></div>
-          <div id="backupList" class="backup-list"></div>
-        </div>
-
-        <div class="card">
-          <h2>Qué incluye el respaldo</h2>
-          <div class="small">
-            <p>• Todos los trabajadores registrados.</p>
-            <p>• Todos los postulantes registrados.</p>
-            <p>• Fecha y hora del respaldo.</p>
-            <p>• Tipo de respaldo: automático o manual.</p>
-          </div>
-          <div class="info-box small">Para restaurar un respaldo, puedes usar el botón <b>Restaurar</b> dentro del historial o importar un archivo JSON previamente exportado.</div>
-        </div>
-      </div>
-    </section>
   </div>
   </div>
 
   <script>
     const STORAGE_KEY = 'control_personal_postulantes_v2';
+
+    // ==== LISTA DE TIENDAS / PDV ====
+    // Para agregar una tienda nueva más adelante: solo añade una línea con el nombre
+    // entre comillas y una coma al final (menos en la última), guarda el archivo y
+    // vuelve a subirlo a GitHub. No hace falta tocar nada más.
+    const TIENDAS = [
+      'Mall Bellavista',
+      'Mall del Sur 1',
+      'Mall del Sur 2',
+      'Mega Plaza',
+      'Plaza Norte',
+      'Primavera',
+      'Rambla Brasil',
+      'Santa Anita 1',
+      'Santa Anita 2',
+      'Call Center',
+      'Multimarca',
+      'Administrativo',
+      'Otro'
+    ];
     const META_KEY = 'control_personal_postulantes_meta_v2';
     const BACKUP_KEY = 'control_personal_postulantes_backups_v2';
     const SESSION_KEY = 'control_personal_session_v1';
@@ -608,6 +587,16 @@
       }
     }
 
+    function populateTiendaSelects() {
+      const opts = '<option value="">-- Selecciona --</option>' +
+        TIENDAS.map(function(t) { return '<option value="' + esc(t) + '">' + esc(t) + '</option>'; }).join('');
+      const e1 = document.getElementById('empTienda');
+      const e2 = document.getElementById('appTienda');
+      if (e1) e1.innerHTML = opts;
+      if (e2) e2.innerHTML = opts;
+    }
+    populateTiendaSelects();
+
     function pad2(v) {
       return String(v || '').padStart(2, '0');
     }
@@ -674,7 +663,8 @@
         name: name,
         phone: norm(getRowValue(row, ['TELEFONO', 'CELULAR', 'MOVIL'])),
         email: norm(getRowValue(row, ['CORREO', 'EMAIL'])),
-        company: norm(getRowValue(row, ['PDV', 'SEDE', 'EMPRESA', 'TIENDA', 'LOCAL'])),
+        company: norm(getRowValue(row, ['AREA', 'ÁREA', 'EMPRESA', 'SEDE'])),
+        tienda: norm(getRowValue(row, ['TIENDA', 'PDV', 'LOCAL', 'PUNTO DE VENTA'])),
         role: norm(getRowValue(row, ['CARGO', 'PUESTO', 'ROL'])),
         time: norm(getRowValue(row, ['TIME', 'JORNADA', 'TURNO', 'HORARIO'])),
         startDate: parseExcelDate(getRowValue(row, ['FECHA DE INGRESO', 'INGRESO', 'FEC INGRESO'])),
@@ -700,7 +690,8 @@
         name: name,
         phone: norm(getRowValue(row, ['TELEFONO', 'CELULAR', 'MOVIL'])),
         email: norm(getRowValue(row, ['CORREO', 'EMAIL'])),
-        company: norm(getRowValue(row, ['PDV', 'SEDE', 'EMPRESA', 'TIENDA', 'LOCAL'])),
+        company: norm(getRowValue(row, ['AREA', 'ÁREA', 'EMPRESA', 'SEDE'])),
+        tienda: norm(getRowValue(row, ['TIENDA', 'PDV', 'LOCAL', 'PUNTO DE VENTA'])),
         appliedArea: norm(getRowValue(row, ['PUESTO / AREA', 'AREA POSTULADA', 'AREA', 'CARGO', 'PUESTO'])),
         applyDate: parseExcelDate(getRowValue(row, ['FECHA DE POSTULACION', 'POSTULACION', 'FECHA'])) ,
         result: result,
@@ -847,8 +838,8 @@
       const rows = type === 'empleados' ? state.empleados : state.postulantes;
       if (!rows.length) return alert('No hay registros para exportar.');
       const cols = type === 'empleados'
-        ? ['docType','doc','name','phone','email','company','role','time','startDate','status','endDate','endReason','notes']
-        : ['docType','doc','name','phone','email','company','appliedArea','applyDate','result','ingresoArea','reason','notes'];
+        ? ['docType','doc','name','phone','email','company','tienda','role','time','startDate','status','endDate','endReason','notes']
+        : ['docType','doc','name','phone','email','company','tienda','appliedArea','applyDate','result','ingresoArea','reason','notes'];
       const header = cols.join(',');
       const body = rows.map(function(r) {
         return cols.map(function(c) {
@@ -876,13 +867,13 @@
     }
 
     function exportExcel() {
-      const employeeHeaders = ['Tipo doc', 'Documento', 'Nombres', 'Teléfono', 'Correo', 'Empresa/Sede', 'Puesto', 'Jornada/Time', 'Fecha ingreso', 'Estado', 'Fecha cese', 'Motivo cese', 'Observaciones'];
-      const applicantHeaders = ['Tipo doc', 'Documento', 'Nombres', 'Teléfono', 'Correo', 'Empresa/Sede', 'Puesto/Área', 'Fecha postulación', 'Resultado', 'Área ingreso', 'Motivo no ingreso/no asistió', 'Observaciones'];
+      const employeeHeaders = ['Tipo doc', 'Documento', 'Nombres', 'Teléfono', 'Correo', 'Área', 'Tienda', 'Puesto', 'Jornada/Time', 'Fecha ingreso', 'Estado', 'Fecha cese', 'Motivo cese', 'Observaciones'];
+      const applicantHeaders = ['Tipo doc', 'Documento', 'Nombres', 'Teléfono', 'Correo', 'Área', 'Tienda', 'Puesto/Área', 'Fecha postulación', 'Resultado', 'Área ingreso', 'Motivo no ingreso/no asistió', 'Observaciones'];
       const employeeRows = state.empleados.map(function(r) {
-        return [r.docType, r.doc, r.name, r.phone, r.email, r.company, r.role, r.time, r.startDate, r.status, r.endDate, r.endReason, r.notes];
+        return [r.docType, r.doc, r.name, r.phone, r.email, r.company, r.tienda, r.role, r.time, r.startDate, r.status, r.endDate, r.endReason, r.notes];
       });
       const applicantRows = state.postulantes.map(function(r) {
-        return [r.docType, r.doc, r.name, r.phone, r.email, r.company, r.appliedArea, r.applyDate, r.result, r.ingresoArea, r.reason, r.notes];
+        return [r.docType, r.doc, r.name, r.phone, r.email, r.company, r.tienda, r.appliedArea, r.applyDate, r.result, r.ingresoArea, r.reason, r.notes];
       });
       const summaryHeaders = ['Indicador', 'Valor'];
       const summaryRows = [
@@ -933,6 +924,7 @@
           '<td>' + esc(r.docType + ' ' + r.doc) + '</td>' +
           '<td>' + esc(r.name) + '</td>' +
           '<td>' + esc(r.company) + '</td>' +
+          '<td>' + esc(r.tienda || '-') + '</td>' +
           '<td>' + esc(r.role) + '</td>' +
           '<td>' + esc(r.time || '-') + '</td>' +
           '<td>' + esc(fmtDate(r.startDate)) + '</td>' +
@@ -940,7 +932,7 @@
           '<td>' + esc(fmtDate(r.endDate)) + '</td>' +
           '<td>' + esc(r.endReason) + '</td>' +
           '</tr>';
-      }).join('') || '<tr><td colspan="9">Sin registros</td></tr>';
+      }).join('') || '<tr><td colspan="10">Sin registros</td></tr>';
 
       const appRows = state.postulantes.map(function(r) {
         const detail = r.result === 'Ingresó' ? (r.ingresoArea || '-') : (r.reason || '-');
@@ -948,12 +940,13 @@
           '<td>' + esc(r.docType + ' ' + r.doc) + '</td>' +
           '<td>' + esc(r.name) + '</td>' +
           '<td>' + esc(r.company) + '</td>' +
+          '<td>' + esc(r.tienda || '-') + '</td>' +
           '<td>' + esc(r.appliedArea) + '</td>' +
           '<td>' + esc(fmtDate(r.applyDate)) + '</td>' +
           '<td>' + esc(r.result) + '</td>' +
           '<td>' + esc(detail) + '</td>' +
           '</tr>';
-      }).join('') || '<tr><td colspan="7">Sin registros</td></tr>';
+      }).join('') || '<tr><td colspan="8">Sin registros</td></tr>';
 
       const html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Reporte PDF</title>' +
         '<style>' +
@@ -979,9 +972,9 @@
         '<div class="box"><div>No asistieron</div><div class="n">' + noAsistioCount + '</div></div>' +
         '</div>' +
         '<h2>Trabajadores</h2>' +
-        '<table><thead><tr><th>Documento</th><th>Nombre</th><th>Sede</th><th>Puesto</th><th>Jornada</th><th>Ingreso</th><th>Estado</th><th>Cese</th><th>Motivo</th></tr></thead><tbody>' + empRows + '</tbody></table>' +
+        '<table><thead><tr><th>Documento</th><th>Nombre</th><th>Área</th><th>Tienda</th><th>Puesto</th><th>Jornada</th><th>Ingreso</th><th>Estado</th><th>Cese</th><th>Motivo</th></tr></thead><tbody>' + empRows + '</tbody></table>' +
         '<h2>Postulantes</h2>' +
-        '<table><thead><tr><th>Documento</th><th>Nombre</th><th>Sede</th><th>Puesto/Área</th><th>Postulación</th><th>Resultado</th><th>Detalle</th></tr></thead><tbody>' + appRows + '</tbody></table>' +
+        '<table><thead><tr><th>Documento</th><th>Nombre</th><th>Área</th><th>Tienda</th><th>Puesto/Área</th><th>Postulación</th><th>Resultado</th><th>Detalle</th></tr></thead><tbody>' + appRows + '</tbody></table>' +
         '</body></html>';
 
       const win = window.open('', '_blank');
@@ -1053,9 +1046,10 @@
     }
 
     function renderBackups() {
-      const list = getBackups();
       const summary = document.getElementById('backupSummary');
       const box = document.getElementById('backupList');
+      if (!summary || !box) return;
+      const list = getBackups();
       summary.textContent = list.length ? ('Copias disponibles: ' + list.length) : 'No hay copias guardadas todavía.';
       if (!list.length) {
         box.innerHTML = '<div class="empty-state">Aún no hay copias guardadas. Guarda datos o crea una copia manual.</div>';
@@ -1149,6 +1143,7 @@
         phone: norm(document.getElementById('empPhone').value),
         email: norm(document.getElementById('empEmail').value),
         company: norm(document.getElementById('empCompany').value),
+        tienda: norm(document.getElementById('empTienda').value),
         role: norm(document.getElementById('empRole').value),
         time: norm(document.getElementById('empTime').value),
         startDate: norm(document.getElementById('empStart').value),
@@ -1173,6 +1168,7 @@
         phone: norm(document.getElementById('appPhone').value),
         email: norm(document.getElementById('appEmail').value),
         company: norm(document.getElementById('appCompany').value),
+        tienda: norm(document.getElementById('appTienda').value),
         appliedArea: norm(document.getElementById('appArea').value),
         applyDate: norm(document.getElementById('appDate').value),
         result: norm(document.getElementById('appResult').value),
@@ -1203,6 +1199,19 @@
       toggleApplicantResult();
     }
 
+    function marcarCese(id) {
+      editEmployee(id);
+      document.getElementById('empStatus').value = 'Cesado';
+      toggleCese();
+      document.getElementById('employeeFormTitle').textContent = 'Dar de cese a trabajador';
+      const endInput = document.getElementById('empEnd');
+      endInput.focus();
+      const today = new Date();
+      if (!endInput.value) {
+        endInput.value = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+      }
+    }
+
     function editEmployee(id) {
       const r = state.empleados.find(function(x) { return x.id === id; });
       if (!r) return;
@@ -1213,6 +1222,7 @@
       document.getElementById('empPhone').value = r.phone || '';
       document.getElementById('empEmail').value = r.email || '';
       document.getElementById('empCompany').value = r.company || '';
+      document.getElementById('empTienda').value = r.tienda || '';
       document.getElementById('empRole').value = r.role || '';
       document.getElementById('empTime').value = r.time || '';
       document.getElementById('empStart').value = r.startDate || '';
@@ -1236,6 +1246,7 @@
       document.getElementById('appPhone').value = r.phone || '';
       document.getElementById('appEmail').value = r.email || '';
       document.getElementById('appCompany').value = r.company || '';
+      document.getElementById('appTienda').value = r.tienda || '';
       document.getElementById('appArea').value = r.appliedArea || '';
       document.getElementById('appDate').value = r.applyDate || '';
       document.getElementById('appResult').value = r.result || 'En evaluación';
@@ -1260,10 +1271,26 @@
       saveData(false, 'auto');
     }
 
+    function verCesados() {
+      showTab('empleados');
+      setEmployeeStatusFilter('Cesado');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    let employeeStatusFilter = 'todos';
+    function setEmployeeStatusFilter(status) {
+      employeeStatusFilter = status;
+      document.getElementById('empFilterAll').classList.toggle('active', status === 'todos');
+      document.getElementById('empFilterActivos').classList.toggle('active', status === 'Activo');
+      document.getElementById('empFilterCesados').classList.toggle('active', status === 'Cesado');
+      renderEmployees();
+    }
+
     function renderEmployees() {
       const q = norm(document.getElementById('employeeFilter').value).toLowerCase();
       const rows = state.empleados.filter(function(r) {
-        return [r.docType, r.doc, r.name, r.phone, r.email, r.company, r.role, r.time, r.status, r.endReason, r.notes].join(' ').toLowerCase().includes(q);
+        if (employeeStatusFilter !== 'todos' && r.status !== employeeStatusFilter) return false;
+        return [r.docType, r.doc, r.name, r.phone, r.email, r.company, r.tienda, r.role, r.time, r.status, r.endReason, r.notes].join(' ').toLowerCase().includes(q);
       });
       const body = document.getElementById('employeeTable');
       body.innerHTML = rows.map(function(r) {
@@ -1272,6 +1299,7 @@
           '<td>' + esc(r.name) + '</td>' +
           '<td><span class="small">' + esc(r.phone || '-') + '<br>' + esc(r.email || '-') + '</span></td>' +
           '<td>' + esc(r.company) + '</td>' +
+          '<td>' + esc(r.tienda || '-') + '</td>' +
           '<td>' + esc(r.role) + '</td>' +
           '<td>' + esc(r.time || '-') + '</td>' +
           '<td>' + esc(fmtDate(r.startDate)) + '</td>' +
@@ -1279,15 +1307,17 @@
           '<td>' + esc(fmtDate(r.endDate)) + '</td>' +
           '<td>' + esc(r.endReason || '-') + '</td>' +
           '<td>' + esc(r.notes || '-') + '</td>' +
-          '<td class="actions"><button class="light" onclick="editEmployee(\'' + r.id + '\')">Editar</button><button class="danger" onclick="deleteEmployee(\'' + r.id + '\')">Eliminar</button></td>' +
+          '<td class="actions"><button class="light" onclick="editEmployee(\'' + r.id + '\')">Editar</button>' +
+          (r.status === 'Activo' ? '<button class="secondary" onclick="marcarCese(\'' + r.id + '\')">Dar de cese</button>' : '') +
+          '<button class="danger" onclick="deleteEmployee(\'' + r.id + '\')">Eliminar</button></td>' +
           '</tr>';
-      }).join('') || '<tr><td colspan="12">Sin registros.</td></tr>';
+      }).join('') || '<tr><td colspan="13">Sin registros.</td></tr>';
     }
 
     function renderApplicants() {
       const q = norm(document.getElementById('applicantFilter').value).toLowerCase();
       const rows = state.postulantes.filter(function(r) {
-        return [r.docType, r.doc, r.name, r.phone, r.email, r.company, r.appliedArea, r.result, r.ingresoArea, r.reason, r.notes].join(' ').toLowerCase().includes(q);
+        return [r.docType, r.doc, r.name, r.phone, r.email, r.company, r.tienda, r.appliedArea, r.result, r.ingresoArea, r.reason, r.notes].join(' ').toLowerCase().includes(q);
       });
       const body = document.getElementById('applicantTable');
       body.innerHTML = rows.map(function(r) {
@@ -1297,6 +1327,7 @@
           '<td>' + esc(r.name) + '</td>' +
           '<td><span class="small">' + esc(r.phone || '-') + '<br>' + esc(r.email || '-') + '</span></td>' +
           '<td>' + esc(r.company) + '</td>' +
+          '<td>' + esc(r.tienda || '-') + '</td>' +
           '<td>' + esc(r.appliedArea) + '</td>' +
           '<td>' + esc(fmtDate(r.applyDate)) + '</td>' +
           '<td>' + badgeStatus('app', r.result) + '</td>' +
@@ -1304,27 +1335,31 @@
           '<td>' + esc(r.notes || '-') + '</td>' +
           '<td class="actions"><button class="light" onclick="editApplicant(\'' + r.id + '\')">Editar</button><button class="danger" onclick="deleteApplicant(\'' + r.id + '\')">Eliminar</button></td>' +
           '</tr>';
-      }).join('') || '<tr><td colspan="10">Sin registros.</td></tr>';
+      }).join('') || '<tr><td colspan="11">Sin registros.</td></tr>';
     }
 
     function searchPerson() {
-      const doc = cleanDoc(document.getElementById('searchDoc').value);
+      const raw = norm(document.getElementById('searchDoc').value);
+      const doc = cleanDoc(raw);
+      const nameQuery = raw.toLowerCase();
       const box = document.getElementById('searchResult');
-      if (!doc) {
-        box.innerHTML = 'Escribe un documento válido.';
+      if (!raw) {
+        box.innerHTML = 'Escribe un documento o Nombre válido.';
         return;
       }
-      const emps = state.empleados.filter(function(x) { return cleanDoc(x.doc) === doc; });
-      const apps = state.postulantes.filter(function(x) { return cleanDoc(x.doc) === doc; });
+      const matchDoc = function(x) { return doc && cleanDoc(x.doc) === doc; };
+      const matchName = function(x) { return nameQuery.length >= 3 && (x.name || '').toLowerCase().includes(nameQuery); };
+      const emps = state.empleados.filter(function(x) { return matchDoc(x) || matchName(x); });
+      const apps = state.postulantes.filter(function(x) { return matchDoc(x) || matchName(x); });
       if (!emps.length && !apps.length) {
-        box.innerHTML = '<b>No se encontraron registros</b><br><span class="muted">El documento ' + esc(doc) + ' no figura como trabajador ni postulante.</span>';
+        box.innerHTML = '<b>No se encontraron registros</b><br><span class="muted">No figura ningún trabajador ni postulante con ese documento o Nombre.</span>';
         return;
       }
       let html = '';
       emps.forEach(function(e) {
         const summary = e.status === 'Activo'
-          ? 'Actualmente trabaja en <b>' + esc(e.company || 'sin sede') + '</b> como <b>' + esc(e.role || 'sin puesto') + '</b> desde el <b>' + esc(fmtDate(e.startDate)) + '</b>.'
-          : 'Trabajó en <b>' + esc(e.company || 'sin sede') + '</b> como <b>' + esc(e.role || 'sin puesto') + '</b> desde el <b>' + esc(fmtDate(e.startDate)) + '</b> hasta el <b>' + esc(fmtDate(e.endDate)) + '</b>. Motivo de cese: <b>' + esc(e.endReason || 'no registrado') + '</b>.';
+          ? 'Actualmente trabaja en <b>' + esc(e.company || 'sin área') + '</b>' + (e.tienda ? (' (' + esc(e.tienda) + ')') : '') + ' como <b>' + esc(e.role || 'sin puesto') + '</b> desde el <b>' + esc(fmtDate(e.startDate)) + '</b>.'
+          : 'Trabajó en <b>' + esc(e.company || 'sin área') + '</b>' + (e.tienda ? (' (' + esc(e.tienda) + ')') : '') + ' como <b>' + esc(e.role || 'sin puesto') + '</b> desde el <b>' + esc(fmtDate(e.startDate)) + '</b> hasta el <b>' + esc(fmtDate(e.endDate)) + '</b>. Motivo de cese: <b>' + esc(e.endReason || 'no registrado') + '</b>.';
         html += '<div style="margin-bottom:12px;">' +
           '<div>' + badgeStatus('emp', e.status) + ' <b>' + esc(e.name) + '</b> · ' + esc(e.docType) + ' ' + esc(e.doc) + '</div>' +
           '<div style="margin-top:6px;">' + summary + '</div>' +
@@ -1348,7 +1383,7 @@
 
     function clearSearch() {
       document.getElementById('searchDoc').value = '';
-      document.getElementById('searchResult').innerHTML = 'Introduce un documento para consultar.';
+      document.getElementById('searchResult').innerHTML = 'Introduce un documento o Nombre para consultar.';
     }
 
     function renderKpis() {
@@ -1421,26 +1456,6 @@
       } catch (err) {
         console.error(err);
         alert('No se pudo importar el archivo Excel. Revisa el formato e inténtalo de nuevo.');
-      }
-      e.target.value = '';
-    });
-
-    document.getElementById('importJson').addEventListener('change', async function(e) {
-      const file = e.target.files[0];
-      if (!file) return;
-      try {
-        const text = await file.text();
-        const data = JSON.parse(text);
-        const empleados = Array.isArray(data.empleados) ? data.empleados : [];
-        const postulantes = Array.isArray(data.postulantes) ? data.postulantes : [];
-        state.empleados = empleados;
-        state.postulantes = postulantes;
-        saveData(false, 'manual');
-        clearEmployeeForm();
-        clearApplicantForm();
-        alert('Datos importados correctamente.');
-      } catch (err) {
-        alert('El archivo JSON no es válido.');
       }
       e.target.value = '';
     });
