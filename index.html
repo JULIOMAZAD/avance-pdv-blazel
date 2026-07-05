@@ -61,7 +61,6 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
 .spinner{display:inline-block;width:32px;height:32px;border:3px solid #eee;border-top-color:#cc0000;border-radius:50%;animation:spin .8s linear infinite;margin-bottom:12px}
 @keyframes spin{to{transform:rotate(360deg)}}
 .load-err{background:#fff5f5;border:1px solid #fcc;border-radius:10px;padding:1rem;color:#cc0000;font-size:13px;margin-bottom:1rem}
-/* ===== Gerencia: selector de tiendas ===== */
 .ger-pick{background:#fff;border-radius:14px;padding:1rem 1.25rem;margin-bottom:1rem}
 .ger-pick h3{font-size:13px;font-weight:700;color:#1a1a2e;margin-bottom:.75rem;text-transform:uppercase;letter-spacing:.5px}
 .ger-chips{display:flex;gap:8px;flex-wrap:wrap}
@@ -69,7 +68,6 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
 .tchip.on{border-color:#cc0000;background:#cc0000;color:#fff}
 .tchip.all{border-color:#1a1a2e;color:#1a1a2e}
 .tchip.all.on{background:#1a1a2e;border-color:#1a1a2e;color:#fff}
-/* ===== KPIs ===== */
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:1rem}
 .kpi{background:#fff;border-radius:14px;padding:1rem 1.25rem;border-left:4px solid #cc0000}
 .kpi .lbl{font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px}
@@ -90,7 +88,6 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
 </head>
 <body>
 
-<!-- ============ LOGIN ============ -->
 <div id="loginScreen" class="screen active">
   <div class="login-wrap">
     <div class="login-card">
@@ -127,7 +124,6 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
   </div>
 </div>
 
-<!-- ============ TIENDA (vista por punto de venta) ============ -->
 <div id="mainScreen" class="screen">
   <div class="main-wrap">
     <div class="top-bar">
@@ -148,7 +144,6 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
   </div>
 </div>
 
-<!-- ============ GERENCIA (consolidado de tiendas) ============ -->
 <div id="gerScreen" class="screen">
   <div class="main-wrap">
     <div class="top-bar">
@@ -160,6 +155,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
         <button class="btn-vend" onclick="abrirVendedor()">📊 Ver por vendedor</button>
         <button class="btn-vend" id="btnMasivo" style="display:none" onclick="abrirMasivo()">📡 Masivo</button>
         <button class="btn-vend" id="btnRecarga" style="display:none" onclick="abrirRecargaDash()">⚡ Recarga</button>
+        <button class="btn-vend" onclick="abrirPersonal('gerScreen')">🗂️ Control Personal</button>
         <button class="btn-out" onclick="doLogout()">Cerrar sesión</button>
       </div>
     </div>
@@ -175,12 +171,11 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
   </div>
 </div>
 
-<!-- ============ RECAR-MM (Amparo) ============ -->
 <div id="recarScreen" class="screen">
   <div class="main-wrap">
     <div class="top-bar">
       <div class="top-left"><h2>COORD. CAMPO — Avance de Campo</h2><div class="pdv">Avance por responsable y asesor</div></div>
-      <div class="top-actions"><button class="btn-vend" id="btnRecarDash" style="display:none" onclick="abrirRecargaAmparo()">⚡ Recarga</button><button class="btn-out" onclick="doLogout()">Cerrar sesión</button></div>
+      <div class="top-actions"><button class="btn-vend" id="btnRecarDash" style="display:none" onclick="abrirRecargaAmparo()">⚡ Recarga</button><button class="btn-vend" onclick="abrirPersonal('recarScreen')">🗂️ Control Personal</button><button class="btn-out" onclick="doLogout()">Cerrar sesión</button></div>
     </div>
     <div class="mes-tabs" id="recarMesTabs"></div>
     <div id="recarInfo" class="info-row"></div>
@@ -190,7 +185,6 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
   </div>
 </div>
 
-<!-- ============ VENDEDOR (iframe al dashboard por vendedor) ============ -->
 <div id="vendedorScreen" class="screen">
   <div style="background:#1a1a2e;padding:10px 16px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:10">
     <button class="btn-out" id="vBackBtn" onclick="salirVendedor()">🏬 Tiendas</button>
@@ -199,7 +193,6 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
   <iframe id="vFrame" style="width:100%;height:calc(100vh - 53px);border:none;display:block;background:#0a0b0d"></iframe>
 </div>
 
-<!-- ============ EMBED (Masivo / Recarga dentro del mismo link) ============ -->
 <div id="embedScreen" class="screen">
   <div style="background:#1a1a2e;padding:10px 16px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:10">
     <button class="btn-out" onclick="salirEmbed()">← Volver</button>
@@ -209,7 +202,6 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
 </div>
 
 <script>
-/* ====================== CONFIG ====================== */
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxlm0VRD8L88rtmDJStmEM1JkcOvO3DbZIQAM8VcVBbRF5nwbS_HpH35QsvNPK-RK9H/exec";
 
 const PWD={
@@ -227,7 +219,6 @@ const PWD={
   "COMERCIAL":"jmaza"
 };
 
-// Nombre de hoja por tienda (debe coincidir EXACTO con la pestaña del Google Sheet)
 const SHEET_NAME={
   "Tienda - Mall Bellavista":"mall bellavista",
   "Tienda - Mall del Sur 1":"mall del sur 1",
@@ -239,7 +230,6 @@ const SHEET_NAME={
   "Tienda - Santa Anita":"santa anita",
   "Call Center":"call center"
 };
-// Etiqueta corta para los chips de Gerencia
 const TIENDA_LABEL={
   "Tienda - Mall Bellavista":"Bellavista",
   "Tienda - Mall del Sur 1":"Sur 1",
@@ -251,8 +241,7 @@ const TIENDA_LABEL={
   "Tienda - Santa Anita":"Santa Anita",
   "Call Center":"Call Center"
 };
-const GER_ALL=Object.keys(SHEET_NAME); // 10 tiendas (para ver una por una)
-// Cuota global oficial = 9 tiendas (Santa Anita 2 NO suma: repite a Santa Anita)
+const GER_ALL=Object.keys(SHEET_NAME);
 const GER_GLOBAL=[
   "Tienda - Mall Bellavista","Tienda - Mall del Sur 1","Tienda - Mall del Sur 2",
   "Tienda - Mega Plaza","Tienda - Plaza Norte","Tienda - Primavera",
@@ -265,9 +254,8 @@ const MESES=[
 ];
 
 let curTienda="", curMes="junio", cache={};
-let gerenteMode=false, comercialMode=false, gerMes="junio", gerMode="all", gerSel=new Set(); // all = cuota global; custom = tiendas marcadas
+let gerenteMode=false, comercialMode=false, gerMes="junio", gerMode="all", gerSel=new Set();
 
-/* ====================== LOGIN ====================== */
 function doLogin(){
   const t=document.getElementById("tiendaSel").value;
   const p=document.getElementById("passIn").value;
@@ -324,6 +312,7 @@ function salirEmbed(){ showScreen(embedReturn); }
 function abrirMasivo(){ openEmbed("DASHBOARD_BLAZEL_LIVE.html?embed=1","📡 Masivo · Centro de Mando","gerScreen"); }
 function abrirRecargaDash(){ openEmbed("DASHBOARD_RECARGAS_BLAZEL.html?embed=1&u=jmaza","⚡ Recarga","gerScreen"); }
 function abrirRecargaAmparo(){ openEmbed("DASHBOARD_RECARGAS_BLAZEL.html?embed=1&u=amparo","⚡ Recarga","recarScreen"); }
+function abrirPersonal(ret){ openEmbed("CONTROL_DE_PERSONAL.html","🗂️ Control de Personal",ret||"gerScreen"); }
 function doLogout(){
   curTienda="";gerenteMode=false;comercialMode=false;
   ["btnMasivo","btnRecarga","btnRecarDash"].forEach(function(id){ var b=document.getElementById(id); if(b) b.style.display="none"; });
@@ -344,7 +333,6 @@ function showScreen(id){
   });
 }
 
-/* ====================== VENDEDOR (iframe) ====================== */
 function abrirVendedor(){
   var f=document.getElementById('vFrame');
   if(!f.getAttribute('src')) f.setAttribute('src','vendedor.html?v=17');
@@ -356,7 +344,6 @@ function salirVendedor(){
 
 document.getElementById("passIn").addEventListener("keydown",e=>{if(e.key==="Enter")doLogin();});
 
-/* ====================== TIENDA (una sola) ====================== */
 function renderTabs(){
   document.getElementById("mesTabs").innerHTML=MESES.map(m=>
     `<button class="mes-tab${m.key===curMes?" active":""}" onclick="selectMes('${m.key}')">${m.label}</button>`
@@ -379,7 +366,6 @@ async function loadData(mes){
   }
 }
 
-/* ====================== FETCH + PARSE (compartido) ====================== */
 async function fetchTienda(sheet, mes){
   const cacheKey="raw_"+sheet+"_"+mes;
   if(cache[cacheKey]) return parseRows(cache[cacheKey]);
@@ -442,7 +428,6 @@ function parseRows(rows){
   return{struct,avance,mes,dias,pdvLabel,totalRow};
 }
 
-/* ====================== FORMATO + TAGS ====================== */
 function fmtPct(v){
   if(v===""||v===undefined||v===null||v===" ") return "-";
   const n=parseFloat(String(v));
@@ -467,7 +452,6 @@ function estadoFromPct(pct){
   return "Ponle punche";
 }
 
-/* ====================== TABLA (una tienda) ====================== */
 function showTable(data){
   document.getElementById("loadMsg").innerHTML="";
   storeStruct=data.struct; storeTotal=data.totalRow;
@@ -480,7 +464,6 @@ function showTable(data){
   renderStoreView(-1);
 }
 
-/* ====================== GERENCIA (consolidado) ====================== */
 function renderGerMesTabs(){
   document.getElementById("gerMesTabs").innerHTML=MESES.map(m=>
     `<button class="mes-tab${m.key===gerMes?" active":""}" onclick="selectGerMes('${m.key}')">${m.label}</button>`
@@ -499,7 +482,7 @@ function renderGerChips(){
 }
 function setAll(){ gerMode="all"; gerSel.clear(); renderGerChips(); loadGerencia(); }
 function toggleStore(t){
-  if(gerMode==="all"){ gerMode="custom"; gerSel=new Set([t]); }   // del global, marcar una empieza selección nueva
+  if(gerMode==="all"){ gerMode="custom"; gerSel=new Set([t]); }
   else { gerSel.has(t)?gerSel.delete(t):gerSel.add(t); if(!gerSel.size) gerMode="all"; }
   renderGerChips(); loadGerencia();
 }
@@ -532,12 +515,10 @@ async function loadGerencia(){
   info.innerHTML=""; km.innerHTML=""; ts.innerHTML="";
   document.getElementById("gerLoadMsg").innerHTML='<div class="loading"><div class="spinner"></div><br>Sumando '+sel.length+' tienda(s)...</div>';
   try{
-    // Pedir en tandas pequeñas: el Apps Script falla si se le piden todas a la vez
     const results=await fetchInBatches(sel, 3, t=>fetchTienda(SHEET_NAME[t]||"", gerMes)
       .then(d=>({t,d})).catch(e=>({t,d:null,err:(e&&e.message)||"error"})));
     let ok=results.filter(r=>r.d);
     let failed=results.filter(r=>!r.d);
-    // Reintento de las que fallaron, una por una (más confiable)
     if(failed.length){
       document.getElementById("gerLoadMsg").innerHTML='<div class="loading"><div class="spinner"></div><br>Reintentando '+failed.length+' tienda(s)...</div>';
       const retry=await fetchInBatches(failed.map(r=>r.t), 1, t=>fetchTienda(SHEET_NAME[t]||"", gerMes)
@@ -547,7 +528,6 @@ async function loadGerencia(){
     }
     if(!ok.length) throw new Error("No se pudo cargar ninguna de las tiendas seleccionadas. Reintenta en unos segundos.");
 
-    // día de avance / días del mes (se toman de la primera tienda con datos)
     let avDia=0, diasMes=0, mesLabel="";
     for(const r of ok){
       const a=parseInt(r.d.avance), dm=parseInt(r.d.dias);
@@ -556,7 +536,6 @@ async function loadGerencia(){
       if(avDia&&diasMes) break;
     }
 
-    // === sumar meta + avance por (categoría + producto) ===
     const acc={prepago:{}, postpago:{}, residencial:{}, otros:{}};
     const order={prepago:[], postpago:[], residencial:[], otros:[]};
     for(const r of ok){
@@ -571,22 +550,20 @@ async function loadGerencia(){
       }
     }
 
-    // === recalcular proyección / falta / venta diaria / estado ===
-    const factor = (avDia>0) ? (diasMes/avDia) : 0;          // (avance ÷ día actual) × días del mes
+    const factor = (avDia>0) ? (diasMes/avDia) : 0;
     const diasRest = (diasMes>avDia) ? (diasMes-avDia) : 0;
     const struct={prepago:[], postpago:[], residencial:[], otros:[]};
     for(const cat of ["prepago","postpago","residencial","otros"]){
       for(const key of order[cat]){
         const it=acc[cat][key];
         const meta=it.meta, av=it.av;
-        const proy = factor>0 ? av*factor : av;             // unidades proyectadas a fin de mes
-        const pct  = meta>0 ? proy/meta : 0;                // proyección %
+        const proy = factor>0 ? av*factor : av;
+        const pct  = meta>0 ? proy/meta : 0;
         const falta= meta-av;
         const vd   = (falta>0 && diasRest>0) ? falta/diasRest : 0;
         struct[cat].push({name:it.name, meta, av, pct, falta, vd, pf:proy, estado:estadoFromPct(pct)});
       }
     }
-    // TOTAL global = suma de la fila TOTAL real de cada tienda (cargo fijo en soles)
     let totMeta=0, totAv=0;
     for(const r of ok){
       const m=parseFloat(r.d.totalRow&&r.d.totalRow.meta), a=parseFloat(r.d.totalRow&&r.d.totalRow.av);
@@ -599,7 +576,6 @@ async function loadGerencia(){
     const totVd   = (totFalta>0 && diasRest>0) ? totFalta/diasRest : 0;
     const totalRow={meta:totMeta, av:totAv, pct:totPct, falta:totFalta, vd:totVd, pf:totProy, estado:estadoFromPct(totPct)};
 
-    // === pintar ===
     const avancePct = totMeta>0 ? totAv/totMeta : 0;
     info.innerHTML=
       `<div class="chip">Tiendas: <strong>${ok.length}${results.length>ok.length?(" de "+results.length):""}</strong></div>
@@ -638,7 +614,6 @@ function kpiCard(lbl,val,sub,cls,tag){
   </div>`;
 }
 
-/* ====================== TABLA (compartida: tienda y gerencia) ====================== */
 function cleanName(n){ return String(n).replace(/Portabiilidad/gi,"Portabilidad").replace(/Portabilidaad/gi,"Portabilidad"); }
 function buildTableHtml(struct,totalRow,recalc){
   const CATNAMES={prepago:"Prepago",postpago:"Postpago",residencial:"Residencial",otros:"Otros"};
@@ -682,7 +657,6 @@ function buildTableHtml(struct,totalRow,recalc){
   return html;
 }
 
-/* ===================== ASESORES POR TIENDA (en vivo, modo=vendedor) ===================== */
 const MES_MAP={'enero':1,'febrero':2,'marzo':3,'abril':4,'mayo':5,'junio':6,'julio':7,'agosto':8,'septiembre':9,'setiembre':9,'octubre':10,'noviembre':11,'diciembre':12};
 const DIAS_MES={1:31,2:28,3:31,4:30,5:31,6:30,7:31,8:31,9:30,10:31,11:30,12:31};
 const CAT_MAP={'alta prepago':'Alta Prepago','portab. prepago':'Portabilidad Prepago','portabilidad prepago':'Portabilidad Prepago','packs prepago':'Packs Prepago','portab. postpago':'Portabilidad Postpago','portabilidad postpago':'Portabilidad Postpago','altas postpago':'Altas Postpago','packs postpago':'Packs Postpago','lineas adic. postpago':'Líneas Adicionales Postpago','líneas adicionales postpago':'Líneas Adicionales Postpago','lineas adicionales postpago':'Líneas Adicionales Postpago','hfc':'HFC','ugis inalambricos':'UGIS Inalámbricos','ugis inalámbricos':'UGIS Inalámbricos','cargo fijo promedio':'Promedio Cargo Fijo','promedio cargo fijo':'Promedio Cargo Fijo','avance cargo fijo':'Avance Cargo Fijo','olo':'OLO','accesorios':'Accesorios','portab. cf >=95.50':'Portabilidad CF >=95.50','portabilidad cf >=95.50':'Portabilidad CF >=95.50'};
@@ -736,13 +710,11 @@ function renderAsesores(recs){
     return {n,tipo:rs[0].t,cf,proy,pct,cumpl,estado:estadoFromPct(pct),rs};
   }).sort((a,b)=>b.pct-a.pct);
   let html=`<div class="ases-head">👥 Asesores de ${STORE_TO_TI[curTienda]} <span style="font-weight:400;color:#888;font-size:12px">· ${_asesorRows.length} asesores</span></div>`;
-  // Filtro por vendedor (chips)
   html+=`<div class="ger-pick"><h3>Filtrar por vendedor</h3><div class="ger-chips" id="asesChips">`;
   html+=`<div class="tchip all on" onclick="pickAsesor(-1)">Ver ranking</div>`;
   _asesorRows.forEach((v,i)=>{ html+=`<div class="tchip" onclick="pickAsesor(${i})">${v.n}</div>`; });
   html+=`</div></div>`;
   html+=`<div id="asesPanel"></div>`;
-  // Ranking
   html+=`<div id="asesRanking"><div class="table-card"><div class="table-wrap"><table><thead><tr>
     <th style="text-align:left">#</th><th style="text-align:left;min-width:170px">Asesor</th><th>Tipo</th>
     <th>Avance CF (S/)</th><th>Cuota CF (S/)</th><th>Cumpl.</th><th>Proyección</th><th>Estado</th></tr></thead><tbody>`;
@@ -799,8 +771,6 @@ function buildAsesorDetail(v){
   return k+buildTableHtml(struct,totalRow,true);
 }
 
-
-/* ===================== RECAR-MM (usuario Amparo) ===================== */
 let recarMes="junio";
 function renderRecarMes(){ document.getElementById("recarMesTabs").innerHTML=MESES.map(m=>`<button class="mes-tab${m.key===recarMes?' active':''}" onclick="selRecarMes('${m.key}')">${m.label}</button>`).join(""); }
 function selRecarMes(m){recarMes=m;renderRecarMes();loadRecar();}
@@ -871,8 +841,6 @@ function renderRecar(rows){
   document.getElementById("recarTable").innerHTML=html;
 }
 
-
-/* ===================== VISTA UNIFICADA TIENDA/VENDEDOR ===================== */
 let storeStruct=null, storeTotal=null;
 function storeKpiCards(total){
   const meta=parseFloat(total.meta)||0, av=parseFloat(total.av)||0, pct=parseFloat(total.pct)||0, falta=parseFloat(total.falta)||0, vd=parseFloat(total.vd)||0;
@@ -924,8 +892,6 @@ async function loadStoreVendors(){
   }catch(e){ cont.innerHTML=""; }
 }
 
-
-/* ===================== GAUGES (estilo imagen 5) + INDICADORES ===================== */
 function gauge(label,pct,meta,av){
   pct=isFinite(pct)?pct:0; const f=Math.max(0,Math.min(1,pct));
   const cl=pct>=1?'#22a843':(pct>=0.8?'#e0a82e':'#cc0000');
