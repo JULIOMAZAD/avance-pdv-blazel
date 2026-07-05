@@ -253,6 +253,9 @@ const MESES=[
   {label:"Junio 2026", key:"junio"}
 ];
 
+const AUTO_KEY = 'blazel-hub-2026';
+const HUB_TO_PERSONAL = { "COMERCIAL":"jmaza", "GERENCIA":"gustavo", "AMPARO":"amparo" };
+let curLoginType = "";
 let curTienda="", curMes="junio", cache={};
 let gerenteMode=false, comercialMode=false, gerMes="junio", gerMode="all", gerSel=new Set();
 
@@ -262,6 +265,7 @@ function doLogin(){
   const e=document.getElementById("loginErr");
   if(!t||PWD[t]!==p){e.style.display="block";return;}
   e.style.display="none";
+  curLoginType=t;
 
   if(t==="COMERCIAL"){
     gerenteMode=true; comercialMode=true;
@@ -312,9 +316,13 @@ function salirEmbed(){ showScreen(embedReturn); }
 function abrirMasivo(){ openEmbed("DASHBOARD_BLAZEL_LIVE.html?embed=1","📡 Masivo · Centro de Mando","gerScreen"); }
 function abrirRecargaDash(){ openEmbed("DASHBOARD_RECARGAS_BLAZEL.html?embed=1&u=jmaza","⚡ Recarga","gerScreen"); }
 function abrirRecargaAmparo(){ openEmbed("DASHBOARD_RECARGAS_BLAZEL.html?embed=1&u=amparo","⚡ Recarga","recarScreen"); }
-function abrirPersonal(ret){ openEmbed("CONTROL_DE_PERSONAL.html","🗂️ Control de Personal",ret||"gerScreen"); }
+function abrirPersonal(ret){
+  const u = HUB_TO_PERSONAL[curLoginType] || "";
+  const url = u ? ("CONTROL_DE_PERSONAL.html?auto="+u+"&key="+AUTO_KEY) : "CONTROL_DE_PERSONAL.html";
+  openEmbed(url,"🗂️ Control de Personal",ret||"gerScreen");
+}
 function doLogout(){
-  curTienda="";gerenteMode=false;comercialMode=false;
+  curTienda="";gerenteMode=false;comercialMode=false;curLoginType="";
   ["btnMasivo","btnRecarga","btnRecarDash"].forEach(function(id){ var b=document.getElementById(id); if(b) b.style.display="none"; });
   var _gh=document.querySelector("#gerScreen h2"); if(_gh) _gh.textContent="COORD. TIENDAS — Consolidado";
   document.getElementById("passIn").value="";
