@@ -1379,7 +1379,7 @@ async function cargarLiveV2(){
     if(live.desabastoMensual) DATA.desabastoMensual = live.desabastoMensual;
     if(live.multimarca) DATA.multimarca = live.multimarca;
     if(live.deb) EMB_MEDIDAS.deb = live.deb;
-    if(live.ope) EMB_MEDIDAS.ope = live.ope;
+    if(live.ope) EMB_MEDIDAS.ope = { tot: live.ope.tot, dist: live.ope.dist, vend: EMB_MEDIDAS.ope.vend };
     try{ toast('Datos de recarga (driver) actualizados en vivo'); }catch(e){}
     const fd = document.getElementById('fechaData');
     if(fd) fd.innerHTML = `Recarga actualizada: ${new Date().toLocaleString('es-PE')} <span style="color:#13A05F;font-weight:700">● en vivo</span>`;
