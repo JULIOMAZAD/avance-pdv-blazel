@@ -648,9 +648,9 @@ function rDiario(ym){
   <p class="note">% Alcance = avance del mes (cierre si ya cerró, o lo alimentado hasta hoy) ÷ cuota. Se alimenta mensual desde el driver.</p>`;
   el.innerHTML = h;
   mkChart('chDiario',{type:'bar',data:{labels:serieCuotas.map(c=>MESN[c.m].slice(0,3).toUpperCase()),datasets:[
-    {type:'bar',label:'FFVV',data:serieCanales.map(c=>c.ffvv),backgroundColor:'#1B1B1F',stack:'s'},
-    {type:'bar',label:'Cell Power',data:serieCanales.map(c=>c.cp),backgroundColor:'#D81F26',stack:'s'},
-    {type:'bar',label:'Zilicom',data:serieCanales.map(c=>c.zil),backgroundColor:'#8E939B',stack:'s'},
+    {type:'bar',label:'FFVV',data:serieCuotas.map(c=>{const cn=serieCanales.find(x=>x.m===c.m);return cn?cn.ffvv:0;}),backgroundColor:'#1B1B1F',stack:'s'},
+    {type:'bar',label:'Cell Power',data:serieCuotas.map(c=>{const cn=serieCanales.find(x=>x.m===c.m);return cn?cn.cp:0;}),backgroundColor:'#D81F26',stack:'s'},
+    {type:'bar',label:'Zilicom',data:serieCuotas.map(c=>{const cn=serieCanales.find(x=>x.m===c.m);return cn?cn.zil:0;}),backgroundColor:'#8E939B',stack:'s'},
     {type:'line',label:'Cuota',data:serieCuotas.map(c=>c.cuota),borderColor:'#1B1B1F',borderDash:[5,4],pointRadius:3,fill:false}
   ]},options:{maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},scales:{x:{stacked:true},y:{stacked:true,ticks:{callback:v=>'S/'+(v/1000)+'k'}}}}});
 }
