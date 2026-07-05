@@ -533,7 +533,7 @@ function rResumen(ym){
 
   dona('dnCuota', r.pct, semColor(r.pct), r.pct==null?'—':(r.pct*100).toFixed(0)+'%', 'proyección');
   dona('dnPdv', pdvPct, semColor(pdvPct), pdvPct==null?'—':(pdvPct*100).toFixed(0)+'%', pdvDif==null?'':(pdvDif>=0?'+':'')+fN(pdvDif)+' PDV');
-  dona('dnDebR', debShow?(_dt.cli?_dt.deb/_dt.cli:0):0, debShow?(debBien?'#13A05F':'#D81F26'):'#C9CCD2', debShow?debPct.toFixed(1)+'%':'—', debShow?'desabasto':'sin histórico');
+  dona('dnDebR', debShow?(_dt.cli?Math.min(1,(_dt.deb/_dt.cli)/0.10):0):0, debShow?(debBien?'#13A05F':'#D81F26'):'#C9CCD2', debShow?debPct.toFixed(1)+'%':'—', debShow?'desabasto':'sin histórico');
   document.getElementById('selAnioCuota').onchange = e=>{anioCuotaSel=+e.target.value; drawCuotaMes(ym);};
   drawCuotaMes(ym);
 }
@@ -1061,7 +1061,7 @@ function rDesabasto(ym){
     h+=`<h2>Por distrito</h2><div class="twrap"><table><thead><tr><th>Distrito</th><th>Clientes</th><th>Desabasto</th><th>%</th></tr></thead><tbody>${rd}<tr class="tot"><td>Total</td><td class="num">${t.cli.toLocaleString()}</td><td class="num">${t.deb.toLocaleString()}</td><td>${_pill(pct,false)}</td></tr></tbody></table></div>`;
     h+=`<p class="note">Nota: el reporte de saldo cargado trae ${t.cli.toLocaleString()} clientes. Cuando subas el reporte completo (debe cubrir todos los operativos), el denominador se actualiza solo.</p>`;
     document.getElementById('tab-desabasto').innerHTML=h;
-    dona('dnDeb', t.cli?t.deb/t.cli:0, col, pct.toFixed(1)+'%', 'desabasto');
+    dona('dnDeb', t.cli?Math.min(1,(t.deb/t.cli)/0.10):0, col, pct.toFixed(1)+'%', 'desabasto');
   } else if(dm){
     const pct = dm.pctGeneral*100;
     const bien = pct<=10;
