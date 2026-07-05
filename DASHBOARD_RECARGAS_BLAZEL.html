@@ -1381,8 +1381,14 @@ async function cargarLiveV2(){
     if(live.deb) EMB_MEDIDAS.deb = live.deb;
     if(live.ope) EMB_MEDIDAS.ope = live.ope;
     try{ toast('Datos de recarga (driver) actualizados en vivo'); }catch(e){}
+    const fd = document.getElementById('fechaData');
+    if(fd) fd.innerHTML = `Recarga actualizada: ${new Date().toLocaleString('es-PE')} <span style="color:#13A05F;font-weight:700">● en vivo</span>`;
     renderFbar(); renderAll();
-  }catch(e){ console.error('cargarLiveV2', e); }
+  }catch(e){
+    console.error('cargarLiveV2', e);
+    const fd = document.getElementById('fechaData');
+    if(fd) fd.innerHTML = `<span style="color:#E1251B">⚠ No se pudo cargar en vivo (revisa la URL o permisos del Web App)</span>`;
+  }
 }
 
 /* ===== Login recarga + botón MASIVO ===== */
