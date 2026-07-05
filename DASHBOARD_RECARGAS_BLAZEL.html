@@ -1363,10 +1363,10 @@ window.addEventListener('drop', e=>{
   if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
 });
 
+const API_URL_V2 = 'https://script.google.com/macros/s/AKfycbzXE6fw7sz0alHy6--UYYx7_EfYGOF7VcKQNl3MPT4BtDN95znswMGuo7Qid30QFsLzrw/exec';
 tabs(); renderFbar(); renderAll(); cargarVivo(); cargarVolumenVivo(); cargarLiveV2();
 
 /* ===== Carga en vivo (driver) para Operativos/Desabasto/Canales/Cuotas/Asesores/Multimarca 2026+ ===== */
-const API_URL_V2 = 'https://script.google.com/macros/s/AKfycbzXE6fw7sz0alHy6--UYYx7_EfYGOF7VcKQNl3MPT4BtDN95znswMGuo7Qid30QFsLzrw/exec';
 async function cargarLiveV2(){
   if(!API_URL_V2 || API_URL_V2.indexOf('PEGAR_AQUI')===0) return;
   try{
