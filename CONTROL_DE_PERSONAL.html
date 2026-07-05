@@ -489,6 +489,9 @@
       amparo:  { pass: 'blazel2026',  label: 'Amparo Suárez' },
       gustavo: { pass: 'blazel2026',  label: 'Gustavo' }
     };
+    // Clave interna para permitir entrada automática desde el hub principal
+    // (no la ve el usuario, solo se usa en el enlace que arma el hub).
+    const AUTO_KEY = 'blazel-hub-2026';
 
     const state = { empleados: [], postulantes: [] };
     const meta = { lastSavedAt: '', lastBackupAt: '' };
@@ -1446,7 +1449,21 @@
       if (e.key === 'Enter') doLogin();
     });
 
-    if (checkSession()) {
+    function checkAutoLogin() {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const auto = params.get('auto');
+        const key = params.get('key');
+        if (auto && key === AUTO_KEY && USERS[auto]) {
+          currentUser = { id: auto, label: USERS[auto].label };
+          localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser));
+          return true;
+        }
+      } catch (e) { /* ignore */ }
+      return false;
+    }
+
+    if (checkAutoLogin() || checkSession()) {
       enterApp();
     }
   </script>
