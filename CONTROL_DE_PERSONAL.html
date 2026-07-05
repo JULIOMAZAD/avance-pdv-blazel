@@ -259,13 +259,12 @@
   <div class="wrap">
     <div class="card no-print">
       <div class="toolbar">
-        <button class="primary" onclick="syncFromCloud(true)">Actualizar desde la nube</button>
-        <button class="primary" onclick="saveData()">Guardar datos</button>
-        <button class="success" onclick="createManualBackup()">Copia de seguridad</button>
-        <button class="secondary" onclick="exportExcel()">Exportar Excel</button>
-        <button class="secondary" onclick="exportPDF()">Exportar PDF</button>
-        <label class="file-label secondary">Importar Excel<input id="importExcel" type="file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" /></label>
-        <button class="danger" onclick="verCesados()">Ver cesados</button>
+        <button class="primary" onclick="syncFromCloud(true)">ACTUALIZAR DESDE LA NUBE</button>
+        <button class="primary" onclick="saveData()">GUARDAR DATOS</button>
+        <button class="success" onclick="createManualBackup()">COPIA DE SEGURIDAD</button>
+        <button class="secondary" onclick="exportExcel()">EXPORTAR EXCEL</button>
+        <button class="secondary" onclick="exportPDF()">EXPORTAR PDF</button>
+        <label class="file-label secondary">IMPORTAR EXCEL<input id="importExcel" type="file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" /></label>
       </div>
       <div class="status-bar muted">
         <div id="lastSaveInfo">Sin guardar aún</div>
@@ -273,10 +272,12 @@
     </div>
 
     <div class="tabs no-print">
-      <button class="tab active" data-tab="inicio">Inicio</button>
-      <button class="tab" data-tab="consulta">Consulta</button>
-      <button class="tab" data-tab="empleados">Trabajadores</button>
-      <button class="tab" data-tab="postulantes">Postulantes</button>
+      <button class="tab active" data-tab="inicio">INICIO</button>
+      <button class="tab" data-tab="consulta">CONSULTA</button>
+      <button class="tab" data-tab="empleados">TRABAJADORES</button>
+      <button class="tab" data-tab="postulantes">POSTULANTES</button>
+      <button class="tab" data-tab="cesados">DAR DE BAJA</button>
+      <button class="danger" onclick="verCesados()">VER CESADOS</button>
     </div>
 
     <section id="tab-inicio" class="tab-panel">
@@ -389,6 +390,7 @@
             <div class="col-3"><label>Fecha de postulación</label><input id="appDate" type="date" required /></div>
             <div class="col-3"><label>Resultado</label><select id="appResult" onchange="toggleApplicantResult()"><option value="En evaluación">En evaluación</option><option value="Ingresó">Ingresó</option><option value="No ingresó">No ingresó</option><option value="No asistió">No asistió</option></select></div>
             <div class="col-3 ingreso-field hidden"><label>Área a la que ingresó</label><input id="appIngresoArea" /></div>
+            <div class="col-3 ingreso-field hidden"><label>Fecha de ingreso</label><input id="appIngresoFecha" type="date" /></div>
             <div class="col-3 noingreso-field hidden"><label>Motivo de no ingreso o no asistencia</label><input id="appReason" /></div>
             <div class="col-12"><label>Observaciones</label><textarea id="appNotes"></textarea></div>
           </div>
@@ -423,6 +425,51 @@
               </tr>
             </thead>
             <tbody id="applicantTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-cesados" class="tab-panel hidden">
+      <div class="card">
+        <h2>Dar de cese a un trabajador</h2>
+        <span class="muted small">Busca al trabajador activo, confirma quién es y solo completa fecha y motivo de cese.</span>
+        <div class="search-box" style="margin-top:12px;">
+          <input id="cesarSearchDoc" placeholder="Escribe DNI, Carnet de Extranjería o Nombre" />
+          <button class="primary" onclick="searchActiveForCese()">Buscar</button>
+          <button class="light" onclick="clearCesePanel()">Limpiar</button>
+        </div>
+        <div id="ceseSearchResult" style="margin-top:12px;"></div>
+        <div id="ceseFormBox" class="hidden" style="margin-top:16px; border-top:1px solid var(--line); padding-top:16px;">
+          <div id="ceseEmployeeLabel" style="font-weight:700; margin-bottom:10px;"></div>
+          <div class="row">
+            <div class="col-3"><label>Fecha de cese</label><input id="ceseDate" type="date" /></div>
+            <div class="col-9"><label>Motivo de cese</label><input id="ceseReason" placeholder="Ej. Renuncia, no renovación, falta grave..." /></div>
+          </div>
+          <div class="toolbar" style="margin-top:12px;">
+            <button class="danger" onclick="confirmCese()">Registrar cese</button>
+            <button class="light" onclick="clearCesePanel()">Cancelar</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="form-title">
+          <h2>Historial de cesados</h2>
+          <span class="muted small">Últimos trabajadores dados de baja.</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Documento</th>
+                <th>Nombre</th>
+                <th>Tienda</th>
+                <th>Fecha de cese</th>
+                <th>Motivo</th>
+              </tr>
+            </thead>
+            <tbody id="cesadosHistoryTable"></tbody>
           </table>
         </div>
       </div>
@@ -1124,14 +1171,41 @@
 
     function validateApplicant(rec) {
       if (!rec.doc || !rec.name || !rec.applyDate) {
-        alert('Completa documento, nombre y fecha de postulación.');
+        alert('No se guardó: completa documento, nombre y fecha de postulación.');
         return false;
       }
       if (rec.result === 'Ingresó' && !rec.ingresoArea) {
-        alert('Indica el área a la que ingresó el postulante.');
+        alert('No se guardó: indica el área a la que ingresó el postulante.');
+        return false;
+      }
+      if (rec.result === 'Ingresó' && !rec.ingresoFecha) {
+        alert('No se guardó: al marcar "Ingresó" es obligatorio poner la fecha de ingreso.');
         return false;
       }
       return true;
+    }
+
+    function verHistorialTienda(id) {
+      const r = state.empleados.find(function(x) { return x.id === id; });
+      if (!r || !r.tiendaHistorial || !r.tiendaHistorial.length) {
+        alert('Este trabajador no tiene traslados registrados.');
+        return;
+      }
+      const lineas = r.tiendaHistorial.map(function(h) {
+        return fmtDate(h.fecha) + ':  ' + h.desde + '  →  ' + h.hasta;
+      });
+      alert('Historial de tiendas de ' + r.name + ':\n\n' + lineas.join('\n'));
+    }
+
+    function todayISO() {
+      const d = new Date();
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+
+    function registrarCambioTienda(historial, tiendaAnterior, tiendaNueva) {
+      const list = Array.isArray(historial) ? historial.slice() : [];
+      list.push({ fecha: todayISO(), desde: tiendaAnterior || '(sin tienda)', hasta: tiendaNueva || '(sin tienda)' });
+      return list;
     }
 
     function addEmployee() {
@@ -1154,7 +1228,17 @@
       };
       if (!validateEmployee(rec)) return;
       const idx = state.empleados.findIndex(function(x) { return x.id === rec.id; });
-      if (idx >= 0) state.empleados[idx] = rec; else state.empleados.unshift(rec);
+      if (idx >= 0) {
+        const anterior = state.empleados[idx];
+        rec.tiendaHistorial = anterior.tiendaHistorial || [];
+        if (norm(anterior.tienda) !== rec.tienda) {
+          rec.tiendaHistorial = registrarCambioTienda(rec.tiendaHistorial, anterior.tienda, rec.tienda);
+        }
+        state.empleados[idx] = rec;
+      } else {
+        rec.tiendaHistorial = rec.tienda ? [{ fecha: todayISO(), desde: '(ingreso)', hasta: rec.tienda }] : [];
+        state.empleados.unshift(rec);
+      }
       saveData(false, 'auto');
       clearEmployeeForm();
     }
@@ -1173,14 +1257,46 @@
         applyDate: norm(document.getElementById('appDate').value),
         result: norm(document.getElementById('appResult').value),
         ingresoArea: norm(document.getElementById('appIngresoArea').value),
+        ingresoFecha: norm(document.getElementById('appIngresoFecha').value),
         reason: norm(document.getElementById('appReason').value),
         notes: norm(document.getElementById('appNotes').value)
       };
       if (!validateApplicant(rec)) return;
       const idx = state.postulantes.findIndex(function(x) { return x.id === rec.id; });
       if (idx >= 0) state.postulantes[idx] = rec; else state.postulantes.unshift(rec);
+      if (rec.result === 'Ingresó') {
+        crearOActualizarTrabajadorDesdePostulante(rec);
+      }
       saveData(false, 'auto');
       clearApplicantForm();
+    }
+
+    function crearOActualizarTrabajadorDesdePostulante(rec) {
+      const existente = state.empleados.find(function(x) { return cleanDoc(x.doc) === cleanDoc(rec.doc) && rec.doc; });
+      const empRec = existente ? Object.assign({}, existente) : {
+        id: uid(),
+        endDate: '',
+        endReason: '',
+        time: '',
+        notes: '',
+        tiendaHistorial: []
+      };
+      const tiendaAnterior = existente ? norm(existente.tienda) : '';
+      empRec.docType = rec.docType;
+      empRec.doc = rec.doc;
+      empRec.name = rec.name;
+      empRec.phone = rec.phone;
+      empRec.email = rec.email;
+      empRec.company = rec.company;
+      empRec.tienda = rec.tienda;
+      empRec.role = rec.ingresoArea || empRec.role || '';
+      empRec.startDate = rec.ingresoFecha;
+      empRec.status = 'Activo';
+      if (tiendaAnterior !== rec.tienda) {
+        empRec.tiendaHistorial = registrarCambioTienda(empRec.tiendaHistorial, tiendaAnterior, rec.tienda);
+      }
+      const idx = state.empleados.findIndex(function(x) { return x.id === empRec.id; });
+      if (idx >= 0) state.empleados[idx] = empRec; else state.empleados.unshift(empRec);
     }
 
     function clearEmployeeForm() {
@@ -1200,16 +1316,9 @@
     }
 
     function marcarCese(id) {
-      editEmployee(id);
-      document.getElementById('empStatus').value = 'Cesado';
-      toggleCese();
-      document.getElementById('employeeFormTitle').textContent = 'Dar de cese a trabajador';
-      const endInput = document.getElementById('empEnd');
-      endInput.focus();
-      const today = new Date();
-      if (!endInput.value) {
-        endInput.value = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
-      }
+      showTab('cesados');
+      selectForCese(id);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     function editEmployee(id) {
@@ -1251,6 +1360,7 @@
       document.getElementById('appDate').value = r.applyDate || '';
       document.getElementById('appResult').value = r.result || 'En evaluación';
       document.getElementById('appIngresoArea').value = r.ingresoArea || '';
+      document.getElementById('appIngresoFecha').value = r.ingresoFecha || '';
       document.getElementById('appReason').value = r.reason || '';
       document.getElementById('appNotes').value = r.notes || '';
       document.getElementById('applicantFormTitle').textContent = 'Editar postulante';
@@ -1272,9 +1382,98 @@
     }
 
     function verCesados() {
-      showTab('empleados');
-      setEmployeeStatusFilter('Cesado');
+      showTab('cesados');
       window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    let ceseSelectedId = null;
+
+    function searchActiveForCese() {
+      const raw = norm(document.getElementById('cesarSearchDoc').value);
+      const doc = cleanDoc(raw);
+      const nameQuery = raw.toLowerCase();
+      const box = document.getElementById('ceseSearchResult');
+      clearCeseForm();
+      if (!raw) {
+        box.innerHTML = '<span class="muted">Escribe un documento o Nombre válido.</span>';
+        return;
+      }
+      const matches = state.empleados.filter(function(x) {
+        if (x.status !== 'Activo') return false;
+        const matchDoc = doc && cleanDoc(x.doc) === doc;
+        const matchName = nameQuery.length >= 3 && (x.name || '').toLowerCase().includes(nameQuery);
+        return matchDoc || matchName;
+      });
+      if (!matches.length) {
+        box.innerHTML = '<span class="muted">No se encontró ningún trabajador activo con ese documento o Nombre.</span>';
+        return;
+      }
+      box.innerHTML = matches.map(function(m) {
+        return '<div class="result-box" style="margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">' +
+          '<span><b>' + esc(m.name) + '</b> · ' + esc(m.docType) + ' ' + esc(m.doc) + (m.tienda ? (' · ' + esc(m.tienda)) : '') + '</span>' +
+          '<button class="primary" onclick="selectForCese(\'' + m.id + '\')">Seleccionar</button>' +
+          '</div>';
+      }).join('');
+    }
+
+    function selectForCese(id) {
+      const r = state.empleados.find(function(x) { return x.id === id; });
+      if (!r) return;
+      ceseSelectedId = id;
+      document.getElementById('ceseEmployeeLabel').textContent = r.name + ' · ' + r.docType + ' ' + r.doc + (r.tienda ? (' · ' + r.tienda) : '');
+      const today = new Date();
+      document.getElementById('ceseDate').value = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+      document.getElementById('ceseReason').value = '';
+      document.getElementById('ceseFormBox').classList.remove('hidden');
+      document.getElementById('ceseReason').focus();
+    }
+
+    function confirmCese() {
+      if (!ceseSelectedId) return;
+      const date = norm(document.getElementById('ceseDate').value);
+      const reason = norm(document.getElementById('ceseReason').value);
+      if (!date) { alert('Ingresa la fecha de cese.'); return; }
+      if (!reason) { alert('Ingresa el motivo de cese.'); return; }
+      const idx = state.empleados.findIndex(function(x) { return x.id === ceseSelectedId; });
+      if (idx < 0) return;
+      state.empleados[idx].status = 'Cesado';
+      state.empleados[idx].endDate = date;
+      state.empleados[idx].endReason = reason;
+      saveData(false, 'auto');
+      alert('Cese registrado correctamente.');
+      clearCesePanel();
+    }
+
+    function clearCeseForm() {
+      ceseSelectedId = null;
+      document.getElementById('ceseFormBox').classList.add('hidden');
+      document.getElementById('ceseEmployeeLabel').textContent = '';
+      document.getElementById('ceseDate').value = '';
+      document.getElementById('ceseReason').value = '';
+    }
+
+    function clearCesePanel() {
+      document.getElementById('cesarSearchDoc').value = '';
+      document.getElementById('ceseSearchResult').innerHTML = '';
+      clearCeseForm();
+    }
+
+    function renderCesadosHistory() {
+      const body = document.getElementById('cesadosHistoryTable');
+      if (!body) return;
+      const rows = state.empleados
+        .filter(function(x) { return x.status === 'Cesado'; })
+        .slice()
+        .sort(function(a, b) { return (b.endDate || '').localeCompare(a.endDate || ''); });
+      body.innerHTML = rows.map(function(r) {
+        return '<tr>' +
+          '<td>' + esc(r.docType) + ' ' + esc(r.doc) + '</td>' +
+          '<td>' + esc(r.name) + '</td>' +
+          '<td>' + esc(r.tienda || '-') + '</td>' +
+          '<td>' + esc(fmtDate(r.endDate)) + '</td>' +
+          '<td>' + esc(r.endReason || '-') + '</td>' +
+          '</tr>';
+      }).join('') || '<tr><td colspan="5">Sin registros.</td></tr>';
     }
 
     let employeeStatusFilter = 'todos';
@@ -1309,6 +1508,7 @@
           '<td>' + esc(r.notes || '-') + '</td>' +
           '<td class="actions"><button class="light" onclick="editEmployee(\'' + r.id + '\')">Editar</button>' +
           (r.status === 'Activo' ? '<button class="secondary" onclick="marcarCese(\'' + r.id + '\')">Dar de cese</button>' : '') +
+          (r.tiendaHistorial && r.tiendaHistorial.length > 1 ? '<button class="light" onclick="verHistorialTienda(\'' + r.id + '\')">Historial tienda</button>' : '') +
           '<button class="danger" onclick="deleteEmployee(\'' + r.id + '\')">Eliminar</button></td>' +
           '</tr>';
       }).join('') || '<tr><td colspan="13">Sin registros.</td></tr>';
@@ -1368,7 +1568,7 @@
       });
       apps.forEach(function(a) {
         let summary = '';
-        if (a.result === 'Ingresó') summary = 'Postuló el <b>' + esc(fmtDate(a.applyDate)) + '</b> y sí ingresó al área <b>' + esc(a.ingresoArea || a.appliedArea || 'no registrada') + '</b>.';
+        if (a.result === 'Ingresó') summary = 'Postuló el <b>' + esc(fmtDate(a.applyDate)) + '</b> y sí ingresó al área <b>' + esc(a.ingresoArea || a.appliedArea || 'no registrada') + '</b> el <b>' + esc(fmtDate(a.ingresoFecha) || 'sin fecha registrada') + '</b>.';
         else if (a.result === 'No ingresó') summary = 'Postuló el <b>' + esc(fmtDate(a.applyDate)) + '</b> para <b>' + esc(a.appliedArea || 'área no registrada') + '</b> y no ingresó. Motivo: <b>' + esc(a.reason || 'no registrado') + '</b>.';
         else if (a.result === 'No asistió') summary = 'Postuló el <b>' + esc(fmtDate(a.applyDate)) + '</b> para <b>' + esc(a.appliedArea || 'área no registrada') + '</b> y no asistió. Detalle: <b>' + esc(a.reason || 'no registrado') + '</b>.';
         else summary = 'Postuló el <b>' + esc(fmtDate(a.applyDate)) + '</b> para <b>' + esc(a.appliedArea || 'área no registrada') + '</b> y sigue en evaluación.';
@@ -1397,6 +1597,7 @@
     function renderAll() {
       renderEmployees();
       renderApplicants();
+      renderCesadosHistory();
       renderKpis();
       renderBackups();
       renderSaveInfo();
