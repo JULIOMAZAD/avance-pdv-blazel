@@ -277,6 +277,7 @@
       <button class="tab" data-tab="empleados">TRABAJADORES</button>
       <button class="tab" data-tab="postulantes">POSTULANTES</button>
       <button class="tab" data-tab="cesados">DAR DE BAJA</button>
+      <button class="tab" data-tab="reingresos">REINGRESOS</button>
       <button class="danger" onclick="verCesados()">VER CESADOS</button>
     </div>
 
@@ -474,6 +475,52 @@
         </div>
       </div>
     </section>
+
+    <section id="tab-reingresos" class="tab-panel hidden">
+      <div class="card">
+        <h2>Reingresar a un trabajador cesado</h2>
+        <span class="muted small">Busca al trabajador cesado, confirma quién es y completa la fecha de reingreso. Conserva su historial anterior.</span>
+        <div class="search-box" style="margin-top:12px;">
+          <input id="reingresoSearchDoc" placeholder="Escribe DNI, Carnet de Extranjería o Nombre" />
+          <button class="primary" onclick="searchCesadoForReingreso()">Buscar</button>
+          <button class="light" onclick="clearReingresoPanel()">Limpiar</button>
+        </div>
+        <div id="reingresoSearchResult" style="margin-top:12px;"></div>
+        <div id="reingresoFormBox" class="hidden" style="margin-top:16px; border-top:1px solid var(--line); padding-top:16px;">
+          <div id="reingresoEmployeeLabel" style="font-weight:700; margin-bottom:10px;"></div>
+          <div class="row">
+            <div class="col-3"><label>Fecha de reingreso</label><input id="reingresoDate" type="date" /></div>
+            <div class="col-3"><label>Tienda / PDV</label><select id="reingresoTienda"></select></div>
+            <div class="col-6"><label>Puesto o cargo</label><input id="reingresoRole" /></div>
+          </div>
+          <div class="toolbar" style="margin-top:12px;">
+            <button class="success" onclick="confirmReingreso()">Registrar reingreso</button>
+            <button class="light" onclick="clearReingresoPanel()">Cancelar</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="form-title">
+          <h2>Historial de reingresos</h2>
+          <span class="muted small">Trabajadores que salieron y volvieron a ingresar.</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Documento</th>
+                <th>Nombre</th>
+                <th>Periodo anterior</th>
+                <th>Motivo de cese anterior</th>
+                <th>Fecha de reingreso</th>
+              </tr>
+            </thead>
+            <tbody id="reingresosHistoryTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
   </div>
   </div>
 
@@ -639,8 +686,10 @@
         TIENDAS.map(function(t) { return '<option value="' + esc(t) + '">' + esc(t) + '</option>'; }).join('');
       const e1 = document.getElementById('empTienda');
       const e2 = document.getElementById('appTienda');
+      const e3 = document.getElementById('reingresoTienda');
       if (e1) e1.innerHTML = opts;
       if (e2) e2.innerHTML = opts;
+      if (e3) e3.innerHTML = opts;
     }
     populateTiendaSelects();
 
@@ -1386,6 +1435,113 @@
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
+    function irAReingresar(id) {
+      showTab('reingresos');
+      selectForReingreso(id);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    let reingresoSelectedId = null;
+
+    function searchCesadoForReingreso() {
+      const raw = norm(document.getElementById('reingresoSearchDoc').value);
+      const doc = cleanDoc(raw);
+      const nameQuery = raw.toLowerCase();
+      const box = document.getElementById('reingresoSearchResult');
+      clearReingresoForm();
+      if (!raw) {
+        box.innerHTML = '<span class="muted">Escribe un documento o Nombre válido.</span>';
+        return;
+      }
+      const matches = state.empleados.filter(function(x) {
+        if (x.status !== 'Cesado') return false;
+        const matchDoc = doc && cleanDoc(x.doc) === doc;
+        const matchName = nameQuery.length >= 3 && (x.name || '').toLowerCase().includes(nameQuery);
+        return matchDoc || matchName;
+      });
+      if (!matches.length) {
+        box.innerHTML = '<span class="muted">No se encontró ningún trabajador cesado con ese documento o Nombre.</span>';
+        return;
+      }
+      box.innerHTML = matches.map(function(m) {
+        return '<div class="result-box" style="margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">' +
+          '<span><b>' + esc(m.name) + '</b> · ' + esc(m.docType) + ' ' + esc(m.doc) + ' · Cesado el ' + esc(fmtDate(m.endDate)) + (m.endReason ? (' (' + esc(m.endReason) + ')') : '') + '</span>' +
+          '<button class="success" onclick="selectForReingreso(\'' + m.id + '\')">Seleccionar</button>' +
+          '</div>';
+      }).join('');
+    }
+
+    function selectForReingreso(id) {
+      const r = state.empleados.find(function(x) { return x.id === id; });
+      if (!r) return;
+      reingresoSelectedId = id;
+      document.getElementById('reingresoEmployeeLabel').textContent = r.name + ' · ' + r.docType + ' ' + r.doc;
+      document.getElementById('reingresoDate').value = todayISO();
+      document.getElementById('reingresoTienda').value = r.tienda || '';
+      document.getElementById('reingresoRole').value = r.role || '';
+      document.getElementById('reingresoFormBox').classList.remove('hidden');
+    }
+
+    function confirmReingreso() {
+      if (!reingresoSelectedId) return;
+      const date = norm(document.getElementById('reingresoDate').value);
+      const tienda = norm(document.getElementById('reingresoTienda').value);
+      const role = norm(document.getElementById('reingresoRole').value);
+      if (!date) { alert('Ingresa la fecha de reingreso.'); return; }
+      const idx = state.empleados.findIndex(function(x) { return x.id === reingresoSelectedId; });
+      if (idx < 0) return;
+      const r = state.empleados[idx];
+      r.historialLaboral = Array.isArray(r.historialLaboral) ? r.historialLaboral : [];
+      r.historialLaboral.push({ desde: r.startDate, hasta: r.endDate, motivoCese: r.endReason, tienda: r.tienda });
+      if (tienda && tienda !== norm(r.tienda)) {
+        r.tiendaHistorial = registrarCambioTienda(r.tiendaHistorial, r.tienda, tienda);
+      }
+      r.tienda = tienda;
+      r.role = role || r.role;
+      r.startDate = date;
+      r.endDate = '';
+      r.endReason = '';
+      r.status = 'Activo';
+      saveData(false, 'auto');
+      alert('Reingreso registrado correctamente.');
+      clearReingresoPanel();
+    }
+
+    function clearReingresoForm() {
+      reingresoSelectedId = null;
+      document.getElementById('reingresoFormBox').classList.add('hidden');
+      document.getElementById('reingresoEmployeeLabel').textContent = '';
+      document.getElementById('reingresoDate').value = '';
+      document.getElementById('reingresoTienda').value = '';
+      document.getElementById('reingresoRole').value = '';
+    }
+
+    function clearReingresoPanel() {
+      document.getElementById('reingresoSearchDoc').value = '';
+      document.getElementById('reingresoSearchResult').innerHTML = '';
+      clearReingresoForm();
+    }
+
+    function renderReingresosHistory() {
+      const body = document.getElementById('reingresosHistoryTable');
+      if (!body) return;
+      const rows = [];
+      state.empleados.forEach(function(r) {
+        (r.historialLaboral || []).forEach(function(h) {
+          rows.push({
+            doc: r.docType + ' ' + r.doc,
+            name: r.name,
+            periodo: fmtDate(h.desde) + ' – ' + fmtDate(h.hasta),
+            motivo: h.motivoCese || '-',
+            reingreso: r.status === 'Activo' ? fmtDate(r.startDate) : '-'
+          });
+        });
+      });
+      body.innerHTML = rows.map(function(r) {
+        return '<tr><td>' + esc(r.doc) + '</td><td>' + esc(r.name) + '</td><td>' + esc(r.periodo) + '</td><td>' + esc(r.motivo) + '</td><td>' + esc(r.reingreso) + '</td></tr>';
+      }).join('') || '<tr><td colspan="5">Sin registros.</td></tr>';
+    }
+
     let ceseSelectedId = null;
 
     function searchActiveForCese() {
@@ -1508,6 +1664,7 @@
           '<td>' + esc(r.notes || '-') + '</td>' +
           '<td class="actions"><button class="light" onclick="editEmployee(\'' + r.id + '\')">Editar</button>' +
           (r.status === 'Activo' ? '<button class="secondary" onclick="marcarCese(\'' + r.id + '\')">Dar de cese</button>' : '') +
+          (r.status === 'Cesado' ? '<button class="success" onclick="irAReingresar(\'' + r.id + '\')">Reingresar</button>' : '') +
           (r.tiendaHistorial && r.tiendaHistorial.length > 1 ? '<button class="light" onclick="verHistorialTienda(\'' + r.id + '\')">Historial tienda</button>' : '') +
           '<button class="danger" onclick="deleteEmployee(\'' + r.id + '\')">Eliminar</button></td>' +
           '</tr>';
@@ -1598,6 +1755,7 @@
       renderEmployees();
       renderApplicants();
       renderCesadosHistory();
+      renderReingresosHistory();
       renderKpis();
       renderBackups();
       renderSaveInfo();
