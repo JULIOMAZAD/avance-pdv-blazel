@@ -278,6 +278,7 @@
       <button class="tab" data-tab="postulantes">POSTULANTES</button>
       <button class="tab" data-tab="cesados">DAR DE BAJA</button>
       <button class="tab" data-tab="reingresos">REINGRESOS</button>
+      <button class="tab" data-tab="vacaciones">VACACIONES</button>
       <button class="danger" onclick="verCesados()">VER CESADOS</button>
     </div>
 
@@ -318,7 +319,7 @@
             <div class="col-6"><label>Nombres y apellidos</label><input id="empName" required /></div>
             <div class="col-3"><label>Teléfono</label><input id="empPhone" /></div>
             <div class="col-3"><label>Correo</label><input id="empEmail" type="email" /></div>
-            <div class="col-3"><label>Área</label><input id="empCompany" /></div>
+            <div class="col-3"><label>Área</label><select id="empCompany" onchange="onAreaChange('empCompany','empTienda')"></select></div>
             <div class="col-3"><label>Tienda / PDV</label><select id="empTienda"></select></div>
             <div class="col-3"><label>Puesto o cargo</label><input id="empRole" /></div>
             <div class="col-3"><label>Jornada / Time</label><input id="empTime" placeholder="Ej. Full Time, Part Time" /></div>
@@ -385,7 +386,7 @@
             <div class="col-6"><label>Nombres y apellidos</label><input id="appName" required /></div>
             <div class="col-3"><label>Teléfono</label><input id="appPhone" /></div>
             <div class="col-3"><label>Correo</label><input id="appEmail" type="email" /></div>
-            <div class="col-3"><label>Área</label><input id="appCompany" /></div>
+            <div class="col-3"><label>Área</label><select id="appCompany" onchange="onAreaChange('appCompany','appTienda')"></select></div>
             <div class="col-3"><label>Tienda / PDV</label><select id="appTienda"></select></div>
             <div class="col-3"><label>Puesto o área postulada</label><input id="appArea" /></div>
             <div class="col-3"><label>Fecha de postulación</label><input id="appDate" type="date" required /></div>
@@ -521,31 +522,112 @@
         </div>
       </div>
     </section>
+
+    <section id="tab-vacaciones" class="tab-panel hidden">
+      <div class="card">
+        <h2>Vacaciones</h2>
+        <span class="muted small">Busca al trabajador, registra fecha de salida y de regreso. Los días se calculan solos.</span>
+        <div class="search-box" style="margin-top:12px;">
+          <input id="vacSearchDoc" placeholder="Escribe DNI, Carnet de Extranjería o Nombre" />
+          <button class="primary" onclick="searchForVacaciones()">Buscar</button>
+          <button class="light" onclick="clearVacacionPanel()">Limpiar</button>
+        </div>
+        <div id="vacSearchResult" style="margin-top:12px;"></div>
+        <div id="vacFormBox" class="hidden" style="margin-top:16px; border-top:1px solid var(--line); padding-top:16px;">
+          <div id="vacEmployeeLabel" style="font-weight:700; margin-bottom:6px;"></div>
+          <div id="vacEstadoActual" class="info-box small" style="margin-bottom:12px;"></div>
+          <div class="row">
+            <div class="col-3"><label>Fecha de salida</label><input id="vacSalida" type="date" onchange="calcVacDias()" /></div>
+            <div class="col-3"><label>Fecha de regreso</label><input id="vacRegreso" type="date" onchange="calcVacDias()" /></div>
+            <div class="col-3"><label>Días</label><input id="vacDias" readonly /></div>
+          </div>
+          <div class="toolbar" style="margin-top:12px;">
+            <button class="success" onclick="confirmVacacion()">Registrar vacaciones</button>
+            <button class="light" onclick="clearVacacionForm()">Cancelar</button>
+          </div>
+          <div style="margin-top:18px;">
+            <h3 style="font-size:14px;">Historial de vacaciones de esta persona</h3>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Salida</th><th>Regreso</th><th>Días</th><th>Estado</th></tr>
+                </thead>
+                <tbody id="vacPersonHistoryTable"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
   </div>
   </div>
 
   <script>
     const STORAGE_KEY = 'control_personal_postulantes_v2';
 
-    // ==== LISTA DE TIENDAS / PDV ====
-    // Para agregar una tienda nueva más adelante: solo añade una línea con el nombre
-    // entre comillas y una coma al final (menos en la última), guarda el archivo y
-    // vuelve a subirlo a GitHub. No hace falta tocar nada más.
-    const TIENDAS = [
-      'Mall Bellavista',
-      'Mall del Sur 1',
-      'Mall del Sur 2',
-      'Mega Plaza',
-      'Plaza Norte',
-      'Primavera',
-      'Rambla Brasil',
-      'Santa Anita 1',
-      'Santa Anita 2',
-      'Call Center',
-      'Multimarca',
-      'Administrativo',
-      'Otro'
-    ];
+    // ==== ÁREAS Y TIENDAS/DISTRITOS SEGÚN ÁREA ====
+    // Para agregar una tienda o distrito nuevo: búscalo dentro del grupo que corresponda
+    // (MOVIL, MULTIMARCA, etc.), agrega la línea con el nombre entre comillas y coma,
+    // guarda el archivo y vuelve a subirlo a GitHub.
+    const AREAS = ['Móvil', 'Multimarca', 'Administrativo', 'Otro'];
+
+    const TIENDAS_POR_AREA = {
+      'Móvil': [
+        'Mall Bellavista', 'Mall del Sur 1', 'Mall del Sur 2', 'Mega Plaza',
+        'Plaza Norte', 'Primavera', 'Rambla Brasil', 'Santa Anita 1', 'Santa Anita 2', 'Call Center'
+      ],
+      'Multimarca': [
+        'Distrito Comas', 'Distrito San Martín de Porres', 'Distrito Rímac',
+        'Distrito Bellavista', 'Todos los distritos (Multimarca)'
+      ],
+      'Administrativo': ['Administrativo'],
+      'Otro': ['Otro']
+    };
+    const TIENDAS = Object.values(TIENDAS_POR_AREA).flat();
+
+    function findAreaKeyCI(value) {
+      const v = normalizeHeaderText(value);
+      return AREAS.find(function(a) { return normalizeHeaderText(a) === v; }) || null;
+    }
+
+    function populateAreaSelects() {
+      const opts = '<option value="">-- Selecciona --</option>' +
+        AREAS.map(function(a) { return '<option value="' + esc(a) + '">' + esc(a) + '</option>'; }).join('');
+      ['empCompany', 'appCompany'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = opts;
+      });
+    }
+    populateAreaSelects();
+
+    function fillTiendaOptions(tiendaSelectId, areaKey, keepValue) {
+      const el = document.getElementById(tiendaSelectId);
+      if (!el) return;
+      const lista = (areaKey && TIENDAS_POR_AREA[areaKey]) ? TIENDAS_POR_AREA[areaKey] : TIENDAS;
+      let opciones = lista.slice();
+      // Si el valor actual no está en la lista filtrada (dato antiguo o de otra área), lo agregamos igual para no perderlo
+      if (keepValue && !opciones.includes(keepValue)) opciones = [keepValue].concat(opciones);
+      el.innerHTML = '<option value="">-- Selecciona --</option>' +
+        opciones.map(function(t) { return '<option value="' + esc(t) + '">' + esc(t) + '</option>'; }).join('');
+      el.value = keepValue || '';
+    }
+
+    function onAreaChange(areaSelectId, tiendaSelectId) {
+      const areaVal = document.getElementById(areaSelectId).value;
+      fillTiendaOptions(tiendaSelectId, areaVal, '');
+    }
+
+    function populateTiendaSelects() {
+      const opts = '<option value="">-- Selecciona --</option>' +
+        TIENDAS.map(function(t) { return '<option value="' + esc(t) + '">' + esc(t) + '</option>'; }).join('');
+      const e1 = document.getElementById('empTienda');
+      const e2 = document.getElementById('appTienda');
+      const e3 = document.getElementById('reingresoTienda');
+      if (e1) e1.innerHTML = opts;
+      if (e2) e2.innerHTML = opts;
+      if (e3) e3.innerHTML = opts;
+    }
+    populateTiendaSelects();
     const META_KEY = 'control_personal_postulantes_meta_v2';
     const BACKUP_KEY = 'control_personal_postulantes_backups_v2';
     const SESSION_KEY = 'control_personal_session_v1';
@@ -680,18 +762,6 @@
         setSyncStatus('bad', 'Sin conexión con la nube, se guardó solo local');
       }
     }
-
-    function populateTiendaSelects() {
-      const opts = '<option value="">-- Selecciona --</option>' +
-        TIENDAS.map(function(t) { return '<option value="' + esc(t) + '">' + esc(t) + '</option>'; }).join('');
-      const e1 = document.getElementById('empTienda');
-      const e2 = document.getElementById('appTienda');
-      const e3 = document.getElementById('reingresoTienda');
-      if (e1) e1.innerHTML = opts;
-      if (e2) e2.innerHTML = opts;
-      if (e3) e3.innerHTML = opts;
-    }
-    populateTiendaSelects();
 
     function pad2(v) {
       return String(v || '').padStart(2, '0');
@@ -1353,6 +1423,7 @@
       document.getElementById('empId').value = '';
       document.getElementById('empStatus').value = 'Activo';
       document.getElementById('employeeFormTitle').textContent = 'Registrar trabajador';
+      fillTiendaOptions('empTienda', '', '');
       toggleCese();
     }
 
@@ -1361,6 +1432,7 @@
       document.getElementById('appId').value = '';
       document.getElementById('appResult').value = 'En evaluación';
       document.getElementById('applicantFormTitle').textContent = 'Registrar postulante';
+      fillTiendaOptions('appTienda', '', '');
       toggleApplicantResult();
     }
 
@@ -1379,8 +1451,8 @@
       document.getElementById('empName').value = r.name || '';
       document.getElementById('empPhone').value = r.phone || '';
       document.getElementById('empEmail').value = r.email || '';
-      document.getElementById('empCompany').value = r.company || '';
-      document.getElementById('empTienda').value = r.tienda || '';
+      document.getElementById('empCompany').value = findAreaKeyCI(r.company) || '';
+      fillTiendaOptions('empTienda', document.getElementById('empCompany').value, r.tienda || '');
       document.getElementById('empRole').value = r.role || '';
       document.getElementById('empTime').value = r.time || '';
       document.getElementById('empStart').value = r.startDate || '';
@@ -1403,8 +1475,8 @@
       document.getElementById('appName').value = r.name || '';
       document.getElementById('appPhone').value = r.phone || '';
       document.getElementById('appEmail').value = r.email || '';
-      document.getElementById('appCompany').value = r.company || '';
-      document.getElementById('appTienda').value = r.tienda || '';
+      document.getElementById('appCompany').value = findAreaKeyCI(r.company) || '';
+      fillTiendaOptions('appTienda', document.getElementById('appCompany').value, r.tienda || '');
       document.getElementById('appArea').value = r.appliedArea || '';
       document.getElementById('appDate').value = r.applyDate || '';
       document.getElementById('appResult').value = r.result || 'En evaluación';
@@ -1540,6 +1612,127 @@
       body.innerHTML = rows.map(function(r) {
         return '<tr><td>' + esc(r.doc) + '</td><td>' + esc(r.name) + '</td><td>' + esc(r.periodo) + '</td><td>' + esc(r.motivo) + '</td><td>' + esc(r.reingreso) + '</td></tr>';
       }).join('') || '<tr><td colspan="5">Sin registros.</td></tr>';
+    }
+
+    let vacSelectedId = null;
+
+    function searchForVacaciones() {
+      const raw = norm(document.getElementById('vacSearchDoc').value);
+      const doc = cleanDoc(raw);
+      const nameQuery = raw.toLowerCase();
+      const box = document.getElementById('vacSearchResult');
+      clearVacacionForm();
+      if (!raw) {
+        box.innerHTML = '<span class="muted">Escribe un documento o Nombre válido.</span>';
+        return;
+      }
+      const matches = state.empleados.filter(function(x) {
+        const matchDoc = doc && cleanDoc(x.doc) === doc;
+        const matchName = nameQuery.length >= 3 && (x.name || '').toLowerCase().includes(nameQuery);
+        return matchDoc || matchName;
+      });
+      if (!matches.length) {
+        box.innerHTML = '<span class="muted">No se encontró ningún trabajador con ese documento o Nombre.</span>';
+        return;
+      }
+      box.innerHTML = matches.map(function(m) {
+        return '<div class="result-box" style="margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">' +
+          '<span><b>' + esc(m.name) + '</b> · ' + esc(m.docType) + ' ' + esc(m.doc) + (m.tienda ? (' · ' + esc(m.tienda)) : '') + ' · ' + esc(m.status) + '</span>' +
+          '<button class="primary" onclick="selectForVacaciones(\'' + m.id + '\')">Seleccionar</button>' +
+          '</div>';
+      }).join('');
+    }
+
+    function calcVacDias() {
+      const s = document.getElementById('vacSalida').value;
+      const r = document.getElementById('vacRegreso').value;
+      const out = document.getElementById('vacDias');
+      if (!s || !r) { out.value = ''; return; }
+      const d1 = new Date(s + 'T00:00:00');
+      const d2 = new Date(r + 'T00:00:00');
+      const dias = Math.round((d2 - d1) / 86400000);
+      out.value = dias > 0 ? dias : '';
+    }
+
+    function estadoVacacion(v) {
+      const hoy = todayISO();
+      if (v.salida <= hoy && hoy < v.regreso) return 'En curso';
+      if (v.salida > hoy) return 'Próxima';
+      return 'Pasada';
+    }
+
+    function vacacionStatusText(r) {
+      const list = Array.isArray(r.vacaciones) ? r.vacaciones : [];
+      if (!list.length) return 'No tiene vacaciones registradas.';
+      const hoy = todayISO();
+      const enCurso = list.find(function(v) { return v.salida <= hoy && hoy < v.regreso; });
+      if (enCurso) return 'Está de vacaciones ahora. Regresa el ' + fmtDate(enCurso.regreso) + '.';
+      const proximas = list.filter(function(v) { return v.salida > hoy; }).sort(function(a, b) { return a.salida.localeCompare(b.salida); });
+      if (proximas.length) {
+        const p = proximas[0];
+        const dias = Math.round((new Date(p.salida + 'T00:00:00') - new Date(hoy + 'T00:00:00')) / 86400000);
+        return 'Le faltan ' + dias + ' día(s) para salir de vacaciones (sale el ' + fmtDate(p.salida) + ', por ' + p.dias + ' días, regresa el ' + fmtDate(p.regreso) + ').';
+      }
+      const pasadas = list.slice().sort(function(a, b) { return b.salida.localeCompare(a.salida); });
+      return 'Sin vacaciones próximas programadas. Su última vacación fue del ' + fmtDate(pasadas[0].salida) + ' al ' + fmtDate(pasadas[0].regreso) + '.';
+    }
+
+    function selectForVacaciones(id) {
+      const r = state.empleados.find(function(x) { return x.id === id; });
+      if (!r) return;
+      vacSelectedId = id;
+      document.getElementById('vacEmployeeLabel').textContent = r.name + ' · ' + r.docType + ' ' + r.doc + (r.tienda ? (' · ' + r.tienda) : '');
+      document.getElementById('vacEstadoActual').textContent = vacacionStatusText(r);
+      document.getElementById('vacSalida').value = '';
+      document.getElementById('vacRegreso').value = '';
+      document.getElementById('vacDias').value = '';
+      document.getElementById('vacFormBox').classList.remove('hidden');
+      renderVacPersonHistory(r);
+    }
+
+    function confirmVacacion() {
+      if (!vacSelectedId) return;
+      const salida = norm(document.getElementById('vacSalida').value);
+      const regreso = norm(document.getElementById('vacRegreso').value);
+      if (!salida || !regreso) { alert('Ingresa la fecha de salida y de regreso.'); return; }
+      if (regreso <= salida) { alert('La fecha de regreso debe ser después de la fecha de salida.'); return; }
+      const idx = state.empleados.findIndex(function(x) { return x.id === vacSelectedId; });
+      if (idx < 0) return;
+      const dias = Math.round((new Date(regreso + 'T00:00:00') - new Date(salida + 'T00:00:00')) / 86400000);
+      const r = state.empleados[idx];
+      r.vacaciones = Array.isArray(r.vacaciones) ? r.vacaciones : [];
+      r.vacaciones.push({ salida: salida, regreso: regreso, dias: dias });
+      saveData(false, 'auto');
+      document.getElementById('vacEstadoActual').textContent = vacacionStatusText(r);
+      document.getElementById('vacSalida').value = '';
+      document.getElementById('vacRegreso').value = '';
+      document.getElementById('vacDias').value = '';
+      renderVacPersonHistory(r);
+      alert('Vacaciones registradas correctamente.');
+    }
+
+    function renderVacPersonHistory(r) {
+      const body = document.getElementById('vacPersonHistoryTable');
+      const list = (Array.isArray(r.vacaciones) ? r.vacaciones.slice() : []).sort(function(a, b) { return b.salida.localeCompare(a.salida); });
+      body.innerHTML = list.map(function(v) {
+        return '<tr><td>' + esc(fmtDate(v.salida)) + '</td><td>' + esc(fmtDate(v.regreso)) + '</td><td>' + esc(v.dias) + '</td><td>' + esc(estadoVacacion(v)) + '</td></tr>';
+      }).join('') || '<tr><td colspan="4">Sin vacaciones registradas.</td></tr>';
+    }
+
+    function clearVacacionForm() {
+      vacSelectedId = null;
+      document.getElementById('vacFormBox').classList.add('hidden');
+      document.getElementById('vacEmployeeLabel').textContent = '';
+      document.getElementById('vacEstadoActual').textContent = '';
+      document.getElementById('vacSalida').value = '';
+      document.getElementById('vacRegreso').value = '';
+      document.getElementById('vacDias').value = '';
+    }
+
+    function clearVacacionPanel() {
+      document.getElementById('vacSearchDoc').value = '';
+      document.getElementById('vacSearchResult').innerHTML = '';
+      clearVacacionForm();
     }
 
     let ceseSelectedId = null;
@@ -1720,6 +1913,7 @@
         html += '<div style="margin-bottom:12px;">' +
           '<div>' + badgeStatus('emp', e.status) + ' <b>' + esc(e.name) + '</b> · ' + esc(e.docType) + ' ' + esc(e.doc) + '</div>' +
           '<div style="margin-top:6px;">' + summary + '</div>' +
+          (e.status === 'Activo' ? '<div class="small" style="margin-top:4px;">🏖️ ' + esc(vacacionStatusText(e)) + '</div>' : '') +
           (e.notes ? '<div class="small muted" style="margin-top:4px;">Observaciones: ' + esc(e.notes) + '</div>' : '') +
           '</div>';
       });
