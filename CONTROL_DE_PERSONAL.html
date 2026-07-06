@@ -726,6 +726,19 @@
         const res = await fetch(API_URL, { method: 'GET' });
         const json = await res.json();
         if (json && json.ok && json.data) {
+          const cloudTotal = (json.data.empleados || []).length + (json.data.postulantes || []).length;
+          const localTotal = (state.empleados || []).length + (state.postulantes || []).length;
+          if (cloudTotal === 0 && localTotal > 0) {
+            const confirmar = confirm(
+              'La nube no tiene datos guardados (0 registros), pero tu navegador tiene ' + localTotal +
+              ' registros locales.\n\n¿Seguro que quieres reemplazar tus datos locales por la nube vacía?\n\n' +
+              'Si no estás seguro, dale Cancelar y primero usa "Guardar datos" para subir lo que tienes.'
+            );
+            if (!confirmar) {
+              setSyncStatus('bad', 'Sincronización cancelada: se mantuvieron tus ' + localTotal + ' registros locales');
+              return;
+            }
+          }
           state.empleados = Array.isArray(json.data.empleados) ? json.data.empleados : [];
           state.postulantes = Array.isArray(json.data.postulantes) ? json.data.postulantes : [];
           localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
