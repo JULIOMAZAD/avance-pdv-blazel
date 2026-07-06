@@ -811,9 +811,12 @@
     function detectSheetKind(rows) {
       if (!rows.length) return '';
       const keys = Object.keys(rows[0] || {}).map(normalizeHeaderText);
-      const has = function(name) { return keys.includes(normalizeHeaderText(name)); };
+      const has = function(name) {
+        const target = normalizeHeaderText(name);
+        return keys.some(function(k) { return k === target || k.indexOf(target) !== -1 || target.indexOf(k) !== -1; });
+      };
       if (has('FECHA DE POSTULACION') || has('RESULTADO') || has('PUESTO / AREA') || has('AREA POSTULADA')) return 'postulantes';
-      if (has('FECHA DE INGRESO') || has('CARGO') || has('PDV') || has('TIME')) return 'empleados';
+      if (has('FECHA DE INGRESO') || has('FECHA INGRESO') || has('CARGO') || has('PUESTO') || has('PDV') || has('TIENDA') || has('TIME') || has('JORNADA')) return 'empleados';
       return '';
     }
     function mapEmployeeRow(row) {
@@ -832,10 +835,10 @@
         company: norm(getRowValue(row, ['AREA', 'ÁREA', 'EMPRESA', 'SEDE'])),
         tienda: norm(getRowValue(row, ['TIENDA', 'PDV', 'LOCAL', 'PUNTO DE VENTA'])),
         role: norm(getRowValue(row, ['CARGO', 'PUESTO', 'ROL'])),
-        time: norm(getRowValue(row, ['TIME', 'JORNADA', 'TURNO', 'HORARIO'])),
-        startDate: parseExcelDate(getRowValue(row, ['FECHA DE INGRESO', 'INGRESO', 'FEC INGRESO'])),
+        time: norm(getRowValue(row, ['TIME', 'JORNADA', 'JORNADA/TIME', 'TURNO', 'HORARIO'])),
+        startDate: parseExcelDate(getRowValue(row, ['FECHA DE INGRESO', 'FECHA INGRESO', 'INGRESO', 'FEC INGRESO'])),
         status: status,
-        endDate: parseExcelDate(getRowValue(row, ['FECHA DE CESE', 'CESE'])),
+        endDate: parseExcelDate(getRowValue(row, ['FECHA DE CESE', 'FECHA CESE', 'CESE'])),
         endReason: norm(getRowValue(row, ['MOTIVO DE CESE', 'MOTIVO CESE'])),
         notes: norm(getRowValue(row, ['OBSERVACIONES', 'NOTAS']))
       };
@@ -858,11 +861,12 @@
         email: norm(getRowValue(row, ['CORREO', 'EMAIL'])),
         company: norm(getRowValue(row, ['AREA', 'ÁREA', 'EMPRESA', 'SEDE'])),
         tienda: norm(getRowValue(row, ['TIENDA', 'PDV', 'LOCAL', 'PUNTO DE VENTA'])),
-        appliedArea: norm(getRowValue(row, ['PUESTO / AREA', 'AREA POSTULADA', 'AREA', 'CARGO', 'PUESTO'])),
-        applyDate: parseExcelDate(getRowValue(row, ['FECHA DE POSTULACION', 'POSTULACION', 'FECHA'])) ,
+        appliedArea: norm(getRowValue(row, ['PUESTO / AREA', 'PUESTO/AREA', 'AREA POSTULADA', 'CARGO', 'PUESTO'])),
+        applyDate: parseExcelDate(getRowValue(row, ['FECHA DE POSTULACION', 'FECHA POSTULACION', 'POSTULACION', 'FECHA'])) ,
         result: result,
         ingresoArea: norm(getRowValue(row, ['AREA INGRESO', 'AREA A LA QUE INGRESO'])),
-        reason: norm(getRowValue(row, ['MOTIVO', 'DETALLE', 'OBSERVACIONES', 'NOTAS'])),
+        ingresoFecha: parseExcelDate(getRowValue(row, ['FECHA DE INGRESO', 'FECHA INGRESO'])),
+        reason: norm(getRowValue(row, ['MOTIVO', 'MOTIVO NO INGRESO', 'MOTIVO NO INGRESO/NO ASISTIO', 'DETALLE'])),
         notes: norm(getRowValue(row, ['OBSERVACIONES', 'NOTAS']))
       };
     }
