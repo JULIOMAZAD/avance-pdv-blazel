@@ -645,7 +645,8 @@
                 <th>Área</th>
                 <th>Tienda</th>
                 <th>Estado</th>
-                <th>Días</th>
+                <th>Días tomados</th>
+                <th>Días por tomar</th>
                 <th>Fecha</th>
               </tr>
             </thead>
@@ -1905,40 +1906,38 @@
       const enCurso = list.find(function(v) { return v.salida <= hoy && hoy <= v.regreso; });
       if (enCurso) {
         return { orden: 0, claseFila: 'vac-row-curso', fechaOrden: enCurso.salida,
-          estado: '🏖️ En curso', dias: enCurso.dias + ' día(s)', fecha: 'Vuelve el ' + fmtDate(nextDay(enCurso.regreso)) };
+          estado: '🏖️ En curso', diasTomados: enCurso.dias, diasPorTomar: 0, fecha: 'Vuelve el ' + fmtDate(nextDay(enCurso.regreso)) };
       }
       const proximas = list.filter(function(v) { return v.salida > hoy; }).sort(function(a, b) { return a.salida.localeCompare(b.salida); });
       if (proximas.length) {
         const p = proximas[0];
-        const dias = Math.round((new Date(p.salida + 'T00:00:00') - new Date(hoy + 'T00:00:00')) / 86400000);
         return { orden: 1, claseFila: 'vac-row-programada', fechaOrden: p.salida,
-          estado: 'Programada', dias: 'Faltan ' + dias + ' día(s)', fecha: 'Sale el ' + fmtDate(p.salida) };
+          estado: 'Programada', diasTomados: 0, diasPorTomar: p.dias, fecha: 'Sale el ' + fmtDate(p.salida) };
       }
       if (norm(r.docType).toUpperCase() !== 'DNI') {
-        return { orden: 5, claseFila: '', fechaOrden: '9999-99-99', estado: 'No aplica', dias: '-', fecha: 'Con CE no ingresa a planilla' };
+        return { orden: 5, claseFila: '', fechaOrden: '9999-99-99', estado: 'No aplica', diasTomados: '-', diasPorTomar: '-', fecha: 'Con CE no ingresa a planilla' };
       }
       const ciclo = calcCicloVacacional(r.startDate, hoy);
       if (!ciclo || ciclo.anosCumplidos < 1) {
-        return { orden: 5, claseFila: '', fechaOrden: '9999-99-99', estado: 'Sin antigüedad', dias: '-', fecha: 'Aún no cumple 1 año en planilla' };
+        return { orden: 5, claseFila: '', fechaOrden: '9999-99-99', estado: 'Sin antigüedad', diasTomados: '-', diasPorTomar: '-', fecha: 'Aún no cumple 1 año en planilla' };
       }
       // Suma los días tomados dentro del periodo vigente (por si los tomó en partes, no de una sola vez)
       const tomadasEnCiclo = list.filter(function(v) { return v.salida >= ciclo.inicio && v.salida < ciclo.fin; });
       const diasTomados = tomadasEnCiclo.reduce(function(sum, v) { return sum + (parseInt(v.dias) || 0); }, 0);
-      const diasPendientes = DIAS_VACACIONES_ANUALES - diasTomados;
+      const diasPendientes = Math.max(DIAS_VACACIONES_ANUALES - diasTomados, 0);
       if (diasPendientes <= 0) {
         return { orden: 2, claseFila: 'vac-row-completada', fechaOrden: '9997-' + ciclo.fin,
-          estado: '✓ Completo', dias: diasTomados + ' de ' + DIAS_VACACIONES_ANUALES + ' días', fecha: 'Venció el ' + fmtDate(ciclo.fin) };
+          estado: '✓ Completo', diasTomados: diasTomados, diasPorTomar: 0, fecha: 'Venció el ' + fmtDate(ciclo.fin) };
       }
       const diasParaVencer = Math.round((new Date(ciclo.fin + 'T00:00:00') - new Date(hoy + 'T00:00:00')) / 86400000);
       const parcial = diasTomados > 0;
-      const diasTexto = parcial ? ('Debe ' + diasPendientes + ' de ' + DIAS_VACACIONES_ANUALES + ' días') : ('Debe ' + diasPendientes + ' días');
       if (diasParaVencer < 0) {
         return { orden: 3, claseFila: 'vac-row-vencido', fechaOrden: ciclo.fin,
-          estado: '⚠️ Vencido', dias: diasTexto, fecha: 'Venció hace ' + Math.abs(diasParaVencer) + ' día(s) (' + fmtDate(ciclo.fin) + ')' };
+          estado: '⚠️ Vencido', diasTomados: diasTomados, diasPorTomar: diasPendientes, fecha: 'Venció el ' + fmtDate(ciclo.fin) };
       }
       const claseParcial = parcial ? 'vac-row-parcial' : 'vac-row-pendiente';
       return { orden: 4, claseFila: claseParcial, fechaOrden: ciclo.fin,
-        estado: parcial ? 'Parcial' : 'Sin programar', dias: diasTexto, fecha: 'Vence en ' + diasParaVencer + ' día(s) (' + fmtDate(ciclo.fin) + ')' };
+        estado: parcial ? 'Parcial' : 'Sin programar', diasTomados: diasTomados, diasPorTomar: diasPendientes, fecha: 'Vence en ' + diasParaVencer + ' días (' + fmtDate(ciclo.fin) + ')' };
     }
 
     function renderVacacionesListado() {
@@ -1962,10 +1961,11 @@
           '<td>' + esc(r.company || '-') + '</td>' +
           '<td>' + esc(r.tienda || '-') + '</td>' +
           '<td style="font-weight:700;">' + esc(g.estado) + '</td>' +
-          '<td>' + esc(g.dias) + '</td>' +
+          '<td>' + esc(g.diasTomados) + '</td>' +
+          '<td>' + esc(g.diasPorTomar) + '</td>' +
           '<td>' + esc(g.fecha) + '</td>' +
           '</tr>';
-      }).join('') || '<tr><td colspan="7">Sin trabajadores activos.</td></tr>';
+      }).join('') || '<tr><td colspan="8">Sin trabajadores activos.</td></tr>';
     }
 
     function vacacionStatusText(r) {
@@ -1978,7 +1978,7 @@
       if (proximas.length) {
         const p = proximas[0];
         const dias = Math.round((new Date(p.salida + 'T00:00:00') - new Date(hoy + 'T00:00:00')) / 86400000);
-        return 'Le faltan ' + dias + ' día(s) para salir de vacaciones (sale el ' + fmtDate(p.salida) + ', por ' + p.dias + ' días, vuelve a trabajar el ' + fmtDate(nextDay(p.regreso)) + ').';
+        return 'Le faltan ' + dias + ' días para salir de vacaciones (sale el ' + fmtDate(p.salida) + ', por ' + p.dias + ' días, vuelve a trabajar el ' + fmtDate(nextDay(p.regreso)) + ').';
       }
       const pasadas = list.slice().sort(function(a, b) { return b.salida.localeCompare(a.salida); });
       return 'Sin vacaciones próximas programadas. Su última vacación fue del ' + fmtDate(pasadas[0].salida) + ' al ' + fmtDate(pasadas[0].regreso) + '.';
