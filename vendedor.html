@@ -61,7 +61,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
 <div class="wrap">
   <div class="head">
     <h2>Avance por Vendedor</h2>
-    <div class="sub">Elige la tienda y toca un vendedor para ver su cuota · <strong>v17</strong> · <span id="liveStatus" style="color:#22a843;font-weight:700">cargando…</span></div>
+    <div class="sub">Elige la tienda y toca un vendedor para ver su cuota · <strong>v19</strong> · <span id="liveStatus" style="color:#22a843;font-weight:700">cargando…</span></div>
   </div>
   <div class="mes-tabs" id="mesTabs"></div>
   <div class="pick">
@@ -107,7 +107,7 @@ async function loadLive(){
   setStatus('actualizando…');
   try{
     const sep=SCRIPT_URL.includes('?')?'&':'?';
-    let meses=['mayo','junio'];
+    let meses=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
     try{const m=await fetchJSON(SCRIPT_URL+sep+'modo=meses');if(m.meses&&m.meses.length)meses=m.meses;}catch(e){}
     let all=[];
     for(const mn of meses){
@@ -115,11 +115,11 @@ async function loadLive(){
         if(j&&j.data&&j.data.length){const mnum=MES_MAP[String(mn).toLowerCase()]||0;const anio=parseInt(j.anio)||2026;all=all.concat(parseStackedRows(j.data,mnum,anio));}
       }catch(e){}
     }
-    if(all.length){DATA=all;const dd=(DATA.find(r=>r.m===curMes)||DATA[0]); renderMes();fillTiendas();setStatus('en vivo · día '+(dd?dd.d:'?'));}
+    if(all.length){DATA=all; const mx=Math.max.apply(null,DATA.map(r=>r.m)); if(mx>0)curMes=mx; const dd=(DATA.find(r=>r.m===curMes)||DATA[0]); renderMes();fillTiendas();setStatus('en vivo · día '+(dd?dd.d:'?'));}
     else setStatus('datos embebidos (sin conexión)');
   }catch(e){ setStatus('datos embebidos (sin conexión)'); }
 }
-const MES_N={5:"Mayo",6:"Junio"};
+const MES_N={1:"Enero",2:"Febrero",3:"Marzo",4:"Abril",5:"Mayo",6:"Junio",7:"Julio",8:"Agosto",9:"Septiembre",10:"Octubre",11:"Noviembre",12:"Diciembre"};
 let curMes=6, curTienda="", curVend="";
 
 // Agrupación de productos para la tabla (unidades)
