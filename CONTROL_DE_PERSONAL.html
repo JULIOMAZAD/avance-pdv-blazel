@@ -278,8 +278,9 @@
       <button class="tab" data-tab="postulantes">POSTULANTES</button>
       <button class="tab" data-tab="cesados">DAR DE BAJA</button>
       <button class="tab" data-tab="reingresos">REINGRESOS</button>
+      <button class="danger" onclick="showTab('verreingresos')">VER REINGRESOS</button>
       <button class="tab" data-tab="vacaciones">VACACIONES</button>
-      <button class="danger" onclick="verCesados()">VER CESADOS</button>
+      <button class="danger" onclick="showTab('vercesados')">VER CESADOS</button>
     </div>
 
     <section id="tab-inicio" class="tab-panel">
@@ -302,38 +303,6 @@
           <button class="light" onclick="clearSearch()">Limpiar</button>
         </div>
         <div id="searchResult" class="result-box">Introduce un documento o Nombre para consultar.</div>
-      </div>
-    </section>
-
-    <section id="tab-empleados" class="tab-panel hidden">
-      <div class="card">
-        <div class="form-title">
-          <h2 id="employeeFormTitle">Registrar trabajador</h2>
-          <span class="muted small">Si pulsas editar en la tabla, el formulario cargará el registro.</span>
-        </div>
-        <form id="employeeForm" onsubmit="event.preventDefault(); addEmployee();">
-          <input type="hidden" id="empId" />
-          <div class="row">
-            <div class="col-3"><label>Tipo de documento</label><select id="empDocType"><option>DNI</option><option>CE</option></select></div>
-            <div class="col-3"><label>Número de documento</label><input id="empDoc" required /></div>
-            <div class="col-6"><label>Nombres y apellidos</label><input id="empName" required /></div>
-            <div class="col-3"><label>Teléfono</label><input id="empPhone" /></div>
-            <div class="col-3"><label>Correo</label><input id="empEmail" type="email" /></div>
-            <div class="col-3"><label>Área</label><select id="empCompany" onchange="onAreaChange('empCompany','empTienda')"></select></div>
-            <div class="col-3"><label>Tienda / PDV</label><select id="empTienda"></select></div>
-            <div class="col-3"><label>Puesto o cargo</label><input id="empRole" /></div>
-            <div class="col-3"><label>Jornada / Time</label><input id="empTime" placeholder="Ej. Full Time, Part Time" /></div>
-            <div class="col-3"><label>Fecha de ingreso</label><input id="empStart" type="date" required /></div>
-            <div class="col-3"><label>Estado actual</label><select id="empStatus" onchange="toggleCese()"><option value="Activo">Activo</option><option value="Cesado">Cesado</option></select></div>
-            <div class="col-3 cese-field hidden"><label>Fecha de cese</label><input id="empEnd" type="date" /></div>
-            <div class="col-3 cese-field hidden"><label>Motivo de cese</label><input id="empEndReason" /></div>
-            <div class="col-12"><label>Observaciones</label><textarea id="empNotes"></textarea></div>
-          </div>
-          <div class="toolbar" style="margin-top:12px;">
-            <button class="primary" type="submit">Guardar trabajador</button>
-            <button class="light" type="button" onclick="clearEmployeeForm()">Limpiar</button>
-          </div>
-        </form>
       </div>
 
       <div class="card">
@@ -370,6 +339,66 @@
           </table>
         </div>
       </div>
+
+      <div class="card">
+        <div class="form-title">
+          <h2>Listado de postulantes</h2>
+          <span class="muted small">Incluye edición y eliminación.</span>
+        </div>
+        <input id="applicantFilter" placeholder="Filtrar por documento, nombre o área" oninput="renderApplicants()" />
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Documento</th>
+                <th>Nombre</th>
+                <th>Teléfono / correo</th>
+                <th>Área</th>
+                <th>Tienda</th>
+                <th>Puesto / área</th>
+                <th>Postulación</th>
+                <th>Resultado</th>
+                <th>Detalle</th>
+                <th>Observaciones</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="applicantTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-empleados" class="tab-panel hidden">
+      <div class="card">
+        <div class="form-title">
+          <h2 id="employeeFormTitle">Registrar trabajador</h2>
+          <span class="muted small">Si pulsas editar en la tabla, el formulario cargará el registro.</span>
+        </div>
+        <form id="employeeForm" onsubmit="event.preventDefault(); addEmployee();">
+          <input type="hidden" id="empId" />
+          <div class="row">
+            <div class="col-3"><label>Tipo de documento</label><select id="empDocType"><option>DNI</option><option>CE</option></select></div>
+            <div class="col-3"><label>Número de documento</label><input id="empDoc" required /></div>
+            <div class="col-6"><label>Nombres y apellidos</label><input id="empName" required /></div>
+            <div class="col-3"><label>Teléfono</label><input id="empPhone" /></div>
+            <div class="col-3"><label>Correo</label><input id="empEmail" type="email" /></div>
+            <div class="col-3"><label>Área</label><select id="empCompany" onchange="onAreaChange('empCompany','empTienda')"></select></div>
+            <div class="col-3"><label>Tienda / PDV</label><select id="empTienda"></select></div>
+            <div class="col-3"><label>Puesto o cargo</label><input id="empRole" /></div>
+            <div class="col-3"><label>Jornada / Time</label><input id="empTime" placeholder="Ej. Full Time, Part Time" /></div>
+            <div class="col-3"><label>Fecha de ingreso</label><input id="empStart" type="date" required /></div>
+            <div class="col-3"><label>Estado actual</label><select id="empStatus" onchange="toggleCese()"><option value="Activo">Activo</option><option value="Cesado">Cesado</option></select></div>
+            <div class="col-3 cese-field hidden"><label>Fecha de cese</label><input id="empEnd" type="date" /></div>
+            <div class="col-3 cese-field hidden"><label>Motivo de cese</label><input id="empEndReason" /></div>
+            <div class="col-12"><label>Observaciones</label><textarea id="empNotes"></textarea></div>
+          </div>
+          <div class="toolbar" style="margin-top:12px;">
+            <button class="primary" type="submit">Guardar trabajador</button>
+            <button class="light" type="button" onclick="clearEmployeeForm()">Limpiar</button>
+          </div>
+        </form>
+      </div>
     </section>
 
     <section id="tab-postulantes" class="tab-panel hidden">
@@ -402,34 +431,6 @@
           </div>
         </form>
       </div>
-
-      <div class="card">
-        <div class="form-title">
-          <h2>Listado de postulantes</h2>
-          <span class="muted small">Incluye edición y eliminación.</span>
-        </div>
-        <input id="applicantFilter" placeholder="Filtrar por documento, nombre o área" oninput="renderApplicants()" />
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Documento</th>
-                <th>Nombre</th>
-                <th>Teléfono / correo</th>
-                <th>Área</th>
-                <th>Tienda</th>
-                <th>Puesto / área</th>
-                <th>Postulación</th>
-                <th>Resultado</th>
-                <th>Detalle</th>
-                <th>Observaciones</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody id="applicantTable"></tbody>
-          </table>
-        </div>
-      </div>
     </section>
 
     <section id="tab-cesados" class="tab-panel hidden">
@@ -454,7 +455,9 @@
           </div>
         </div>
       </div>
+    </section>
 
+    <section id="tab-vercesados" class="tab-panel hidden">
       <div class="card">
         <div class="form-title">
           <h2>Historial de cesados</h2>
@@ -501,6 +504,33 @@
         </div>
       </div>
 
+      <div class="card">
+        <div class="form-title">
+          <h2>Agregar un periodo laboral anterior (manual)</h2>
+          <span class="muted small">Para historial antiguo que no pasó por este sistema (ej. datos de un Excel importado). No cambia el estado actual de la persona.</span>
+        </div>
+        <div class="search-box" style="margin-top:12px;">
+          <input id="periodoSearchDoc" placeholder="Escribe DNI, Carnet de Extranjería o Nombre" />
+          <button class="primary" onclick="searchPersonForPeriodo()">Buscar</button>
+          <button class="light" onclick="clearPeriodoPanel()">Limpiar</button>
+        </div>
+        <div id="periodoSearchResult" style="margin-top:12px;"></div>
+        <div id="periodoFormBox" class="hidden" style="margin-top:16px; border-top:1px solid var(--line); padding-top:16px;">
+          <div id="periodoEmployeeLabel" style="font-weight:700; margin-bottom:10px;"></div>
+          <div class="row">
+            <div class="col-4"><label>Fecha de ingreso (periodo anterior)</label><input id="periodoDesde" type="date" /></div>
+            <div class="col-4"><label>Fecha de cese (periodo anterior)</label><input id="periodoHasta" type="date" /></div>
+            <div class="col-4"><label>Motivo de cese anterior</label><input id="periodoMotivo" /></div>
+          </div>
+          <div class="toolbar" style="margin-top:12px;">
+            <button class="secondary" onclick="confirmPeriodoAnterior()">Agregar periodo al historial</button>
+            <button class="light" onclick="clearPeriodoPanel()">Cancelar</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-verreingresos" class="tab-panel hidden">
       <div class="card">
         <div class="form-title">
           <h2>Historial de reingresos</h2>
@@ -1462,6 +1492,8 @@
     function editEmployee(id) {
       const r = state.empleados.find(function(x) { return x.id === id; });
       if (!r) return;
+      showTab('empleados');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       document.getElementById('empId').value = r.id;
       document.getElementById('empDocType').value = r.docType || 'DNI';
       document.getElementById('empDoc').value = r.doc || '';
@@ -1486,6 +1518,8 @@
     function editApplicant(id) {
       const r = state.postulantes.find(function(x) { return x.id === id; });
       if (!r) return;
+      showTab('postulantes');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       document.getElementById('appId').value = r.id;
       document.getElementById('appDocType').value = r.docType || 'DNI';
       document.getElementById('appDoc').value = r.doc || '';
@@ -1528,6 +1562,77 @@
       showTab('reingresos');
       selectForReingreso(id);
       window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    let periodoSelectedId = null;
+
+    function searchPersonForPeriodo() {
+      const raw = norm(document.getElementById('periodoSearchDoc').value);
+      const doc = cleanDoc(raw);
+      const nameQuery = raw.toLowerCase();
+      const box = document.getElementById('periodoSearchResult');
+      clearPeriodoForm();
+      if (!raw) {
+        box.innerHTML = '<span class="muted">Escribe un documento o Nombre válido.</span>';
+        return;
+      }
+      const matches = state.empleados.filter(function(x) {
+        const matchDoc = doc && cleanDoc(x.doc) === doc;
+        const matchName = nameQuery.length >= 3 && (x.name || '').toLowerCase().includes(nameQuery);
+        return matchDoc || matchName;
+      });
+      if (!matches.length) {
+        box.innerHTML = '<span class="muted">No se encontró ningún trabajador con ese documento o Nombre.</span>';
+        return;
+      }
+      box.innerHTML = matches.map(function(m) {
+        return '<div class="result-box" style="margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">' +
+          '<span><b>' + esc(m.name) + '</b> · ' + esc(m.docType) + ' ' + esc(m.doc) + ' · ' + esc(m.status) + '</span>' +
+          '<button class="secondary" onclick="selectForPeriodo(\'' + m.id + '\')">Seleccionar</button>' +
+          '</div>';
+      }).join('');
+    }
+
+    function selectForPeriodo(id) {
+      const r = state.empleados.find(function(x) { return x.id === id; });
+      if (!r) return;
+      periodoSelectedId = id;
+      document.getElementById('periodoEmployeeLabel').textContent = r.name + ' · ' + r.docType + ' ' + r.doc;
+      document.getElementById('periodoDesde').value = '';
+      document.getElementById('periodoHasta').value = '';
+      document.getElementById('periodoMotivo').value = '';
+      document.getElementById('periodoFormBox').classList.remove('hidden');
+    }
+
+    function confirmPeriodoAnterior() {
+      if (!periodoSelectedId) return;
+      const desde = norm(document.getElementById('periodoDesde').value);
+      const hasta = norm(document.getElementById('periodoHasta').value);
+      const motivo = norm(document.getElementById('periodoMotivo').value);
+      if (!desde) { alert('Ingresa al menos la fecha de ingreso del periodo anterior.'); return; }
+      const idx = state.empleados.findIndex(function(x) { return x.id === periodoSelectedId; });
+      if (idx < 0) return;
+      const r = state.empleados[idx];
+      r.historialLaboral = Array.isArray(r.historialLaboral) ? r.historialLaboral : [];
+      r.historialLaboral.push({ desde: desde, hasta: hasta, motivoCese: motivo });
+      saveData(false, 'auto');
+      alert('Periodo anterior agregado al historial.');
+      clearPeriodoPanel();
+    }
+
+    function clearPeriodoForm() {
+      periodoSelectedId = null;
+      document.getElementById('periodoFormBox').classList.add('hidden');
+      document.getElementById('periodoEmployeeLabel').textContent = '';
+      document.getElementById('periodoDesde').value = '';
+      document.getElementById('periodoHasta').value = '';
+      document.getElementById('periodoMotivo').value = '';
+    }
+
+    function clearPeriodoPanel() {
+      document.getElementById('periodoSearchDoc').value = '';
+      document.getElementById('periodoSearchResult').innerHTML = '';
+      clearPeriodoForm();
     }
 
     let reingresoSelectedId = null;
@@ -1667,13 +1772,20 @@
       if (!s || !r) { out.value = ''; return; }
       const d1 = new Date(s + 'T00:00:00');
       const d2 = new Date(r + 'T00:00:00');
-      const dias = Math.round((d2 - d1) / 86400000);
+      const dias = Math.round((d2 - d1) / 86400000) + 1;
       out.value = dias > 0 ? dias : '';
+    }
+
+    function nextDay(dateStr) {
+      if (!dateStr) return dateStr;
+      const d = new Date(dateStr + 'T00:00:00');
+      d.setDate(d.getDate() + 1);
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     }
 
     function estadoVacacion(v) {
       const hoy = todayISO();
-      if (v.salida <= hoy && hoy < v.regreso) return 'En curso';
+      if (v.salida <= hoy && hoy <= v.regreso) return 'En curso';
       if (v.salida > hoy) return 'Próxima';
       return 'Pasada';
     }
@@ -1682,13 +1794,13 @@
       const list = Array.isArray(r.vacaciones) ? r.vacaciones : [];
       if (!list.length) return 'No tiene vacaciones registradas.';
       const hoy = todayISO();
-      const enCurso = list.find(function(v) { return v.salida <= hoy && hoy < v.regreso; });
-      if (enCurso) return 'Está de vacaciones ahora. Regresa el ' + fmtDate(enCurso.regreso) + '.';
+      const enCurso = list.find(function(v) { return v.salida <= hoy && hoy <= v.regreso; });
+      if (enCurso) return 'Está de vacaciones ahora. Regresa a trabajar el ' + fmtDate(nextDay(enCurso.regreso)) + '.';
       const proximas = list.filter(function(v) { return v.salida > hoy; }).sort(function(a, b) { return a.salida.localeCompare(b.salida); });
       if (proximas.length) {
         const p = proximas[0];
         const dias = Math.round((new Date(p.salida + 'T00:00:00') - new Date(hoy + 'T00:00:00')) / 86400000);
-        return 'Le faltan ' + dias + ' día(s) para salir de vacaciones (sale el ' + fmtDate(p.salida) + ', por ' + p.dias + ' días, regresa el ' + fmtDate(p.regreso) + ').';
+        return 'Le faltan ' + dias + ' día(s) para salir de vacaciones (sale el ' + fmtDate(p.salida) + ', por ' + p.dias + ' días, vuelve a trabajar el ' + fmtDate(nextDay(p.regreso)) + ').';
       }
       const pasadas = list.slice().sort(function(a, b) { return b.salida.localeCompare(a.salida); });
       return 'Sin vacaciones próximas programadas. Su última vacación fue del ' + fmtDate(pasadas[0].salida) + ' al ' + fmtDate(pasadas[0].regreso) + '.';
@@ -1715,7 +1827,7 @@
       if (regreso <= salida) { alert('La fecha de regreso debe ser después de la fecha de salida.'); return; }
       const idx = state.empleados.findIndex(function(x) { return x.id === vacSelectedId; });
       if (idx < 0) return;
-      const dias = Math.round((new Date(regreso + 'T00:00:00') - new Date(salida + 'T00:00:00')) / 86400000);
+      const dias = Math.round((new Date(regreso + 'T00:00:00') - new Date(salida + 'T00:00:00')) / 86400000) + 1;
       const r = state.empleados[idx];
       r.vacaciones = Array.isArray(r.vacaciones) ? r.vacaciones : [];
       r.vacaciones.push({ salida: salida, regreso: regreso, dias: dias });
