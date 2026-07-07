@@ -142,6 +142,7 @@
     tr.vac-row-completada td { background: #dbeafe !important; }
     tr.vac-row-vencido td { background: #fecaca !important; }
     tr.vac-row-pendiente td { background: #ffedd5 !important; }
+    tr.vac-row-parcial td { background: #e9d5ff !important; }
     .kpi {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
@@ -1894,6 +1895,8 @@
       return { inicio: dateToISO(inicio), fin: dateToISO(fin), anosCumplidos: years };
     }
 
+    const DIAS_VACACIONES_ANUALES = 15; // ajusta aquí si tu política cambia
+
     function vacacionGroup(r) {
       const list = Array.isArray(r.vacaciones) ? r.vacaciones : [];
       const hoy = todayISO();
@@ -1912,15 +1915,21 @@
       if (!ciclo || ciclo.anosCumplidos < 1) {
         return { orden: 5, claseFila: '', fechaOrden: '9999-99-99', texto: 'Aún no cumple 1 año en planilla (no le corresponde vacación todavía)' };
       }
-      const tomadaEnCiclo = list.some(function(v) { return v.salida >= ciclo.inicio && v.salida < ciclo.fin; });
-      if (tomadaEnCiclo) {
-        return { orden: 2, claseFila: 'vac-row-completada', fechaOrden: '9997-' + ciclo.fin, texto: '✓ Vacaciones tomadas en este periodo (vence ' + fmtDate(ciclo.fin) + ')' };
+      // Suma los días tomados dentro del periodo vigente (por si los tomó en partes, no de una sola vez)
+      const tomadasEnCiclo = list.filter(function(v) { return v.salida >= ciclo.inicio && v.salida < ciclo.fin; });
+      const diasTomados = tomadasEnCiclo.reduce(function(sum, v) { return sum + (parseInt(v.dias) || 0); }, 0);
+      const diasPendientes = DIAS_VACACIONES_ANUALES - diasTomados;
+      if (diasPendientes <= 0) {
+        return { orden: 2, claseFila: 'vac-row-completada', fechaOrden: '9997-' + ciclo.fin, texto: '✓ Vacaciones completas este periodo (tomó ' + diasTomados + ' de ' + DIAS_VACACIONES_ANUALES + ' días · vence ' + fmtDate(ciclo.fin) + ')' };
       }
       const diasParaVencer = Math.round((new Date(ciclo.fin + 'T00:00:00') - new Date(hoy + 'T00:00:00')) / 86400000);
+      const parcial = diasTomados > 0;
+      const prefijo = parcial ? ('Tomó ' + diasTomados + ' de ' + DIAS_VACACIONES_ANUALES + ' días · le quedan ' + diasPendientes + ' pendientes · ') : ('Sin programar (' + diasPendientes + ' días pendientes) · ');
       if (diasParaVencer < 0) {
-        return { orden: 3, claseFila: 'vac-row-vencido', fechaOrden: ciclo.fin, texto: '⚠️ Vencido hace ' + Math.abs(diasParaVencer) + ' día(s) · debió salir antes del ' + fmtDate(ciclo.fin) };
+        return { orden: 3, claseFila: 'vac-row-vencido', fechaOrden: ciclo.fin, texto: '⚠️ ' + prefijo + 'vencido hace ' + Math.abs(diasParaVencer) + ' día(s) (debió salir antes del ' + fmtDate(ciclo.fin) + ')' };
       }
-      return { orden: 4, claseFila: 'vac-row-pendiente', fechaOrden: ciclo.fin, texto: 'Sin programar · vence en ' + diasParaVencer + ' día(s) (hasta el ' + fmtDate(ciclo.fin) + ')' };
+      const claseParcial = parcial ? 'vac-row-parcial' : 'vac-row-pendiente';
+      return { orden: 4, claseFila: claseParcial, fechaOrden: ciclo.fin, texto: prefijo + 'vence en ' + diasParaVencer + ' día(s) (hasta el ' + fmtDate(ciclo.fin) + ')' };
     }
 
     function renderVacacionesListado() {
