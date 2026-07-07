@@ -137,6 +137,8 @@
       font-weight: 700;
       line-height: 1.4;
     }
+    tr.vac-row-curso td { background: #dcfce7 !important; }
+    tr.vac-row-programada td { background: #fef9c3 !important; }
     .kpi {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
@@ -1865,6 +1867,16 @@
       return '<span class="tag t-pun">Sin vacaciones registradas</span>';
     }
 
+    function vacacionGroup(r) {
+      const list = Array.isArray(r.vacaciones) ? r.vacaciones : [];
+      const hoy = todayISO();
+      const enCurso = list.find(function(v) { return v.salida <= hoy && hoy <= v.regreso; });
+      if (enCurso) return { orden: 0, claseFila: 'vac-row-curso', fechaOrden: enCurso.salida };
+      const proximas = list.filter(function(v) { return v.salida > hoy; }).sort(function(a, b) { return a.salida.localeCompare(b.salida); });
+      if (proximas.length) return { orden: 1, claseFila: 'vac-row-programada', fechaOrden: proximas[0].salida };
+      return { orden: 2, claseFila: '', fechaOrden: '9999-99-99' };
+    }
+
     function renderVacacionesListado() {
       const body = document.getElementById('vacListadoTable');
       if (!body) return;
@@ -1873,8 +1885,14 @@
         if (r.status !== 'Activo') return false;
         return [r.doc, r.name, r.tienda, r.company].join(' ').toLowerCase().includes(q);
       });
-      body.innerHTML = rows.map(function(r) {
-        return '<tr>' +
+      const rowsConGrupo = rows.map(function(r) { return { r: r, g: vacacionGroup(r) }; });
+      rowsConGrupo.sort(function(a, b) {
+        if (a.g.orden !== b.g.orden) return a.g.orden - b.g.orden;
+        return a.g.fechaOrden.localeCompare(b.g.fechaOrden);
+      });
+      body.innerHTML = rowsConGrupo.map(function(item) {
+        const r = item.r, g = item.g;
+        return '<tr class="' + g.claseFila + '">' +
           '<td>' + esc(r.docType) + ' ' + esc(r.doc) + '</td>' +
           '<td>' + esc(r.name) + '</td>' +
           '<td>' + esc(r.company || '-') + '</td>' +
