@@ -280,6 +280,7 @@
       <button class="tab" data-tab="reingresos">REINGRESOS</button>
       <button class="danger" onclick="showTab('verreingresos')">VER REINGRESOS</button>
       <button class="tab" data-tab="vacaciones">VACACIONES</button>
+      <button class="danger" onclick="showTab('vervacaciones')">VER VACACIONES</button>
       <button class="danger" onclick="showTab('vercesados')">VER CESADOS</button>
     </div>
 
@@ -303,6 +304,38 @@
           <button class="light" onclick="clearSearch()">Limpiar</button>
         </div>
         <div id="searchResult" class="result-box">Introduce un documento o Nombre para consultar.</div>
+      </div>
+    </section>
+
+    <section id="tab-empleados" class="tab-panel hidden">
+      <div class="card">
+        <div class="form-title">
+          <h2 id="employeeFormTitle">Registrar trabajador</h2>
+          <span class="muted small">Si pulsas editar en la tabla, el formulario cargará el registro.</span>
+        </div>
+        <form id="employeeForm" onsubmit="event.preventDefault(); addEmployee();">
+          <input type="hidden" id="empId" />
+          <div class="row">
+            <div class="col-3"><label>Tipo de documento</label><select id="empDocType"><option>DNI</option><option>CE</option></select></div>
+            <div class="col-3"><label>Número de documento</label><input id="empDoc" required /></div>
+            <div class="col-6"><label>Nombres y apellidos</label><input id="empName" required /></div>
+            <div class="col-3"><label>Teléfono</label><input id="empPhone" /></div>
+            <div class="col-3"><label>Correo</label><input id="empEmail" type="email" /></div>
+            <div class="col-3"><label>Área</label><select id="empCompany" onchange="onAreaChange('empCompany','empTienda')"></select></div>
+            <div class="col-3"><label>Tienda / PDV</label><select id="empTienda"></select></div>
+            <div class="col-3"><label>Puesto o cargo</label><input id="empRole" /></div>
+            <div class="col-3"><label>Jornada / Time</label><input id="empTime" placeholder="Ej. Full Time, Part Time" /></div>
+            <div class="col-3"><label>Fecha de ingreso</label><input id="empStart" type="date" required /></div>
+            <div class="col-3"><label>Estado actual</label><select id="empStatus" onchange="toggleCese()"><option value="Activo">Activo</option><option value="Cesado">Cesado</option></select></div>
+            <div class="col-3 cese-field hidden"><label>Fecha de cese</label><input id="empEnd" type="date" /></div>
+            <div class="col-3 cese-field hidden"><label>Motivo de cese</label><input id="empEndReason" /></div>
+            <div class="col-12"><label>Observaciones</label><textarea id="empNotes"></textarea></div>
+          </div>
+          <div class="toolbar" style="margin-top:12px;">
+            <button class="primary" type="submit">Guardar trabajador</button>
+            <button class="light" type="button" onclick="clearEmployeeForm()">Limpiar</button>
+          </div>
+        </form>
       </div>
 
       <div class="card">
@@ -339,66 +372,6 @@
           </table>
         </div>
       </div>
-
-      <div class="card">
-        <div class="form-title">
-          <h2>Listado de postulantes</h2>
-          <span class="muted small">Incluye edición y eliminación.</span>
-        </div>
-        <input id="applicantFilter" placeholder="Filtrar por documento, nombre o área" oninput="renderApplicants()" />
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Documento</th>
-                <th>Nombre</th>
-                <th>Teléfono / correo</th>
-                <th>Área</th>
-                <th>Tienda</th>
-                <th>Puesto / área</th>
-                <th>Postulación</th>
-                <th>Resultado</th>
-                <th>Detalle</th>
-                <th>Observaciones</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody id="applicantTable"></tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-    <section id="tab-empleados" class="tab-panel hidden">
-      <div class="card">
-        <div class="form-title">
-          <h2 id="employeeFormTitle">Registrar trabajador</h2>
-          <span class="muted small">Si pulsas editar en la tabla, el formulario cargará el registro.</span>
-        </div>
-        <form id="employeeForm" onsubmit="event.preventDefault(); addEmployee();">
-          <input type="hidden" id="empId" />
-          <div class="row">
-            <div class="col-3"><label>Tipo de documento</label><select id="empDocType"><option>DNI</option><option>CE</option></select></div>
-            <div class="col-3"><label>Número de documento</label><input id="empDoc" required /></div>
-            <div class="col-6"><label>Nombres y apellidos</label><input id="empName" required /></div>
-            <div class="col-3"><label>Teléfono</label><input id="empPhone" /></div>
-            <div class="col-3"><label>Correo</label><input id="empEmail" type="email" /></div>
-            <div class="col-3"><label>Área</label><select id="empCompany" onchange="onAreaChange('empCompany','empTienda')"></select></div>
-            <div class="col-3"><label>Tienda / PDV</label><select id="empTienda"></select></div>
-            <div class="col-3"><label>Puesto o cargo</label><input id="empRole" /></div>
-            <div class="col-3"><label>Jornada / Time</label><input id="empTime" placeholder="Ej. Full Time, Part Time" /></div>
-            <div class="col-3"><label>Fecha de ingreso</label><input id="empStart" type="date" required /></div>
-            <div class="col-3"><label>Estado actual</label><select id="empStatus" onchange="toggleCese()"><option value="Activo">Activo</option><option value="Cesado">Cesado</option></select></div>
-            <div class="col-3 cese-field hidden"><label>Fecha de cese</label><input id="empEnd" type="date" /></div>
-            <div class="col-3 cese-field hidden"><label>Motivo de cese</label><input id="empEndReason" /></div>
-            <div class="col-12"><label>Observaciones</label><textarea id="empNotes"></textarea></div>
-          </div>
-          <div class="toolbar" style="margin-top:12px;">
-            <button class="primary" type="submit">Guardar trabajador</button>
-            <button class="light" type="button" onclick="clearEmployeeForm()">Limpiar</button>
-          </div>
-        </form>
-      </div>
     </section>
 
     <section id="tab-postulantes" class="tab-panel hidden">
@@ -430,6 +403,34 @@
             <button class="light" type="button" onclick="clearApplicantForm()">Limpiar</button>
           </div>
         </form>
+      </div>
+
+      <div class="card">
+        <div class="form-title">
+          <h2>Listado de postulantes</h2>
+          <span class="muted small">Incluye edición y eliminación.</span>
+        </div>
+        <input id="applicantFilter" placeholder="Filtrar por documento, nombre o área" oninput="renderApplicants()" />
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Documento</th>
+                <th>Nombre</th>
+                <th>Teléfono / correo</th>
+                <th>Área</th>
+                <th>Tienda</th>
+                <th>Puesto / área</th>
+                <th>Postulación</th>
+                <th>Resultado</th>
+                <th>Detalle</th>
+                <th>Observaciones</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="applicantTable"></tbody>
+          </table>
+        </div>
       </div>
     </section>
 
@@ -586,6 +587,30 @@
               </table>
             </div>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-vervacaciones" class="tab-panel hidden">
+      <div class="card">
+        <div class="form-title">
+          <h2>Vacaciones — Vista general</h2>
+          <span class="muted small">Todos los trabajadores activos, con tienda, área y su situación de vacaciones.</span>
+        </div>
+        <input id="vacListFilter" placeholder="Filtrar por documento, nombre, tienda o área" oninput="renderVacacionesListado()" />
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Documento</th>
+                <th>Nombre</th>
+                <th>Área</th>
+                <th>Tienda</th>
+                <th>Situación de vacaciones</th>
+              </tr>
+            </thead>
+            <tbody id="vacListadoTable"></tbody>
+          </table>
         </div>
       </div>
     </section>
@@ -1790,6 +1815,43 @@
       return 'Pasada';
     }
 
+    function vacacionBadge(r) {
+      const list = Array.isArray(r.vacaciones) ? r.vacaciones : [];
+      const hoy = todayISO();
+      const enCurso = list.find(function(v) { return v.salida <= hoy && hoy <= v.regreso; });
+      if (enCurso) return '<span class="tag t-exc">🏖️ En curso · vuelve el ' + esc(fmtDate(nextDay(enCurso.regreso))) + '</span>';
+      const proximas = list.filter(function(v) { return v.salida > hoy; }).sort(function(a, b) { return a.salida.localeCompare(b.salida); });
+      if (proximas.length) {
+        const p = proximas[0];
+        const dias = Math.round((new Date(p.salida + 'T00:00:00') - new Date(hoy + 'T00:00:00')) / 86400000);
+        return '<span class="tag t-reg">Programada · faltan ' + dias + ' día(s) (sale ' + esc(fmtDate(p.salida)) + ')</span>';
+      }
+      if (list.length) {
+        const pasadas = list.slice().sort(function(a, b) { return b.salida.localeCompare(a.salida); });
+        return '<span class="tag t-pun">Sin programar · última fue del ' + esc(fmtDate(pasadas[0].salida)) + ' al ' + esc(fmtDate(pasadas[0].regreso)) + '</span>';
+      }
+      return '<span class="tag t-pun">Sin vacaciones registradas</span>';
+    }
+
+    function renderVacacionesListado() {
+      const body = document.getElementById('vacListadoTable');
+      if (!body) return;
+      const q = norm(document.getElementById('vacListFilter').value).toLowerCase();
+      const rows = state.empleados.filter(function(r) {
+        if (r.status !== 'Activo') return false;
+        return [r.doc, r.name, r.tienda, r.company].join(' ').toLowerCase().includes(q);
+      });
+      body.innerHTML = rows.map(function(r) {
+        return '<tr>' +
+          '<td>' + esc(r.docType) + ' ' + esc(r.doc) + '</td>' +
+          '<td>' + esc(r.name) + '</td>' +
+          '<td>' + esc(r.company || '-') + '</td>' +
+          '<td>' + esc(r.tienda || '-') + '</td>' +
+          '<td>' + vacacionBadge(r) + '</td>' +
+          '</tr>';
+      }).join('') || '<tr><td colspan="5">Sin trabajadores activos.</td></tr>';
+    }
+
     function vacacionStatusText(r) {
       const list = Array.isArray(r.vacaciones) ? r.vacaciones : [];
       if (!list.length) return 'No tiene vacaciones registradas.';
@@ -2044,6 +2106,7 @@
           '<div style="margin-top:6px;">' + summary + '</div>' +
           (e.status === 'Activo' ? '<div class="small" style="margin-top:4px;">🏖️ ' + esc(vacacionStatusText(e)) + '</div>' : '') +
           (e.notes ? '<div class="small muted" style="margin-top:4px;">Observaciones: ' + esc(e.notes) + '</div>' : '') +
+          (e.status === 'Cesado' ? '<div style="margin-top:10px;">Esta persona ya no trabaja aquí. <button class="success" onclick="irAReingresar(\'' + e.id + '\')">¿Reingresar?</button></div>' : '') +
           '</div>';
       });
       apps.forEach(function(a) {
@@ -2079,6 +2142,7 @@
       renderApplicants();
       renderCesadosHistory();
       renderReingresosHistory();
+      renderVacacionesListado();
       renderKpis();
       renderBackups();
       renderSaveInfo();
