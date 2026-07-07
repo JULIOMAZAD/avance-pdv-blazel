@@ -149,7 +149,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
     <div class="top-bar">
       <div class="top-left">
         <h2>COORD. TIENDAS — Consolidado</h2>
-        <div class="pdv">Toca "Todas" para el global, o marca una o varias tiendas para sumarlas · <strong>v30</strong></div>
+        <div class="pdv">Toca "Todas" para el global, o marca una o varias tiendas para sumarlas · <strong>v31</strong></div>
       </div>
       <div class="top-actions">
         <button class="btn-vend" onclick="abrirVendedor()">📊 Ver por vendedor</button>
@@ -248,10 +248,32 @@ const GER_GLOBAL=[
   "Tienda - Rambla Brasil","Tienda - Santa Anita","Call Center"
 ];
 
-const MESES=[
+let MESES=[
   {label:"Mayo 2026", key:"mayo"},
   {label:"Junio 2026", key:"junio"}
 ];
+const MES_ORDER={enero:1,febrero:2,marzo:3,abril:4,mayo:5,junio:6,julio:7,agosto:8,septiembre:9,setiembre:9,octubre:10,noviembre:11,diciembre:12};
+async function cargarMeses(){
+  const sep=SCRIPT_URL.includes('?')?'&':'?';
+  const store="mega plaza"; // tienda de referencia para probar cada mes
+  const cand=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+  const found=[];
+  await Promise.all(cand.map(async m=>{
+    try{
+      const r=await fetch(`${SCRIPT_URL}${sep}tienda=${encodeURIComponent(store)}&mes=${m}`);
+      const j=await r.json();
+      if(j && !j.error && Array.isArray(j.data) && j.data.length>3) found.push(m);
+    }catch(e){}
+  }));
+  if(!found.length) return;
+  found.sort((a,b)=>MES_ORDER[a]-MES_ORDER[b]);
+  const yr=new Date().getFullYear();
+  MESES=found.map(k=>({key:k,label:k.charAt(0).toUpperCase()+k.slice(1)+" "+yr}));
+  const latest=found[found.length-1];
+  curMes=latest; gerMes=latest; try{recarMes=latest;}catch(e){}
+  try{renderTabs();}catch(e){} try{renderGerMesTabs();}catch(e){} try{renderRecarMes();}catch(e){}
+}
+cargarMeses();
 
 const AUTO_KEY = 'blazel-hub-2026';
 const HUB_TO_PERSONAL = { "COMERCIAL":"jmaza", "GERENCIA":"gustavo", "AMPARO":"amparo" };
