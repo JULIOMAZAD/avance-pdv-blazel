@@ -105,6 +105,38 @@
       margin-top: 12px;
       min-height: 94px;
     }
+    .person-card {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 16px;
+      border-radius: 12px;
+      background: #fff;
+      border: 1px solid var(--line);
+      margin-bottom: 14px;
+    }
+    .person-card:last-child { margin-bottom: 0; }
+    .person-card-head {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .person-card-name { font-weight: 800; font-size: 16px; color: var(--text); }
+    .person-card-doc { color: var(--muted); font-size: 13px; }
+    .person-card-summary { line-height: 1.5; }
+    .vac-banner {
+      width: 100%;
+      box-sizing: border-box;
+      margin-top: 12px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: #fdecea;
+      border: 1px solid #f3b6bb;
+      color: #b3001b;
+      font-weight: 700;
+      line-height: 1.4;
+    }
     .kpi {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
@@ -2091,7 +2123,13 @@
       const matchDoc = function(x) { return doc && cleanDoc(x.doc) === doc; };
       const matchName = function(x) { return nameQuery.length >= 3 && (x.name || '').toLowerCase().includes(nameQuery); };
       const emps = state.empleados.filter(function(x) { return matchDoc(x) || matchName(x); });
-      const apps = state.postulantes.filter(function(x) { return matchDoc(x) || matchName(x); });
+      const activeDocs = emps.filter(function(x) { return x.status === 'Activo'; }).map(function(x) { return cleanDoc(x.doc); });
+      const apps = state.postulantes.filter(function(x) {
+        if (!(matchDoc(x) || matchName(x))) return false;
+        // Si ya es trabajador activo, no mostramos una postulación vieja/obsoleta con el mismo documento
+        if (x.result !== 'Ingresó' && activeDocs.indexOf(cleanDoc(x.doc)) !== -1) return false;
+        return true;
+      });
       if (!emps.length && !apps.length) {
         box.innerHTML = '<b>No se encontraron registros</b><br><span class="muted">No figura ningún trabajador ni postulante con ese documento o Nombre.</span>';
         return;
@@ -2101,11 +2139,11 @@
         const summary = e.status === 'Activo'
           ? 'Actualmente trabaja en <b>' + esc(e.company || 'sin área') + '</b>' + (e.tienda ? (' (' + esc(e.tienda) + ')') : '') + ' como <b>' + esc(e.role || 'sin puesto') + '</b> desde el <b>' + esc(fmtDate(e.startDate)) + '</b>.'
           : 'Trabajó en <b>' + esc(e.company || 'sin área') + '</b>' + (e.tienda ? (' (' + esc(e.tienda) + ')') : '') + ' como <b>' + esc(e.role || 'sin puesto') + '</b> desde el <b>' + esc(fmtDate(e.startDate)) + '</b> hasta el <b>' + esc(fmtDate(e.endDate)) + '</b>. Motivo de cese: <b>' + esc(e.endReason || 'no registrado') + '</b>.';
-        html += '<div style="margin-bottom:12px;">' +
-          '<div>' + badgeStatus('emp', e.status) + ' <b>' + esc(e.name) + '</b> · ' + esc(e.docType) + ' ' + esc(e.doc) + '</div>' +
-          '<div style="margin-top:6px;">' + summary + '</div>' +
-          (e.status === 'Activo' ? '<div class="small" style="margin-top:4px;">🏖️ ' + esc(vacacionStatusText(e)) + '</div>' : '') +
-          (e.notes ? '<div class="small muted" style="margin-top:4px;">Observaciones: ' + esc(e.notes) + '</div>' : '') +
+        html += '<div class="person-card">' +
+          '<div class="person-card-head">' + badgeStatus('emp', e.status) + '<span class="person-card-name">' + esc(e.name) + '</span><span class="person-card-doc">' + esc(e.docType) + ' ' + esc(e.doc) + '</span></div>' +
+          '<div class="person-card-summary">' + summary + '</div>' +
+          (e.status === 'Activo' ? '<div class="vac-banner">🏖️ ' + esc(vacacionStatusText(e)) + '</div>' : '') +
+          (e.notes ? '<div class="small muted" style="margin-top:8px;">Observaciones: ' + esc(e.notes) + '</div>' : '') +
           (e.status === 'Cesado' ? '<div style="margin-top:10px;">Esta persona ya no trabaja aquí. <button class="success" onclick="irAReingresar(\'' + e.id + '\')">¿Reingresar?</button></div>' : '') +
           '</div>';
       });
@@ -2115,10 +2153,10 @@
         else if (a.result === 'No ingresó') summary = 'Postuló el <b>' + esc(fmtDate(a.applyDate)) + '</b> para <b>' + esc(a.appliedArea || 'área no registrada') + '</b> y no ingresó. Motivo: <b>' + esc(a.reason || 'no registrado') + '</b>.';
         else if (a.result === 'No asistió') summary = 'Postuló el <b>' + esc(fmtDate(a.applyDate)) + '</b> para <b>' + esc(a.appliedArea || 'área no registrada') + '</b> y no asistió. Detalle: <b>' + esc(a.reason || 'no registrado') + '</b>.';
         else summary = 'Postuló el <b>' + esc(fmtDate(a.applyDate)) + '</b> para <b>' + esc(a.appliedArea || 'área no registrada') + '</b> y sigue en evaluación.';
-        html += '<div style="margin-bottom:12px;">' +
-          '<div>' + badgeStatus('app', a.result) + ' <b>' + esc(a.name) + '</b> · ' + esc(a.docType) + ' ' + esc(a.doc) + '</div>' +
-          '<div style="margin-top:6px;">' + summary + '</div>' +
-          (a.notes ? '<div class="small muted" style="margin-top:4px;">Observaciones: ' + esc(a.notes) + '</div>' : '') +
+        html += '<div class="person-card">' +
+          '<div class="person-card-head">' + badgeStatus('app', a.result) + '<span class="person-card-name">' + esc(a.name) + '</span><span class="person-card-doc">' + esc(a.docType) + ' ' + esc(a.doc) + '</span></div>' +
+          '<div class="person-card-summary">' + summary + '</div>' +
+          (a.notes ? '<div class="small muted" style="margin-top:8px;">Observaciones: ' + esc(a.notes) + '</div>' : '') +
           '</div>';
       });
       box.innerHTML = html;
