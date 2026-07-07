@@ -139,6 +139,9 @@
     }
     tr.vac-row-curso td { background: #dcfce7 !important; }
     tr.vac-row-programada td { background: #fef9c3 !important; }
+    tr.vac-row-completada td { background: #dbeafe !important; }
+    tr.vac-row-vencido td { background: #fecaca !important; }
+    tr.vac-row-pendiente td { background: #ffedd5 !important; }
     .kpi {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
@@ -1867,14 +1870,57 @@
       return '<span class="tag t-pun">Sin vacaciones registradas</span>';
     }
 
+    function dateToISO(d) {
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+
+    function fechaIngresoPlanilla(startDateStr) {
+      if (!startDateStr) return null;
+      const start = new Date(startDateStr + 'T00:00:00');
+      if (isNaN(start.getTime())) return null;
+      // La mayoría entra primero por Recibo por Honorarios (RxH) el primer mes,
+      // y recién al segundo mes pasa a planilla; ahí empieza a correr la vacación.
+      return new Date(start.getFullYear(), start.getMonth() + 1, start.getDate());
+    }
+
+    function calcCicloVacacional(startDateStr, hoyStr) {
+      const start = fechaIngresoPlanilla(startDateStr);
+      if (!start) return null;
+      const hoy = new Date(hoyStr + 'T00:00:00');
+      let years = hoy.getFullYear() - start.getFullYear();
+      let inicio = new Date(start.getFullYear() + years, start.getMonth(), start.getDate());
+      if (inicio > hoy) { years -= 1; inicio = new Date(start.getFullYear() + years, start.getMonth(), start.getDate()); }
+      const fin = new Date(inicio.getFullYear() + 1, inicio.getMonth(), inicio.getDate());
+      return { inicio: dateToISO(inicio), fin: dateToISO(fin), anosCumplidos: years };
+    }
+
     function vacacionGroup(r) {
       const list = Array.isArray(r.vacaciones) ? r.vacaciones : [];
       const hoy = todayISO();
       const enCurso = list.find(function(v) { return v.salida <= hoy && hoy <= v.regreso; });
-      if (enCurso) return { orden: 0, claseFila: 'vac-row-curso', fechaOrden: enCurso.salida };
+      if (enCurso) return { orden: 0, claseFila: 'vac-row-curso', fechaOrden: enCurso.salida, texto: '🏖️ En curso · vuelve el ' + fmtDate(nextDay(enCurso.regreso)) };
       const proximas = list.filter(function(v) { return v.salida > hoy; }).sort(function(a, b) { return a.salida.localeCompare(b.salida); });
-      if (proximas.length) return { orden: 1, claseFila: 'vac-row-programada', fechaOrden: proximas[0].salida };
-      return { orden: 2, claseFila: '', fechaOrden: '9999-99-99' };
+      if (proximas.length) {
+        const p = proximas[0];
+        const dias = Math.round((new Date(p.salida + 'T00:00:00') - new Date(hoy + 'T00:00:00')) / 86400000);
+        return { orden: 1, claseFila: 'vac-row-programada', fechaOrden: p.salida, texto: 'Programada · faltan ' + dias + ' día(s) (sale ' + fmtDate(p.salida) + ')' };
+      }
+      if (norm(r.docType).toUpperCase() !== 'DNI') {
+        return { orden: 5, claseFila: '', fechaOrden: '9999-99-99', texto: 'No aplica (con CE no ingresa a planilla)' };
+      }
+      const ciclo = calcCicloVacacional(r.startDate, hoy);
+      if (!ciclo || ciclo.anosCumplidos < 1) {
+        return { orden: 5, claseFila: '', fechaOrden: '9999-99-99', texto: 'Aún no cumple 1 año en planilla (no le corresponde vacación todavía)' };
+      }
+      const tomadaEnCiclo = list.some(function(v) { return v.salida >= ciclo.inicio && v.salida < ciclo.fin; });
+      if (tomadaEnCiclo) {
+        return { orden: 2, claseFila: 'vac-row-completada', fechaOrden: '9997-' + ciclo.fin, texto: '✓ Vacaciones tomadas en este periodo (vence ' + fmtDate(ciclo.fin) + ')' };
+      }
+      const diasParaVencer = Math.round((new Date(ciclo.fin + 'T00:00:00') - new Date(hoy + 'T00:00:00')) / 86400000);
+      if (diasParaVencer < 0) {
+        return { orden: 3, claseFila: 'vac-row-vencido', fechaOrden: ciclo.fin, texto: '⚠️ Vencido hace ' + Math.abs(diasParaVencer) + ' día(s) · debió salir antes del ' + fmtDate(ciclo.fin) };
+      }
+      return { orden: 4, claseFila: 'vac-row-pendiente', fechaOrden: ciclo.fin, texto: 'Sin programar · vence en ' + diasParaVencer + ' día(s) (hasta el ' + fmtDate(ciclo.fin) + ')' };
     }
 
     function renderVacacionesListado() {
@@ -1897,7 +1943,7 @@
           '<td>' + esc(r.name) + '</td>' +
           '<td>' + esc(r.company || '-') + '</td>' +
           '<td>' + esc(r.tienda || '-') + '</td>' +
-          '<td>' + vacacionBadge(r) + '</td>' +
+          '<td>' + esc(g.texto) + '</td>' +
           '</tr>';
       }).join('') || '<tr><td colspan="5">Sin trabajadores activos.</td></tr>';
     }
