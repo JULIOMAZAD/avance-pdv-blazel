@@ -61,7 +61,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
 <div class="wrap">
   <div class="head">
     <h2>Avance por Vendedor</h2>
-    <div class="sub">Elige la tienda y toca un vendedor para ver su cuota · <strong>v19</strong> · <span id="liveStatus" style="color:#22a843;font-weight:700">cargando…</span></div>
+    <div class="sub">Elige la tienda y toca un vendedor para ver su cuota · <strong>v20</strong> · <span id="liveStatus" style="color:#22a843;font-weight:700">cargando…</span></div>
   </div>
   <div class="mes-tabs" id="mesTabs"></div>
   <div class="pick">
@@ -103,12 +103,22 @@ function parseStackedRows(rows,mes,anio){
 }
 async function fetchJSON(u){const r=await fetch(u);if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}
 function setStatus(t){var e=document.getElementById('liveStatus');if(e)e.textContent=t;}
+function extractMesFromRows(rows){
+  for(let i=0;i<4;i++){ const r=rows[i]||[]; for(let j=0;j<r.length;j++){ if(String(r[j]||'').trim().toUpperCase()==='MES' && rows[i+1]){ const v=String((rows[i+1]||[])[j]||'').trim().toUpperCase(); if(v) return v; } } }
+  return '';
+}
 async function loadLive(){
   setStatus('actualizando…');
   try{
     const sep=SCRIPT_URL.includes('?')?'&':'?';
-    let meses=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-    try{const m=await fetchJSON(SCRIPT_URL+sep+'modo=meses');if(m.meses&&m.meses.length)meses=m.meses;}catch(e){}
+    const cand=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+    // detectar SOLO los meses reales (el campo MES debe coincidir con lo pedido)
+    const meses=[];
+    await Promise.all(cand.map(async mn=>{
+      try{ const r=await fetch(`${SCRIPT_URL}${sep}tienda=${encodeURIComponent('mega plaza')}&mes=${mn}`); const jj=await r.json();
+        if(jj&&!jj.error&&Array.isArray(jj.data)&&jj.data.length>3){ const mm=extractMesFromRows(jj.data); if(mm&&mm===mn.toUpperCase()) meses.push(mn); } }catch(e){}
+    }));
+    meses.sort((a,b)=>(MES_MAP[a]||0)-(MES_MAP[b]||0));
     let all=[];
     for(const mn of meses){
       try{const j=await fetchJSON(SCRIPT_URL+sep+'modo=vendedor&mes='+encodeURIComponent(mn));

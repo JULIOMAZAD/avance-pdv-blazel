@@ -149,7 +149,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
     <div class="top-bar">
       <div class="top-left">
         <h2>COORD. TIENDAS — Consolidado</h2>
-        <div class="pdv">Toca "Todas" para el global, o marca una o varias tiendas para sumarlas · <strong>v31</strong></div>
+        <div class="pdv">Toca "Todas" para el global, o marca una o varias tiendas para sumarlas · <strong>v32</strong></div>
       </div>
       <div class="top-actions">
         <button class="btn-vend" onclick="abrirVendedor()">📊 Ver por vendedor</button>
@@ -253,6 +253,10 @@ let MESES=[
   {label:"Junio 2026", key:"junio"}
 ];
 const MES_ORDER={enero:1,febrero:2,marzo:3,abril:4,mayo:5,junio:6,julio:7,agosto:8,septiembre:9,setiembre:9,octubre:10,noviembre:11,diciembre:12};
+function extractMesFromRows(rows){
+  for(let i=0;i<4;i++){ const r=rows[i]||[]; for(let j=0;j<r.length;j++){ if(String(r[j]||'').trim().toUpperCase()==='MES' && rows[i+1]){ const v=String((rows[i+1]||[])[j]||'').trim().toUpperCase(); if(v) return v; } } }
+  return '';
+}
 async function cargarMeses(){
   const sep=SCRIPT_URL.includes('?')?'&':'?';
   const store="mega plaza"; // tienda de referencia para probar cada mes
@@ -262,7 +266,10 @@ async function cargarMeses(){
     try{
       const r=await fetch(`${SCRIPT_URL}${sep}tienda=${encodeURIComponent(store)}&mes=${m}`);
       const j=await r.json();
-      if(j && !j.error && Array.isArray(j.data) && j.data.length>3) found.push(m);
+      if(j && !j.error && Array.isArray(j.data) && j.data.length>3){
+        const mesResp=extractMesFromRows(j.data);          // el mes REAL que devolvió la hoja
+        if(mesResp && mesResp===m.toUpperCase()) found.push(m); // solo si coincide con lo pedido
+      }
     }catch(e){}
   }));
   if(!found.length) return;
@@ -365,7 +372,7 @@ function showScreen(id){
 
 function abrirVendedor(){
   var f=document.getElementById('vFrame');
-  if(!f.getAttribute('src')) f.setAttribute('src','vendedor.html?v=19');
+  if(!f.getAttribute('src')) f.setAttribute('src','vendedor.html?v=20');
   showScreen("vendedorScreen");
 }
 function salirVendedor(){
