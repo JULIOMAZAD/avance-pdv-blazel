@@ -149,7 +149,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
     <div class="top-bar">
       <div class="top-left">
         <h2>COORD. TIENDAS — Consolidado</h2>
-        <div class="pdv">Toca "Todas" para el global, o marca una o varias tiendas para sumarlas · <strong>v32</strong></div>
+        <div class="pdv">Toca "Todas" para el global, o marca una o varias tiendas para sumarlas · <strong>v33</strong></div>
       </div>
       <div class="top-actions">
         <button class="btn-vend" onclick="abrirVendedor()">📊 Ver por vendedor</button>
@@ -372,7 +372,7 @@ function showScreen(id){
 
 function abrirVendedor(){
   var f=document.getElementById('vFrame');
-  if(!f.getAttribute('src')) f.setAttribute('src','vendedor.html?v=20');
+  if(!f.getAttribute('src')) f.setAttribute('src','vendedor.html?v=21');
   showScreen("vendedorScreen");
 }
 function salirVendedor(){
@@ -476,6 +476,12 @@ function fmt(v){
   const n=parseFloat(String(v));
   if(isNaN(n)) return String(v);
   return n%1===0?n.toLocaleString("es-PE"):n.toLocaleString("es-PE",{maximumFractionDigits:2});
+}
+function fmtUp(v){
+  if(v===""||v===undefined||v===null||v===" ") return "-";
+  const n=parseFloat(String(v));
+  if(isNaN(n)) return String(v);
+  return Math.ceil(n).toLocaleString("es-PE");
 }
 function getTag(estado){
   const e=String(estado||"").toLowerCase();
@@ -674,7 +680,7 @@ function buildTableHtml(struct,totalRow,recalc){
         <td>${fmt(p.meta)}</td><td>${fmt(p.av)}</td>
         <td><span style="display:inline-flex;align-items:center;gap:4px"><span class="dot ${t.dot}"></span>${fmtPct(p.pct)}</span></td>
         <td class="${fc}">${fmt(p.falta)}</td>
-        <td>${fmt(p.vd)}</td><td>${fmt(p.pf)}</td>
+        <td>${fmtUp(p.vd)}</td><td>${fmtUp(p.pf)}</td>
         <td><span class="tag ${t.cls}">${t.lbl}</span></td>
       </tr>`;
     }
@@ -685,8 +691,8 @@ function buildTableHtml(struct,totalRow,recalc){
       <td>TOTAL</td>
       <td>${fmt(totalRow.meta)}</td><td>${fmt(totalRow.av)}</td>
       <td>${fmtPct(totalRow.pct)}</td>
-      <td>${fmt(totalRow.falta)}</td><td>${fmt(totalRow.vd)}</td>
-      <td>${fmt(totalRow.pf)}</td>
+      <td>${fmt(totalRow.falta)}</td><td>${fmtUp(totalRow.vd)}</td>
+      <td>${fmtUp(totalRow.pf)}</td>
       <td><span class="tag ${t.cls}">${t.lbl}</span></td>
     </tr>`;
   }
