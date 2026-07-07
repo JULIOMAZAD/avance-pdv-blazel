@@ -1900,6 +1900,17 @@
 
     const DIAS_VACACIONES_ANUALES = 15; // ajusta aquí si tu política cambia
 
+    function calcularSituacionCiclo(r, hoy) {
+      if (norm(r.docType).toUpperCase() !== 'DNI') return null;
+      const ciclo = calcCicloVacacional(r.startDate, hoy);
+      if (!ciclo || ciclo.anosCumplidos < 1) return null;
+      const list = Array.isArray(r.vacaciones) ? r.vacaciones : [];
+      const tomadasEnCiclo = list.filter(function(v) { return v.salida >= ciclo.inicio && v.salida < ciclo.fin && v.salida <= hoy; });
+      const diasTomados = tomadasEnCiclo.reduce(function(sum, v) { return sum + (parseInt(v.dias) || 0); }, 0);
+      const diasPendientes = Math.max(DIAS_VACACIONES_ANUALES - diasTomados, 0);
+      return { ciclo: ciclo, diasTomados: diasTomados, diasPendientes: diasPendientes };
+    }
+
     function vacacionGroup(r) {
       const list = Array.isArray(r.vacaciones) ? r.vacaciones : [];
       const hoy = todayISO();
@@ -1911,20 +1922,18 @@
       const proximas = list.filter(function(v) { return v.salida > hoy; }).sort(function(a, b) { return a.salida.localeCompare(b.salida); });
       if (proximas.length) {
         const p = proximas[0];
+        const sit = calcularSituacionCiclo(r, hoy);
         return { orden: 1, claseFila: 'vac-row-programada', fechaOrden: p.salida,
-          estado: 'Programada', diasTomados: 0, diasPorTomar: p.dias, fecha: 'Sale el ' + fmtDate(p.salida) };
+          estado: 'Programada', diasTomados: sit ? sit.diasTomados : 0, diasPorTomar: p.dias, fecha: 'Sale el ' + fmtDate(p.salida) };
       }
       if (norm(r.docType).toUpperCase() !== 'DNI') {
         return { orden: 5, claseFila: '', fechaOrden: '9999-99-99', estado: 'No aplica', diasTomados: '-', diasPorTomar: '-', fecha: 'Con CE no ingresa a planilla' };
       }
-      const ciclo = calcCicloVacacional(r.startDate, hoy);
-      if (!ciclo || ciclo.anosCumplidos < 1) {
+      const sit = calcularSituacionCiclo(r, hoy);
+      if (!sit) {
         return { orden: 5, claseFila: '', fechaOrden: '9999-99-99', estado: 'Sin antigüedad', diasTomados: '-', diasPorTomar: '-', fecha: 'Aún no cumple 1 año en planilla' };
       }
-      // Suma los días tomados dentro del periodo vigente (por si los tomó en partes, no de una sola vez)
-      const tomadasEnCiclo = list.filter(function(v) { return v.salida >= ciclo.inicio && v.salida < ciclo.fin; });
-      const diasTomados = tomadasEnCiclo.reduce(function(sum, v) { return sum + (parseInt(v.dias) || 0); }, 0);
-      const diasPendientes = Math.max(DIAS_VACACIONES_ANUALES - diasTomados, 0);
+      const ciclo = sit.ciclo, diasTomados = sit.diasTomados, diasPendientes = sit.diasPendientes;
       if (diasPendientes <= 0) {
         return { orden: 2, claseFila: 'vac-row-completada', fechaOrden: '9997-' + ciclo.fin,
           estado: '✓ Completo', diasTomados: diasTomados, diasPorTomar: 0, fecha: 'Venció el ' + fmtDate(ciclo.fin) };
@@ -1961,8 +1970,8 @@
           '<td>' + esc(r.company || '-') + '</td>' +
           '<td>' + esc(r.tienda || '-') + '</td>' +
           '<td style="font-weight:700;">' + esc(g.estado) + '</td>' +
-          '<td>' + esc(g.diasTomados) + '</td>' +
-          '<td>' + esc(g.diasPorTomar) + '</td>' +
+          '<td>' + esc(String(g.diasTomados)) + '</td>' +
+          '<td>' + esc(String(g.diasPorTomar)) + '</td>' +
           '<td>' + esc(g.fecha) + '</td>' +
           '</tr>';
       }).join('') || '<tr><td colspan="8">Sin trabajadores activos.</td></tr>';
