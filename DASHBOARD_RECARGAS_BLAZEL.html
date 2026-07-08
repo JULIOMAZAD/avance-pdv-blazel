@@ -816,9 +816,15 @@ function rEvolutivo(){
 }
 
 /* ================= MULTIMARCA ================= */
-function rMultimarca(){
+function rMultimarca(ym){
   const el = document.getElementById('tab-multimarca');
-  const mm = DATA.multimarca;
+  let mm = null;
+  if(DATA.multimarcaBloques && DATA.multimarcaBloques.length){
+    const mNum = ym ? +ym.split('-')[1] : null;
+    mm = DATA.multimarcaBloques.find(b=>b.m===mNum) || DATA.multimarcaBloques[DATA.multimarcaBloques.length-1];
+  } else {
+    mm = DATA.multimarca;
+  }
   if(!mm || (!mm.indicadores.length && !mm.distritos.length)){
     el.innerHTML = `<h2>Multimarca</h2><div class="card">No se encontró la hoja MULTIMARCA en el archivo cargado. Agrégala al Excel y vuelve a actualizar.</div>`;
     return;
@@ -1249,7 +1255,7 @@ function renderAll(){
   const cur = curMonth();
   sel.innerHTML = ms.map(m=>{const [y,mm]=m.split('-');return `<option value="${m}" ${m===cur?'selected':''}>${MESN[+mm]} ${y}</option>`}).join('');
   actualizarIndicador();
-  rResumen(cur); rOperativos(cur); rDesabasto(cur); rDiario(cur); rDistritos(cur); rCanales(cur); rEvolutivo(); rMultimarca(); rComparativo(); rAsesores(cur);
+  rResumen(cur); rOperativos(cur); rDesabasto(cur); rDiario(cur); rDistritos(cur); rCanales(cur); rEvolutivo(); rMultimarca(cur); rComparativo(); rAsesores(cur);
 }
 document.getElementById('selMes').onchange = renderAll;
 
@@ -1444,7 +1450,7 @@ async function cargarLiveV2(){
     if(live.canalesMensual) DATA.canalesMensual = live.canalesMensual;
     if(live.asesoresMensual) DATA.asesoresMensual = live.asesoresMensual;
     if(live.desabastoMensual) DATA.desabastoMensual = live.desabastoMensual;
-    if(live.multimarca) DATA.multimarca = live.multimarca;
+    if(live.multimarca) DATA.multimarcaBloques = live.multimarca;
     if(live.comparativo) DATA.comparativo = live.comparativo;
     if(live.deb) EMB_MEDIDAS.deb = live.deb;
     if(live.ope) EMB_MEDIDAS.ope = { tot: live.ope.tot, dist: live.ope.dist, vend: EMB_MEDIDAS.ope.vend };
