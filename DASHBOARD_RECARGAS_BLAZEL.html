@@ -171,8 +171,8 @@ tr.cur td{background:#FDF1F1}
   <span id="fechaData"></span>
   <a id="btnMasivo" href="#" style="display:none">▸ MASIVO</a>
   <select id="selMes" style="display:none"></select>
-  <button id="btnDrop">Actualizar Excel</button>
-  <input type="file" id="fileInput" accept=".xlsx,.xlsm">
+  <button id="btnDrop" style="display:none">Actualizar Excel</button>
+  <input type="file" id="fileInput" accept=".xlsx,.xlsm" style="display:none">
 </header>
 
 <div class="fbar" id="fbar"></div>
@@ -1462,7 +1462,8 @@ async function cargarLiveV2(){
 /* ===== Login recarga + botón MASIVO ===== */
 const USUARIOS_REC = {
   jmaza:  { clave:'jmaza',  masivo:true  },
-  amparo: { clave:'amparo', masivo:false }
+  amparo: { clave:'amparo', masivo:false },
+  gracie: { clave:'gracie', masivo:false, soloMM:true }
 };
 const URL_MASIVO = 'https://juliomazad.github.io/avance-pdv-blazel/DASHBOARD_BLAZEL_LIVE.html';
 (function(){
@@ -1473,6 +1474,19 @@ const URL_MASIVO = 'https://juliomazad.github.io/avance-pdv-blazel/DASHBOARD_BLA
     ov.style.display='none';
     const bm=document.getElementById('btnMasivo');
     if(USUARIOS_REC[u].masivo){ bm.style.display=''; bm.href=URL_MASIVO; } else { bm.style.display='none'; }
+    if(USUARIOS_REC[u].soloMM){
+      document.querySelectorAll('nav button').forEach(bt=>{
+        if(bt.dataset.t!=='multimarca' && bt.dataset.t!=='comparativo') bt.style.display='none';
+      });
+      const sel=document.getElementById('selMes'); if(sel) sel.style.display='none';
+      const fb=document.getElementById('fbar'); if(fb) fb.style.display='none';
+      document.querySelectorAll('nav button').forEach(x=>x.classList.remove('on'));
+      document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+      const btMM=document.querySelector('nav button[data-t="multimarca"]');
+      if(btMM) btMM.classList.add('on');
+      const tabMM=document.getElementById('tab-multimarca');
+      if(tabMM) tabMM.classList.add('on');
+    }
   }
   function entrar(){
     const u=document.getElementById('luser').value.trim().toLowerCase();
