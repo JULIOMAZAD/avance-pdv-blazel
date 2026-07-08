@@ -431,7 +431,6 @@
             <div class="col-3"><label>Puesto o área postulada</label><input id="appArea" /></div>
             <div class="col-3"><label>Fecha de postulación</label><input id="appDate" type="date" required /></div>
             <div class="col-3"><label>Resultado</label><select id="appResult" onchange="toggleApplicantResult()"><option value="En evaluación">En evaluación</option><option value="Ingresó">Ingresó</option><option value="No ingresó">No ingresó</option><option value="No asistió">No asistió</option></select></div>
-            <div class="col-3 ingreso-field hidden"><label>Área a la que ingresó</label><input id="appIngresoArea" /></div>
             <div class="col-3 ingreso-field hidden"><label>Fecha de ingreso</label><input id="appIngresoFecha" type="date" /></div>
             <div class="col-3 noingreso-field hidden"><label>Motivo de no ingreso o no asistencia</label><input id="appReason" /></div>
             <div class="col-12"><label>Observaciones</label><textarea id="appNotes"></textarea></div>
@@ -1489,7 +1488,7 @@
         appliedArea: norm(document.getElementById('appArea').value),
         applyDate: norm(document.getElementById('appDate').value),
         result: norm(document.getElementById('appResult').value),
-        ingresoArea: norm(document.getElementById('appIngresoArea').value) || norm(document.getElementById('appArea').value),
+        ingresoArea: norm(document.getElementById('appArea').value),
         ingresoFecha: norm(document.getElementById('appIngresoFecha').value),
         reason: norm(document.getElementById('appReason').value),
         notes: norm(document.getElementById('appNotes').value)
@@ -1599,7 +1598,6 @@
       document.getElementById('appArea').value = r.appliedArea || '';
       document.getElementById('appDate').value = r.applyDate || '';
       document.getElementById('appResult').value = r.result || 'En evaluación';
-      document.getElementById('appIngresoArea').value = r.ingresoArea || '';
       document.getElementById('appIngresoFecha').value = r.ingresoFecha || '';
       document.getElementById('appReason').value = r.reason || '';
       document.getElementById('appNotes').value = r.notes || '';
