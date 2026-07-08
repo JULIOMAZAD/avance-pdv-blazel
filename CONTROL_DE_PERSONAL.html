@@ -1473,6 +1473,7 @@
       }
       saveData(false, 'auto');
       clearEmployeeForm();
+      alert('Trabajador guardado correctamente.');
     }
 
     function addApplicant() {
@@ -1488,7 +1489,7 @@
         appliedArea: norm(document.getElementById('appArea').value),
         applyDate: norm(document.getElementById('appDate').value),
         result: norm(document.getElementById('appResult').value),
-        ingresoArea: norm(document.getElementById('appIngresoArea').value),
+        ingresoArea: norm(document.getElementById('appIngresoArea').value) || norm(document.getElementById('appArea').value),
         ingresoFecha: norm(document.getElementById('appIngresoFecha').value),
         reason: norm(document.getElementById('appReason').value),
         notes: norm(document.getElementById('appNotes').value)
@@ -1501,6 +1502,7 @@
       }
       saveData(false, 'auto');
       clearApplicantForm();
+      alert('Postulante guardado correctamente.');
     }
 
     function crearOActualizarTrabajadorDesdePostulante(rec) {
