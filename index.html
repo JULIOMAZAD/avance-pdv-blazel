@@ -149,7 +149,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
     <div class="top-bar">
       <div class="top-left">
         <h2>COORD. TIENDAS — Consolidado</h2>
-        <div class="pdv">Toca "Todas" para el global, o marca una o varias tiendas para sumarlas · <strong>v35</strong></div>
+        <div class="pdv">Toca "Todas" para el global, o marca una o varias tiendas para sumarlas · <strong>v36</strong></div>
       </div>
       <div class="top-actions">
         <button class="btn-vend" onclick="abrirVendedor()">📊 Ver por vendedor</button>
@@ -351,7 +351,7 @@ function abrirPersonal(ret){
   openEmbed(url,"🗂️ Control de Personal",ret||"gerScreen");
 }
 function doLogout(){
-  curTienda="";gerenteMode=false;comercialMode=false;curLoginType="";
+  curTienda="";gerenteMode=false;comercialMode=false;curLoginType="";gerMode="all";gerSel.clear();
   ["btnMasivo","btnRecarga","btnRecarDash"].forEach(function(id){ var b=document.getElementById(id); if(b) b.style.display="none"; });
   var _gh=document.querySelector("#gerScreen h2"); if(_gh) _gh.textContent="COORD. TIENDAS — Consolidado";
   document.getElementById("passIn").value="";
@@ -535,8 +535,10 @@ function renderGerChips(){
     const on = gerMode==="custom" && gerSel.has(t);
     return `<div class="tchip${on?" on":""}" onclick="toggleStore('${t.replace(/'/g,"\\'")}')">${on?"✓ ":""}${TIENDA_LABEL[t]}</div>`;
   }).join("");
-  const cOn = gerMode==="campo";
-  html+=`<div class="tchip${cOn?" on":""}" onclick="pickCampo()">${cOn?"✓ ":""}⚑ Campo</div>`;
+  if(comercialMode){
+    const cOn = gerMode==="campo";
+    html+=`<div class="tchip${cOn?" on":""}" onclick="pickCampo()">${cOn?"✓ ":""}⚑ Campo</div>`;
+  }
   document.getElementById("gerChips").innerHTML=html;
 }
 function setAll(){ gerMode="all"; gerSel.clear(); renderGerChips(); loadGerencia(); }
@@ -561,7 +563,7 @@ async function fetchInBatches(items, size, fn){
 }
 
 async function loadGerencia(){
-  const sel = gerMode==="all" ? GER_GLOBAL.slice() : [...gerSel];
+  const sel = gerMode==="custom" ? [...gerSel] : GER_GLOBAL.slice();
   const km=document.getElementById("gerKpis");
   const ts=document.getElementById("gerTableSection");
   const info=document.getElementById("gerInfoRow");
