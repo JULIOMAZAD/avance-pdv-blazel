@@ -1444,7 +1444,8 @@ async function cargarLiveV2(){
     if(live.canalesMensual) DATA.canalesMensual = live.canalesMensual;
     if(live.asesoresMensual) DATA.asesoresMensual = live.asesoresMensual;
     if(live.desabastoMensual) DATA.desabastoMensual = live.desabastoMensual;
-    // multimarca en vivo: pendiente de validar formato, se deja el estático por ahora
+    if(live.multimarca) DATA.multimarca = live.multimarca;
+    if(live.comparativo) DATA.comparativo = live.comparativo;
     if(live.deb) EMB_MEDIDAS.deb = live.deb;
     if(live.ope) EMB_MEDIDAS.ope = { tot: live.ope.tot, dist: live.ope.dist, vend: EMB_MEDIDAS.ope.vend };
     try{ toast('Datos de recarga (driver) actualizados en vivo'); }catch(e){}
