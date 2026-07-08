@@ -862,12 +862,12 @@ function rMultimarca(ym){
       if(ava!=null && cuota){ const p=ava/cuota; return `<td class="num">${fN(ava)} <span style="color:var(--ink2);font-size:11px">/ ${fN(cuota)}</span> <span class="pill ${semClass(p)}" style="margin-left:4px">${fP(p)}</span></td>`; }
       return `<td class="num">${fN(cuota)}${ava!=null?' / '+fN(ava):' <span style="color:var(--ink2);font-size:10px">meta</span>'}</td>`;
     };
-    return `<tr><td>${d.d}</td><td>${d.zona||''}</td><td>${d.resp||''}</td>
+    return `<tr><td>${d.d}</td><td>${d.resp||''}</td>
       ${cell(d.chips_pre,d.ava_pre)}${cell(d.cap_pre,d.ava_cap_pre)}
       ${cell(d.chips_post,d.ava_chip_post)}${cell(d.cap_post,d.ava_cap_post)}</tr>`;
   };
   const t = mm.total;
-  const totFila = t ? `<tr class="tot"><td>TOTAL</td><td></td><td></td>
+  const totFila = t ? `<tr class="tot"><td>TOTAL</td><td></td>
     <td class="num">${fN(t.chips_pre)}${t.ava_pre!=null?' / '+fN(t.ava_pre):''}</td>
     <td class="num">${fN(t.cap_pre)}${t.ava_cap_pre!=null?' / '+fN(t.ava_cap_pre):''}</td>
     <td class="num">${fN(t.chips_post)}${t.ava_chip_post!=null?' / '+fN(t.ava_chip_post):''}</td>
@@ -879,7 +879,7 @@ function rMultimarca(ym){
   <div class="chartbox"><div class="ch"><canvas id="chMM"></canvas></div></div>
   <h2 style="margin-top:22px">Por distrito <span class="tag">chips y capilaridad · prepago y postpago</span></h2>
   <div class="twrap"><table>
-    <thead><tr><th>Distrito</th><th>Zona</th><th>Responsable</th><th>Chips prepago</th><th>Capilaridad pre</th><th>Chips postpago</th><th>Capilaridad post</th></tr></thead>
+    <thead><tr><th>Distrito</th><th>Responsable</th><th>Chips prepago</th><th>Capilaridad pre</th><th>Chips postpago</th><th>Capilaridad post</th></tr></thead>
     <tbody>${mm.distritos.map(filaDist).join('')}${totFila}</tbody>
   </table></div>
   <p class="note">${hayAvance?'Cada celda muestra avance / meta y su %.':'Las columnas muestran la <b>meta</b>. Cuando llenes las columnas AVA (avance) en la hoja MULTIMARCA, aparecerá el avance y el % automáticamente.'}</p>`;
@@ -1484,8 +1484,6 @@ const URL_MASIVO = 'https://juliomazad.github.io/avance-pdv-blazel/DASHBOARD_BLA
       document.querySelectorAll('nav button').forEach(bt=>{
         if(bt.dataset.t!=='multimarca' && bt.dataset.t!=='comparativo') bt.style.display='none';
       });
-      const sel=document.getElementById('selMes'); if(sel) sel.style.display='none';
-      const fb=document.getElementById('fbar'); if(fb) fb.style.display='none';
       document.querySelectorAll('nav button').forEach(x=>x.classList.remove('on'));
       document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
       const btMM=document.querySelector('nav button[data-t="multimarca"]');
