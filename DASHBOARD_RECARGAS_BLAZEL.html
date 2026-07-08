@@ -449,7 +449,8 @@ function rResumen(ym){
   const sobraFalta = r.falta==null ? null : -r.falta;
   const _debF=EMB_MEDIDAS.deb.dist.filter(d=>distOK(d.d));
   const _dt={cli:_debF.reduce((s,d)=>s+d.cli,0), deb:_debF.reduce((s,d)=>s+d.deb,0)};
-  const debPct = _dt.cli ? 100*_dt.deb/_dt.cli : 0;
+  const dmActual = desabastoMensualDe(ym);
+const debPct = dmActual ? dmActual.pctGeneral*100 : (_dt.cli ? 100*_dt.deb/_dt.cli : 0);
   const debBien = debPct<=10;
   const debCol = debBien?'var(--verde)':'var(--rojo)';
   const debShow = esActual;
