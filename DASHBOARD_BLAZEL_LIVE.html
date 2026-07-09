@@ -819,12 +819,24 @@ let F = { anio: [], mes: [], pdv: [], prod: [], tipo: [], moda: [], dia: 0, proj
 
 function setActiveData(data){
   DATA = data;
-  // valores por defecto del filtro: año y mes actuales, todas las tiendas, todos los productos
-  F.anio = [DATA.anioActual];
-  F.mes = [DATA.mesActual];
-  F.pdv = [];
-  F.prod = [];
-  F.dia = 0;
+  const vista = cargarVistaFiltros();
+  if(vista){
+    // recordamos exactamente cómo quedó el dashboard la última vez
+    F.anio = Array.isArray(vista.anio) ? vista.anio : [];
+    F.mes  = Array.isArray(vista.mes)  ? vista.mes  : [];
+    F.pdv  = Array.isArray(vista.pdv)  ? vista.pdv  : [];
+    F.prod = Array.isArray(vista.prod) ? vista.prod : [];
+    F.tipo = Array.isArray(vista.tipo) ? vista.tipo : [];
+    F.moda = Array.isArray(vista.moda) ? vista.moda : [];
+    F.dia  = (typeof vista.dia==='number') ? vista.dia : 0;
+  } else {
+    // valores por defecto del filtro: año y mes actuales, todas las tiendas, todos los productos
+    F.anio = [DATA.anioActual];
+    F.mes = [DATA.mesActual];
+    F.pdv = [];
+    F.prod = [];
+    F.dia = 0;
+  }
 }
 
 // ---------- helpers de selección ----------
@@ -1162,6 +1174,7 @@ function applyFiltroDia(){
     F.dia = sinCero.length>0 ? Math.max(...sinCero) : 0;
   }
   refreshFiltroDiaLabel();
+  guardarVistaFiltros();
   render();
 }
 
@@ -1200,6 +1213,7 @@ function applyFiltroFromDOM(key){
   if(key==='anio' || key==='mes'){ F.dia = 0; }
   actualizarFiltroDia();
   refreshFiltroLabels();
+  guardarVistaFiltros();
   render();
 }
 
@@ -1962,6 +1976,24 @@ function loadDataFromStorage(key){
     console.error('No se pudo leer localStorage', e);
     return null;
   }
+}
+
+// ===================== ÚLTIMA VISTA (recordar filtros elegidos) =====================
+const STORAGE_KEY_VISTA = 'blazel_ultima_vista_v1';
+function guardarVistaFiltros(){
+  try{
+    localStorage.setItem(STORAGE_KEY_VISTA, JSON.stringify({
+      anio:F.anio, mes:F.mes, pdv:F.pdv, prod:F.prod, tipo:F.tipo, moda:F.moda, dia:F.dia
+    }));
+  }catch(e){ console.warn('No se pudo guardar la última vista', e); }
+}
+function cargarVistaFiltros(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY_VISTA);
+    if(!raw) return null;
+    const v = JSON.parse(raw);
+    return (v && typeof v==='object') ? v : null;
+  }catch(e){ return null; }
 }
 
 function setUploadStatus(msg, cls){
