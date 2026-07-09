@@ -108,13 +108,13 @@ tr.cur td{background:#FDF1F1}
 .cmpTable th, .cmpTable td{text-align:center}
 .cmpTable th:first-child, .cmpTable td:first-child{text-align:left}
 .cmpTable .grpHead{border-radius:10px 10px 0 0;padding:9px 10px}
-.cmpTable .g-pre{background:#2b2d36}
-.cmpTable .g-post{background:#3a2226}
-.cmpTable .g-tot{background:#1f3a2c}
+.cmpTable .g-pre{background:#3B4252;color:#fff}
+.cmpTable .g-post{background:#B5302E;color:#fff}
+.cmpTable .g-tot{background:#1F8A55;color:#fff}
 .cmpTable td.b-start{border-left:2px solid var(--line)}
-.cmpTable td.b-tint-pre{background:#FAFAFC}
-.cmpTable td.b-tint-post{background:#FDF7F5}
-.cmpTable td.b-tint-tot{background:#F5FAF7}
+.cmpTable td.b-tint-pre{background:#EEF1F6}
+.cmpTable td.b-tint-post{background:#FBEAE9}
+.cmpTable td.b-tint-tot{background:#E7F6ED}
 .chartbox{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px;box-shadow:var(--sombra)}
 .chartbox .ch{position:relative;height:300px}
 .two{grid-template-columns:1fr 1fr}
@@ -1307,8 +1307,8 @@ function rComparativo(){
     const lista = todas.slice(0,50);
     const nCols = ult3.length;
     res.innerHTML = `<div class="twrap"><table class="cmpTable">
-      <thead><tr><th rowspan="2" style="background:var(--negro)"></th><th class="grpHead g-pre" colspan="${nCols+1}">Prepago</th><th class="grpHead g-post" colspan="${nCols+1}">Postpago</th><th class="grpHead g-tot" colspan="${nCols+1}">Total</th></tr>
-      <tr><th style="text-align:left">Cliente</th>${ult3.map(cabMes).map((l,i)=>`<th class="${i===0?'b-start':''}">${l}</th>`).join('')}<th>Δ</th>${ult3.map(cabMes).map((l,i)=>`<th class="${i===0?'b-start':''}">${l}</th>`).join('')}<th>Δ</th>${ult3.map(cabMes).map((l,i)=>`<th class="${i===0?'b-start':''}">${l}</th>`).join('')}<th>Δ</th></tr></thead>
+      <thead><tr><th rowspan="2" style="text-align:left">Cliente</th><th class="grpHead g-pre" colspan="${nCols+1}">Prepago</th><th class="grpHead g-post" colspan="${nCols+1}">Postpago</th><th class="grpHead g-tot" colspan="${nCols+1}">Total</th></tr>
+      <tr>${ult3.map(cabMes).map((l,i)=>`<th class="${i===0?'b-start':''}">${l}</th>`).join('')}<th>Δ</th>${ult3.map(cabMes).map((l,i)=>`<th class="${i===0?'b-start':''}">${l}</th>`).join('')}<th>Δ</th>${ult3.map(cabMes).map((l,i)=>`<th class="${i===0?'b-start':''}">${l}</th>`).join('')}<th>Δ</th></tr></thead>
       <tbody>${lista.map(fila).join('')}</tbody></table></div>
       ${todas.length>50?`<p class="note">Mostrando 50 de ${fN(todas.length)}. Afina la búsqueda.</p>`:''}`;
   };
