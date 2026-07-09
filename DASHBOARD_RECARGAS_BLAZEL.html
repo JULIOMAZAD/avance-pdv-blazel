@@ -390,7 +390,7 @@ function dona(id, frac, color, texto, sub){
 }
 
 /* ================= RESUMEN (primera vista) ================= */
-function rComparativo(meses){
+function rComparativoResumen(meses){
   const el=document.getElementById('tab-resumen');
   const _bls=(DATA.bloques||[]);
   const _last=_bls.length?_bls.reduce((a,c)=>((c.y>a.y)||(c.y===a.y&&c.m>a.m))?c:a):null;
@@ -428,7 +428,7 @@ function rComparativo(meses){
   });
 }
 function rResumen(ym){
-  if(mesesGlob && mesesGlob.size>=2){ return rComparativo([...mesesGlob].sort()); }
+  if(mesesGlob && mesesGlob.size>=2){ return rComparativoResumen([...mesesGlob].sort()); }
   const r = resumenMes(ym);
   const rp = resumenMes(ymPrev(ym));
   const el = document.getElementById('tab-resumen');
@@ -873,8 +873,17 @@ function rMultimarca(ym){
     <td class="num">${fN(t.cap_pre)}${t.ava_cap_pre!=null?' / '+fN(t.ava_cap_pre):''}</td>
     <td class="num">${fN(t.chips_post)}${t.ava_chip_post!=null?' / '+fN(t.ava_chip_post):''}</td>
     <td class="num">${fN(t.cap_post)}${t.ava_cap_post!=null?' / '+fN(t.ava_cap_post):''}</td></tr>` : '';
+  const diaAvHtml = (USUARIO_REC==='jmaza')
+    ? `<input id="inpDiaAvMM" type="number" min="1" max="31" placeholder="día" value="${window._diaAvanceMM||''}"
+         style="width:64px;padding:6px 8px;border:1px solid #3A3A42;border-radius:6px;background:#1b1c22;color:#e8e8ea">
+       <button id="btnDiaAvMM" style="background:#D81F26;color:#fff;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;margin-left:6px">Guardar</button>
+       <span id="diaAvMsg" style="margin-left:8px;font-size:12px;color:var(--ink2)"></span>`
+    : `<span style="color:var(--ink2)">${window._diaAvanceMM?('Día '+window._diaAvanceMM):'—'}</span>`;
   el.innerHTML = `
   <h2>${tit} <span class="tag">meta vs avance del canal multimarca</span></h2>
+  <div class="card" style="margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <b>Día de avance:</b> ${diaAvHtml}
+  </div>
   ${!hayAvance?'<div class="card" style="border-left:4px solid var(--ambar);margin-bottom:14px"><b>Avance aún en 0.</b> Las columnas AVA (avance) de la hoja MULTIMARCA están vacías. Llénalas conforme avancen las activaciones y el % se calculará solo. Por ahora las cifras grandes son la <b>meta</b>.</div>':''}
   <div class="grid kpis">${kpis}</div>
   <div class="chartbox"><div class="ch"><canvas id="chMM"></canvas></div></div>
@@ -884,6 +893,21 @@ function rMultimarca(ym){
     <tbody>${mm.distritos.map(filaDist).join('')}${totFila}</tbody>
   </table></div>
   <p class="note">${hayAvance?'Cada celda muestra avance / meta y su %.':'Las columnas muestran la <b>meta</b>. Cuando llenes las columnas AVA (avance) en la hoja MULTIMARCA, aparecerá el avance y el % automáticamente.'}</p>`;
+  if(USUARIO_REC==='jmaza'){
+    const btnDA = document.getElementById('btnDiaAvMM');
+    if(btnDA) btnDA.onclick = async ()=>{
+      const v = document.getElementById('inpDiaAvMM').value;
+      const msg = document.getElementById('diaAvMsg');
+      if(!v || v<1 || v>31){ if(msg) msg.textContent='Pon un día válido (1-31)'; return; }
+      if(msg) msg.textContent='Guardando…';
+      try{
+        await fetch(API_URL_V2, { method:'POST', body: JSON.stringify({accion:'diaAvanceMM', valor:v}) });
+        window._diaAvanceMM = v;
+        if(msg) msg.textContent='✓ Guardado';
+        try{ toast('Día de avance guardado'); }catch(e){}
+      }catch(e){ if(msg) msg.textContent='No se pudo guardar'; }
+    };
+  }
   // gráfico: meta (gris) vs avance real (rojo) de los 4 indicadores
   mkChart('chMM',{type:'bar',data:{labels:mm.indicadores.map(x=>x.n),datasets:[
     {label:'Meta',data:mm.indicadores.map(x=>x.cuota),backgroundColor:'#D9DCE1',borderRadius:5,labelColor:'#6B7077'},
@@ -1222,8 +1246,27 @@ function rComparativo(){
     el.innerHTML = `<h2>Comparativo por cliente</h2><div class="card">No se encontró la hoja <b>COMPARATIVO MULTIMARCA</b> en el archivo cargado. Agrégala al Excel y vuelve a actualizar.</div>`;
     return;
   }
+  // ---- Detecta automaticamente los meses disponibles en cada registro ----
+  // Soporta 2 formatos: (a) cp[i].meses = [{mes:'JUNIO',pre,post}, ...] (formato nuevo, ilimitado)
+  //                      (b) campos sueltos tipo abr_pre/abr_post/may_pre/.../jul_pre/jul_post (formato viejo, fijo)
+  const ORDEN_MESES = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
+  let mesesDetectados = [];
+  if(cp[0] && Array.isArray(cp[0].meses)){
+    const set = new Map();
+    cp.forEach(c=> (c.meses||[]).forEach(m=> set.set(m.mes, true)));
+    mesesDetectados = [...set.keys()].sort((a,b)=> ORDEN_MESES.indexOf(a.slice(0,3).toUpperCase())-ORDEN_MESES.indexOf(b.slice(0,3).toUpperCase()));
+  } else {
+    const claves = Object.keys(cp[0]||{});
+    const pref = new Set();
+    claves.forEach(k=>{ const m=k.match(/^([a-zA-Z]+)_pre$/); if(m && claves.includes(m[1]+'_post')) pref.add(m[1]); });
+    mesesDetectados = [...pref].sort((a,b)=> ORDEN_MESES.indexOf(a.slice(0,3).toUpperCase())-ORDEN_MESES.indexOf(b.slice(0,3).toUpperCase()));
+  }
+  const ult3 = mesesDetectados.slice(-3);
+  const getPre = (c,mes)=> Array.isArray(c.meses) ? (c.meses.find(m=>m.mes===mes)||{}).pre||0 : (c[mes+'_pre']||0);
+  const getPost = (c,mes)=> Array.isArray(c.meses) ? (c.meses.find(m=>m.mes===mes)||{}).post||0 : (c[mes+'_post']||0);
+  const lbl3 = ult3.length ? ult3.map(m=>m.slice(0,3).charAt(0).toUpperCase()+m.slice(1,3).toLowerCase()).join(' → ') : '';
   el.innerHTML = `
-  <h2>Comparativo por cliente <span class="tag">Cierre Junio (otro distribuidor) vs Avance Julio (Blazel)</span></h2>
+  <h2>Comparativo por cliente <span class="tag">Últimos ${ult3.length} meses cargados${lbl3?' · '+lbl3:''}</span></h2>
   <div class="card" style="margin-bottom:14px">
     <label style="font-weight:600;display:block;margin-bottom:6px">Buscar por DNI o nombre</label>
     <input id="cpBuscar" type="text" placeholder="Escribe un DNI o un nombre…" autocomplete="off"
@@ -1233,23 +1276,29 @@ function rComparativo(){
   <div id="cpRes"></div>`;
   const inp=document.getElementById('cpBuscar'), res=document.getElementById('cpRes');
   const arrow=v=> v>0?`<span class="pill pv">+${fN(v)}</span>`: v<0?`<span class="pill pr">-${fN(-v)}</span>`:`<span class="pill pn">=</span>`;
+  const cabMes = m=> m.slice(0,3).charAt(0).toUpperCase()+m.slice(1,3).toLowerCase();
   const fila = c=>{
-    const nt=c.jun_pre+c.jun_post, jt=c.jul_pre+c.jul_post;
+    const pres = ult3.map(m=>getPre(c,m)), posts = ult3.map(m=>getPost(c,m));
+    const tots = ult3.map((m,i)=>pres[i]+posts[i]);
+    const dPre = pres.length>1 ? arrow(pres[pres.length-1]-pres[pres.length-2]) : '';
+    const dPost = posts.length>1 ? arrow(posts[posts.length-1]-posts[posts.length-2]) : '';
+    const dTot = tots.length>1 ? arrow(tots[tots.length-1]-tots[tots.length-2]) : '';
     return `<tr>
       <td><b>${c.nombre||'—'}</b><div style="color:var(--ink2);font-size:11px">DNI ${c.dni} · ${c.distrito||''}${c.vendedor?' · '+c.vendedor:''}</div></td>
-      <td class="num">${fN(c.jun_pre)}</td><td class="num">${fN(c.jul_pre)}</td><td class="num">${arrow(c.jul_pre-c.jun_pre)}</td>
-      <td class="num">${fN(c.jun_post)}</td><td class="num">${fN(c.jul_post)}</td><td class="num">${arrow(c.jul_post-c.jun_post)}</td>
-      <td class="num"><b>${fN(nt)}</b></td><td class="num"><b>${fN(jt)}</b></td><td class="num">${arrow(jt-nt)}</td></tr>`;
+      ${pres.map(v=>`<td class="num">${fN(v)}</td>`).join('')}<td class="num">${dPre}</td>
+      ${posts.map(v=>`<td class="num">${fN(v)}</td>`).join('')}<td class="num">${dPost}</td>
+      ${tots.map(v=>`<td class="num"><b>${fN(v)}</b></td>`).join('')}<td class="num">${dTot}</td></tr>`;
   };
   const pintar = q=>{
     q=(q||'').trim().toUpperCase();
-    if(!q){ res.innerHTML=`<div class="card">Escribe un <b>DNI</b> o un <b>nombre</b> arriba para ver su comparativo Junio vs Julio.</div>`; return; }
-    const todas = cp.filter(c=> String(c.dni).toUpperCase().includes(q) || c.nombre.toUpperCase().includes(q));
-    if(!todas.length){ res.innerHTML=`<div class="card">Sin resultados para “${q}”.</div>`; return; }
+    if(!q){ res.innerHTML=`<div class="card">Escribe un <b>DNI</b> o un <b>nombre</b> arriba para ver su comparativo.</div>`; return; }
+    const todas = cp.filter(c=> String(c.dni).toUpperCase().includes(q) || (c.nombre||'').toUpperCase().includes(q));
+    if(!todas.length){ res.innerHTML=`<div class="card">Sin resultados para "${q}".</div>`; return; }
     const lista = todas.slice(0,50);
+    const nCols = ult3.length;
     res.innerHTML = `<div class="twrap"><table>
-      <thead><tr><th rowspan="2">Cliente</th><th colspan="3">Prepago</th><th colspan="3">Postpago</th><th colspan="3">Total</th></tr>
-      <tr><th>Jun</th><th>Jul</th><th>Δ</th><th>Jun</th><th>Jul</th><th>Δ</th><th>Jun</th><th>Jul</th><th>Δ</th></tr></thead>
+      <thead><tr><th rowspan="2">Cliente</th><th colspan="${nCols+1}">Prepago</th><th colspan="${nCols+1}">Postpago</th><th colspan="${nCols+1}">Total</th></tr>
+      <tr>${ult3.map(cabMes).map(l=>`<th>${l}</th>`).join('')}<th>Δ</th>${ult3.map(cabMes).map(l=>`<th>${l}</th>`).join('')}<th>Δ</th>${ult3.map(cabMes).map(l=>`<th>${l}</th>`).join('')}<th>Δ</th></tr></thead>
       <tbody>${lista.map(fila).join('')}</tbody></table></div>
       ${todas.length>50?`<p class="note">Mostrando 50 de ${fN(todas.length)}. Afina la búsqueda.</p>`:''}`;
   };
@@ -1462,12 +1511,38 @@ async function cargarLiveV2(){
     if(live.comparativo) DATA.comparativo = live.comparativo;
     if(live.deb) EMB_MEDIDAS.deb = live.deb;
     if(live.ope) EMB_MEDIDAS.ope = { tot: live.ope.tot, dist: live.ope.dist, vend: EMB_MEDIDAS.ope.vend };
+    if(live.diaAvanceMM!=null) window._diaAvanceMM = live.diaAvanceMM;
+    try{
+      localStorage.setItem('blazel_v2_last_ok', JSON.stringify({
+        cuotas: DATA.cuotas, bloques: DATA.bloques, canalesMensual: DATA.canalesMensual,
+        asesoresMensual: DATA.asesoresMensual, desabastoMensual: DATA.desabastoMensual,
+        multimarcaBloques: DATA.multimarcaBloques, comparativo: DATA.comparativo,
+        deb: EMB_MEDIDAS.deb, ope: EMB_MEDIDAS.ope, diaAvanceMM: window._diaAvanceMM,
+        fecha: new Date().toISOString()
+      }));
+    }catch(e){}
     try{ toast('Datos de recarga (driver) actualizados en vivo'); }catch(e){}
     try{ renderFbar(); renderAll(); }catch(e2){ console.error('renderAll tras cargarLiveV2', e2); }
     const fd = document.getElementById('fechaData');
     if(fd) fd.innerHTML = `Recarga actualizada: ${new Date().toLocaleString('es-PE')} <span style="color:#13A05F;font-weight:700">● en vivo</span>`;
   }catch(e){
     console.error('cargarLiveV2', e);
+    try{
+      const c = JSON.parse(localStorage.getItem('blazel_v2_last_ok'));
+      if(c){
+        DATA.cuotas = c.cuotas; DATA.bloques = c.bloques; DATA.canalesMensual = c.canalesMensual;
+        DATA.asesoresMensual = c.asesoresMensual; DATA.desabastoMensual = c.desabastoMensual;
+        DATA.multimarcaBloques = c.multimarcaBloques; DATA.comparativo = c.comparativo;
+        if(c.deb) EMB_MEDIDAS.deb = c.deb;
+        if(c.ope) EMB_MEDIDAS.ope = { tot: c.ope.tot, dist: c.ope.dist, vend: EMB_MEDIDAS.ope.vend };
+        if(c.diaAvanceMM!=null) window._diaAvanceMM = c.diaAvanceMM;
+        try{ renderFbar(); renderAll(); }catch(e2){}
+        const fd = document.getElementById('fechaData');
+        const f = c.fecha ? new Date(c.fecha).toLocaleString('es-PE') : '—';
+        if(fd) fd.innerHTML = `Última consulta exitosa: ${f} <span style="color:#E1251B;font-weight:700">⚠ sin conexión ahora</span>`;
+        return;
+      }
+    }catch(e2){}
     const fd = document.getElementById('fechaData');
     if(fd) fd.innerHTML = `<span style="color:#E1251B">⚠ No se pudo cargar en vivo (revisa la URL o permisos del Web App)</span>`;
   }
