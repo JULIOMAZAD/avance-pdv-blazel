@@ -1287,6 +1287,17 @@ function rComparativo(){
   const inp=document.getElementById('cpBuscar'), res=document.getElementById('cpRes');
   const arrow=v=> v>0?`<span class="pill pv">+${fN(v)}</span>`: v<0?`<span class="pill pr">-${fN(-v)}</span>`:`<span class="pill pn">=</span>`;
   const cabMes = m=> m.slice(0,3).charAt(0).toUpperCase()+m.slice(1,3).toLowerCase();
+  // ---- Proyeccion de cierre del mes en curso (ultimo de los 3), en base al dia de avance ----
+  const ORDEN3 = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  const diaAv = Number(window._diaAvanceMM) || 0;
+  let diasDelMesActual = 0;
+  if(diaAv > 0 && ult3.length){
+    const idxMes = ORDEN3.indexOf(ult3[ult3.length-1]);
+    const anio = anioGlob || new Date().getFullYear();
+    if(idxMes >= 0) diasDelMesActual = new Date(anio, idxMes+1, 0).getDate();
+  }
+  const proy = v => (diaAv>0 && diasDelMesActual>0) ? Math.round(v/diaAv*diasDelMesActual) : null;
+  const proyTxt = v => { const p = proy(v); return p==null ? `<span style="color:var(--ink2)">—</span>` : `<b>${fN(p)}</b>`; };
   const fila = c=>{
     const pres = ult3.map(m=>getPre(c,m)), posts = ult3.map(m=>getPost(c,m));
     const tots = ult3.map((m,i)=>pres[i]+posts[i]);
@@ -1295,9 +1306,9 @@ function rComparativo(){
     const dTot = tots.length>1 ? arrow(tots[tots.length-1]-tots[tots.length-2]) : '';
     return `<tr>
       <td><b>${c.nombre||'—'}</b><div style="color:var(--ink2);font-size:11px">DNI ${c.dni} · ${c.distrito||''}${c.vendedor?' · '+c.vendedor:''}</div></td>
-      ${pres.map((v,i)=>`<td class="num b-tint-pre${i===0?' b-start':''}">${fN(v)}</td>`).join('')}<td class="num b-tint-pre">${dPre}</td>
-      ${posts.map((v,i)=>`<td class="num b-tint-post${i===0?' b-start':''}">${fN(v)}</td>`).join('')}<td class="num b-tint-post">${dPost}</td>
-      ${tots.map((v,i)=>`<td class="num b-tint-tot${i===0?' b-start':''}"><b>${fN(v)}</b></td>`).join('')}<td class="num b-tint-tot">${dTot}</td></tr>`;
+      ${pres.map((v,i)=>`<td class="num b-tint-pre${i===0?' b-start':''}">${fN(v)}</td>`).join('')}<td class="num b-tint-pre">${dPre}</td><td class="num b-tint-pre">${proyTxt(pres[pres.length-1])}</td>
+      ${posts.map((v,i)=>`<td class="num b-tint-post${i===0?' b-start':''}">${fN(v)}</td>`).join('')}<td class="num b-tint-post">${dPost}</td><td class="num b-tint-post">${proyTxt(posts[posts.length-1])}</td>
+      ${tots.map((v,i)=>`<td class="num b-tint-tot${i===0?' b-start':''}"><b>${fN(v)}</b></td>`).join('')}<td class="num b-tint-tot">${dTot}</td><td class="num b-tint-tot">${proyTxt(tots[tots.length-1])}</td></tr>`;
   };
   const pintar = q=>{
     q=(q||'').trim().toUpperCase();
@@ -1306,10 +1317,13 @@ function rComparativo(){
     if(!todas.length){ res.innerHTML=`<div class="card">Sin resultados para "${q}".</div>`; return; }
     const lista = todas.slice(0,50);
     const nCols = ult3.length;
+    const avisoProy = diaAv>0 ? `<p class="note">Proyección de cierre de ${cabMes(ult3[ult3.length-1])} con avance al día ${diaAv} de ${diasDelMesActual}.</p>`
+                               : `<p class="note">Para ver la proyección, pon el <b>día de avance</b> en la pestaña Multimarca.</p>`;
     res.innerHTML = `<div class="twrap"><table class="cmpTable">
-      <thead><tr><th rowspan="2" style="text-align:left">Cliente</th><th class="grpHead g-pre" colspan="${nCols+1}">Prepago</th><th class="grpHead g-post" colspan="${nCols+1}">Postpago</th><th class="grpHead g-tot" colspan="${nCols+1}">Total</th></tr>
-      <tr>${ult3.map(cabMes).map((l,i)=>`<th class="${i===0?'b-start':''}">${l}</th>`).join('')}<th>Δ</th>${ult3.map(cabMes).map((l,i)=>`<th class="${i===0?'b-start':''}">${l}</th>`).join('')}<th>Δ</th>${ult3.map(cabMes).map((l,i)=>`<th class="${i===0?'b-start':''}">${l}</th>`).join('')}<th>Δ</th></tr></thead>
+      <thead><tr><th rowspan="2" style="text-align:left">Cliente</th><th class="grpHead g-pre" colspan="${nCols+2}">Prepago</th><th class="grpHead g-post" colspan="${nCols+2}">Postpago</th><th class="grpHead g-tot" colspan="${nCols+2}">Total</th></tr>
+      <tr>${ult3.map(cabMes).map((l,i)=>`<th class="${i===0?'b-start':''}">${l}</th>`).join('')}<th>Δ</th><th>Proy.</th>${ult3.map(cabMes).map((l,i)=>`<th class="${i===0?'b-start':''}">${l}</th>`).join('')}<th>Δ</th><th>Proy.</th>${ult3.map(cabMes).map((l,i)=>`<th class="${i===0?'b-start':''}">${l}</th>`).join('')}<th>Δ</th><th>Proy.</th></tr></thead>
       <tbody>${lista.map(fila).join('')}</tbody></table></div>
+      ${avisoProy}
       ${todas.length>50?`<p class="note">Mostrando 50 de ${fN(todas.length)}. Afina la búsqueda.</p>`:''}`;
   };
   inp.oninput = e=> pintar(e.target.value);
