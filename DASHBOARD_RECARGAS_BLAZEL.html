@@ -1135,7 +1135,14 @@ async function cargarVivo(){
       try{ toast('Datos de recarga actualizados en vivo'); }catch(e){}
       renderFbar(); renderAll();
     }
-  }catch(e){ /* sin conexión o vacío: se queda con la data embebida */ }
+  try{ localStorage.setItem('blazel_last_ok', JSON.stringify({EMB_MEDIDAS, CUOTAS_LIVE})); }catch(e){}
+
+  }catch(e){
+    try{
+      const c = JSON.parse(localStorage.getItem('blazel_last_ok'));
+      if(c){ EMB_MEDIDAS = c.EMB_MEDIDAS; if(c.CUOTAS_LIVE) CUOTAS_LIVE = c.CUOTAS_LIVE; renderFbar(); renderAll(); }
+    }catch(e2){}
+  }
 }
 /* lee la "foto" de volumen que subió jmaza, para que todos vean lo mismo */
 async function cargarVolumenVivo(){
