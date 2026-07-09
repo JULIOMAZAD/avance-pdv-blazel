@@ -1923,7 +1923,12 @@ function actualizarProjBox(){
       // guarda el día para que viaje a las demás máquinas (no bloquea la UI)
       if(F.proj>=1) guardarDiaCompartido(F.proj);
     });
-    // al cargar por primera vez, traemos el día guardado en la nube y lo precargamos
+  }
+  // Traemos el día guardado en la nube cada vez que cambia el mes/año actual
+  // (antes solo se traía una vez al abrir, y se quedaba pegado en el mes viejo)
+  const claveMesDia = _diaKeyMes()+'_'+DATA.anioActual;
+  if(show && projInput.dataset.diaMesCargado !== claveMesDia){
+    projInput.dataset.diaMesCargado = claveMesDia;
     fetchDiaGuardado().then(d=>{
       if(d){
         projInput.value = d;
