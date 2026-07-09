@@ -6,6 +6,7 @@
 <title>RECARGAS BLAZEL · Tablero de Control</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -1291,29 +1292,112 @@ function rComparativo(){
   <div id="cpRes"></div>`;
   const inp=document.getElementById('cpBuscar'), res=document.getElementById('cpRes');
 
-  document.getElementById('cpExportar').onclick = ()=>{
-    const filas = cp.map(c=>{
-      const fila = { DNI: c.dni, NOMBRE: c.nombre||'', DISTRITO: c.distrito||'', VENDEDOR: c.vendedor||'' };
+  document.getElementById('cpExportar').onclick = async ()=>{
+    const btn = document.getElementById('cpExportar');
+    const txtOrig = btn.textContent; btn.textContent = 'Generando…'; btn.disabled = true;
+    try{
+      const PALETA_MES = ['FFD9EAD3','FFFCE5CD','FFCFE2F3','FFEAD1DC','FFD9D2E9','FFFFF2CC']; // se repite si hay mas de 6 meses
+      const COLOR_PROY = 'FFCFF3EA';
+      const mesActual = ult3.length ? ult3[ult3.length-1] : null;
+
+      const wb = new ExcelJS.Workbook();
+      const ws = wb.addWorksheet('Comparativo Multimarca');
+
+      // ---- Construye columnas: fijas + 3 por mes + 3 de proyeccion ----
+      const cols = [
+        {header:'DNI', key:'dni', width:12},
+        {header:'NOMBRE', key:'nombre', width:28},
+        {header:'DISTRITO', key:'distrito', width:16},
+        {header:'VENDEDOR', key:'vendedor', width:14},
+      ];
       mesesDetectados.forEach(m=>{
-        const pre = getPre(c,m), post = getPost(c,m);
-        fila[cabMes(m)+' Pre'] = pre;
-        fila[cabMes(m)+' Post'] = post;
-        fila[cabMes(m)+' Cap'] = (pre+post) > 0 ? 1 : 0;
+        cols.push({header:`${cabMes(m)} Pre`, key:m+'_pre', width:10});
+        cols.push({header:`${cabMes(m)} Post`, key:m+'_post', width:10});
+        cols.push({header:`${cabMes(m)} Cap`, key:m+'_cap', width:9});
       });
-      if(diaAv>0 && ult3.length){
-        const preAct = getPre(c, ult3[ult3.length-1]), postAct = getPost(c, ult3[ult3.length-1]);
-        fila['Proyección Prepago'] = proy(preAct);
-        fila['Proyección Postpago'] = proy(postAct);
-        fila['Proyección Total'] = proy(preAct) + proy(postAct);
+      const hayProy = diaAv>0 && mesActual;
+      if(hayProy){
+        const lblMes = cabMes(mesActual);
+        cols.push({header:`Proyección Prepago (${lblMes})`, key:'proy_pre', width:20});
+        cols.push({header:`Proyección Postpago (${lblMes})`, key:'proy_post', width:21});
+        cols.push({header:`Proyección Total (${lblMes})`, key:'proy_tot', width:18});
       }
-      return fila;
-    });
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(filas);
-    ws['!cols'] = Object.keys(filas[0]||{}).map(k=> ({wch: Math.max(10, k.length+2)}));
-    XLSX.utils.book_append_sheet(wb, ws, 'Comparativo Multimarca');
-    const hoy = new Date().toISOString().slice(0,10);
-    XLSX.writeFile(wb, `Comparativo_Multimarca_Blazel_${hoy}.xlsx`);
+      ws.columns = cols;
+
+      // ---- Filas de datos ----
+      cp.forEach(c=>{
+        const fila = { dni:c.dni, nombre:c.nombre||'', distrito:c.distrito||'', vendedor:c.vendedor||'' };
+        mesesDetectados.forEach(m=>{
+          const pre=getPre(c,m), post=getPost(c,m);
+          fila[m+'_pre']=pre; fila[m+'_post']=post; fila[m+'_cap']=(pre+post)>0?1:0;
+        });
+        if(hayProy){
+          const preAct=getPre(c,mesActual), postAct=getPost(c,mesActual);
+          const pP=proy(preAct), pPo=proy(postAct);
+          fila['proy_pre']=pP; fila['proy_post']=pPo; fila['proy_tot']=pP+pPo;
+        }
+        ws.addRow(fila);
+      });
+
+      // ---- Encabezado: negro con letra blanca ----
+      const headerRow = ws.getRow(1);
+      headerRow.eachCell(cell=>{
+        cell.font = { bold:true, color:{argb:'FFFFFFFF'} };
+        cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FF1B1B1F'} };
+        cell.alignment = { horizontal:'center', vertical:'middle', wrapText:true };
+      });
+      headerRow.height = 24;
+
+      // ---- Color de fondo por mes (3 columnas cada uno) y por proyeccion ----
+      const colorPorColumna = {};
+      mesesDetectados.forEach((m,i)=>{
+        const color = PALETA_MES[i % PALETA_MES.length];
+        [m+'_pre', m+'_post', m+'_cap'].forEach(k=> colorPorColumna[k]=color);
+      });
+      if(hayProy){ ['proy_pre','proy_post','proy_tot'].forEach(k=> colorPorColumna[k]=COLOR_PROY); }
+
+      ws.columns.forEach(col=>{
+        const color = colorPorColumna[col.key];
+        if(!color) return;
+        for(let r=2; r<=ws.rowCount; r++){
+          const cell = ws.getCell(r, col.number);
+          cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:color} };
+        }
+      });
+
+      // ---- Numeros en rojo si son negativos (Δ implicitos y, sobre todo, proyeccion) ----
+      if(hayProy){
+        ['proy_pre','proy_post','proy_tot'].forEach(key=>{
+          const colNum = ws.getColumn(key).number;
+          for(let r=2; r<=ws.rowCount; r++){
+            const cell = ws.getCell(r, colNum);
+            if(typeof cell.value === 'number' && cell.value < 0){
+              cell.font = { color:{argb:'FFCC0000'}, bold:true };
+            }
+          }
+        });
+      }
+
+      // ---- Bordes finos y centrado en toda la tabla ----
+      for(let r=1; r<=ws.rowCount; r++){
+        for(let cIdx=1; cIdx<=cols.length; cIdx++){
+          const cell = ws.getCell(r,cIdx);
+          cell.border = { top:{style:'thin',color:{argb:'FFDDDDDD'}}, bottom:{style:'thin',color:{argb:'FFDDDDDD'}}, left:{style:'thin',color:{argb:'FFDDDDDD'}}, right:{style:'thin',color:{argb:'FFDDDDDD'}} };
+          if(r>1 && cIdx>4) cell.alignment = { horizontal:'center' };
+        }
+      }
+      ws.views = [{ state:'frozen', xSplit:4, ySplit:1 }];
+
+      const buf = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buf], {type:'application/octet-stream'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const hoy = new Date().toISOString().slice(0,10);
+      a.href = url; a.download = `Comparativo_Multimarca_Blazel_${hoy}.xlsx`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }catch(e){ console.error('export comparativo', e); alert('No se pudo generar el Excel. Revisa la consola (F12).'); }
+    finally{ btn.textContent = txtOrig; btn.disabled = false; }
   };
   const arrow=v=> v>0?`<span class="pill pv">+${fN(v)}</span>`: v<0?`<span class="pill pr">-${fN(-v)}</span>`:`<span class="pill pn">=</span>`;
   const cabMes = m=> m.slice(0,3).charAt(0).toUpperCase()+m.slice(1,3).toLowerCase();
