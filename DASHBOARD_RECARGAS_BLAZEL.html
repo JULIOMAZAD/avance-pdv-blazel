@@ -1278,13 +1278,43 @@ function rComparativo(){
   el.innerHTML = `
   <h2>Comparativo por cliente <span class="tag">Últimos ${ult3.length} meses cargados${lbl3?' · '+lbl3:''}</span></h2>
   <div class="card" style="margin-bottom:14px">
-    <label style="font-weight:600;display:block;margin-bottom:6px">Buscar por DNI o nombre</label>
-    <input id="cpBuscar" type="text" placeholder="Escribe un DNI o un nombre…" autocomplete="off"
-      style="width:100%;max-width:440px;padding:11px 14px;border:1px solid #2c2e38;border-radius:10px;background:#1b1c22;color:#e8e8ea;font-size:15px;outline:none">
-    <div style="color:var(--ink2);font-size:12px;margin-top:6px">${fN(cp.length)} clientes en la base.</div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:14px;flex-wrap:wrap">
+      <div>
+        <label style="font-weight:600;display:block;margin-bottom:6px">Buscar por DNI o nombre</label>
+        <input id="cpBuscar" type="text" placeholder="Escribe un DNI o un nombre…" autocomplete="off"
+          style="width:100%;max-width:440px;padding:11px 14px;border:1px solid #2c2e38;border-radius:10px;background:#1b1c22;color:#e8e8ea;font-size:15px;outline:none">
+        <div style="color:var(--ink2);font-size:12px;margin-top:6px">${fN(cp.length)} clientes en la base.</div>
+      </div>
+      <button id="cpExportar" style="background:#1F8A55;color:#fff;border:none;border-radius:8px;padding:11px 18px;font-weight:700;cursor:pointer;white-space:nowrap">⬇ Exportar Excel (${fN(cp.length)} clientes)</button>
+    </div>
   </div>
   <div id="cpRes"></div>`;
   const inp=document.getElementById('cpBuscar'), res=document.getElementById('cpRes');
+
+  document.getElementById('cpExportar').onclick = ()=>{
+    const filas = cp.map(c=>{
+      const fila = { DNI: c.dni, NOMBRE: c.nombre||'', DISTRITO: c.distrito||'', VENDEDOR: c.vendedor||'' };
+      mesesDetectados.forEach(m=>{
+        const pre = getPre(c,m), post = getPost(c,m);
+        fila[cabMes(m)+' Pre'] = pre;
+        fila[cabMes(m)+' Post'] = post;
+        fila[cabMes(m)+' Cap'] = (pre+post) > 0 ? 1 : 0;
+      });
+      if(diaAv>0 && ult3.length){
+        const preAct = getPre(c, ult3[ult3.length-1]), postAct = getPost(c, ult3[ult3.length-1]);
+        fila['Proyección Prepago'] = proy(preAct);
+        fila['Proyección Postpago'] = proy(postAct);
+        fila['Proyección Total'] = proy(preAct) + proy(postAct);
+      }
+      return fila;
+    });
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(filas);
+    ws['!cols'] = Object.keys(filas[0]||{}).map(k=> ({wch: Math.max(10, k.length+2)}));
+    XLSX.utils.book_append_sheet(wb, ws, 'Comparativo Multimarca');
+    const hoy = new Date().toISOString().slice(0,10);
+    XLSX.writeFile(wb, `Comparativo_Multimarca_Blazel_${hoy}.xlsx`);
+  };
   const arrow=v=> v>0?`<span class="pill pv">+${fN(v)}</span>`: v<0?`<span class="pill pr">-${fN(-v)}</span>`:`<span class="pill pn">=</span>`;
   const cabMes = m=> m.slice(0,3).charAt(0).toUpperCase()+m.slice(1,3).toLowerCase();
   // ---- Proyeccion de cierre del mes en curso (ultimo de los 3), en base al dia de avance ----
