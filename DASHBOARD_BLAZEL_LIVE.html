@@ -119,7 +119,7 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
     </div>
   </div>
   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
-    <div style="display:flex;gap:8px">
+    <div style="display:none">
       <button class="btn-upload" id="btnUpload">📤 Actualizar datos (Excel)</button>
       <button class="btn-upload" id="btnUploadCuotas">🎯 Actualizar cuotas (Excel)</button>
       <button class="btn-upload" id="btnReset" style="border-color:var(--line)">↺ Restaurar original</button>
@@ -1919,6 +1919,7 @@ function actualizarProjBox(){
     projInput.addEventListener('input', ()=>{
       const v = parseInt(projInput.value, 10);
       F.proj = (v>=1 && v<=31) ? v : 0;
+      projInput.dataset.userEdited = '1'; // el usuario ya tocó el campo: la nube ya no lo pisa
       render();
       // guarda el día para que viaje a las demás máquinas (no bloquea la UI)
       if(F.proj>=1) guardarDiaCompartido(F.proj);
@@ -1929,8 +1930,10 @@ function actualizarProjBox(){
   const claveMesDia = _diaKeyMes()+'_'+DATA.anioActual;
   if(show && projInput.dataset.diaMesCargado !== claveMesDia){
     projInput.dataset.diaMesCargado = claveMesDia;
+    projInput.dataset.userEdited = '0'; // nuevo mes: aún no lo ha tocado el usuario
     fetchDiaGuardado().then(d=>{
-      if(d){
+      // si mientras esperábamos la respuesta el usuario ya escribió algo, o cambió de mes, no lo pisamos
+      if(d && projInput.dataset.diaMesCargado===claveMesDia && projInput.dataset.userEdited!=='1'){
         projInput.value = d;
         if(esMesActualSolo()) F.proj = d;
         render();
