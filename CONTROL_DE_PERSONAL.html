@@ -671,19 +671,9 @@
           <div id="contratoEmployeeLabel" style="font-weight:700; margin-bottom:6px;"></div>
           <div id="contratoActual" class="info-box small" style="margin-bottom:12px;"></div>
           <div class="row">
-            <div class="col-3"><label>Fecha de inicio</label><input id="contratoInicio" type="date" onchange="calcContratoFin()" /></div>
-            <div class="col-3"><label>Duración</label>
-              <select id="contratoDuracion" onchange="calcContratoFin()">
-                <option value="">-- Selecciona --</option>
-                <option value="1">1 mes</option>
-                <option value="3">3 meses</option>
-                <option value="6">6 meses</option>
-                <option value="12">1 año</option>
-                <option value="indefinido">Indefinido</option>
-                <option value="personalizado">Personalizado (elegir fecha)</option>
-              </select>
-            </div>
-            <div class="col-3"><label>Fecha de vencimiento</label><input id="contratoFin" type="date" /></div>
+            <div class="col-3"><label>Fecha de inicio</label><input id="contratoInicio" type="date" onchange="calcContratoDuracion()" /></div>
+            <div class="col-3"><label>Fecha de vencimiento (déjalo vacío si es indefinido)</label><input id="contratoFin" type="date" onchange="calcContratoDuracion()" /></div>
+            <div class="col-3"><label>Duración (calculada)</label><input id="contratoDuracionCalc" readonly /></div>
             <div class="col-3"><label>N° de contrato / referencia</label><input id="contratoRef" placeholder="Opcional" /></div>
           </div>
           <div class="toolbar" style="margin-top:12px;">
@@ -2006,16 +1996,28 @@
       }).join('');
     }
 
-    function calcContratoFin() {
+    function calcContratoDuracion() {
       const inicio = document.getElementById('contratoInicio').value;
-      const dur = document.getElementById('contratoDuracion').value;
-      const finInput = document.getElementById('contratoFin');
-      if (!inicio || !dur) return;
-      if (dur === 'personalizado') { finInput.focus(); return; }
-      if (dur === 'indefinido') { finInput.value = ''; return; }
-      const d = new Date(inicio + 'T00:00:00');
-      d.setMonth(d.getMonth() + parseInt(dur, 10));
-      finInput.value = dateToISO(d);
+      const fin = document.getElementById('contratoFin').value;
+      const out = document.getElementById('contratoDuracionCalc');
+      if (!inicio) { out.value = ''; return; }
+      if (!fin) { out.value = 'Indefinido'; return; }
+      const d1 = new Date(inicio + 'T00:00:00');
+      const d2 = new Date(fin + 'T00:00:00');
+      if (d2 <= d1) { out.value = 'Fecha de vencimiento inválida'; return; }
+      let meses = (d2.getFullYear() - d1.getFullYear()) * 12 + (d2.getMonth() - d1.getMonth());
+      if (d2.getDate() < d1.getDate()) meses -= 1;
+      const dias = Math.round((d2 - d1) / 86400000);
+      if (meses <= 0) {
+        out.value = dias + ' día(s)';
+      } else {
+        const anos = Math.floor(meses / 12);
+        const mesesRestantes = meses % 12;
+        let texto = '';
+        if (anos > 0) texto += anos + (anos === 1 ? ' año' : ' años');
+        if (mesesRestantes > 0) texto += (texto ? ' ' : '') + mesesRestantes + (mesesRestantes === 1 ? ' mes' : ' meses');
+        out.value = texto || '0 meses';
+      }
     }
 
     function selectForContrato(id) {
@@ -2028,8 +2030,8 @@
         ? ('Contrato actual: del ' + fmtDate(c.inicio) + ' al ' + (c.fin ? fmtDate(c.fin) : 'indefinido') + (c.ref ? (' · Ref: ' + c.ref) : ''))
         : 'No tiene contrato registrado todavía.';
       document.getElementById('contratoInicio').value = todayISO();
-      document.getElementById('contratoDuracion').value = '';
       document.getElementById('contratoFin').value = '';
+      document.getElementById('contratoDuracionCalc').value = '';
       document.getElementById('contratoRef').value = '';
       document.getElementById('contratoFormBox').classList.remove('hidden');
       renderContratoPersonHistory(r);
@@ -2038,18 +2040,16 @@
     function confirmContrato() {
       if (!contratoSelectedId) return;
       const inicio = norm(document.getElementById('contratoInicio').value);
-      const dur = document.getElementById('contratoDuracion').value;
       const fin = norm(document.getElementById('contratoFin').value);
       const ref = norm(document.getElementById('contratoRef').value);
       if (!inicio) { alert('Ingresa la fecha de inicio del contrato.'); return; }
-      if (!dur) { alert('Selecciona la duración del contrato.'); return; }
-      if (dur !== 'indefinido' && !fin) { alert('Ingresa o confirma la fecha de vencimiento.'); return; }
+      if (fin && fin <= inicio) { alert('La fecha de vencimiento debe ser posterior a la de inicio.'); return; }
       const idx = state.empleados.findIndex(function(x) { return x.id === contratoSelectedId; });
       if (idx < 0) return;
       const r = state.empleados[idx];
       r.contratoHistorial = Array.isArray(r.contratoHistorial) ? r.contratoHistorial : [];
       if (r.contrato) r.contratoHistorial.push(r.contrato);
-      r.contrato = { inicio: inicio, fin: dur === 'indefinido' ? '' : fin, ref: ref };
+      r.contrato = { inicio: inicio, fin: fin, ref: ref };
       saveData(false, 'auto');
       alert('Contrato registrado correctamente.');
       clearContratoPanel();
@@ -2069,8 +2069,8 @@
       document.getElementById('contratoEmployeeLabel').textContent = '';
       document.getElementById('contratoActual').textContent = '';
       document.getElementById('contratoInicio').value = '';
-      document.getElementById('contratoDuracion').value = '';
       document.getElementById('contratoFin').value = '';
+      document.getElementById('contratoDuracionCalc').value = '';
       document.getElementById('contratoRef').value = '';
     }
 
