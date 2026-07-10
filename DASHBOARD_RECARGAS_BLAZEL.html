@@ -1315,12 +1315,16 @@ function rComparativo(){
         cols.push({header:`${cabMes(m)} Post`, key:m+'_post', width:10});
         cols.push({header:`${cabMes(m)} Cap`, key:m+'_cap', width:9});
       });
+      // Prepago y Postpago son productos distintos: cada uno con su propia proyeccion
+      // Diaria / Semanal / Mensual. Nunca se suman entre si.
       const hayProy = diaAv>0 && mesActual;
       if(hayProy){
         const lblMes = cabMes(mesActual);
-        cols.push({header:`Proyección Prepago (${lblMes})`, key:'proy_pre', width:20});
-        cols.push({header:`Proyección Postpago (${lblMes})`, key:'proy_post', width:21});
-        cols.push({header:`Proyección Total (${lblMes})`, key:'proy_tot', width:18});
+        ['Prepago','Postpago'].forEach(prod=>{
+          cols.push({header:`${prod} Diaria (${lblMes})`, key:prod.toLowerCase()+'_dia', width:16});
+          cols.push({header:`${prod} Semanal (${lblMes})`, key:prod.toLowerCase()+'_sem', width:17});
+          cols.push({header:`${prod} Mensual (${lblMes})`, key:prod.toLowerCase()+'_mes', width:17});
+        });
       }
       ws.columns = cols;
 
@@ -1333,8 +1337,8 @@ function rComparativo(){
         });
         if(hayProy){
           const preAct=getPre(c,mesActual), postAct=getPost(c,mesActual);
-          const pP=proy(preAct), pPo=proy(postAct);
-          fila['proy_pre']=pP; fila['proy_post']=pPo; fila['proy_tot']=pP+pPo;
+          fila['prepago_dia']=Math.round(preAct/diaAv); fila['prepago_sem']=Math.round(preAct/diaAv*7); fila['prepago_mes']=proy(preAct);
+          fila['postpago_dia']=Math.round(postAct/diaAv); fila['postpago_sem']=Math.round(postAct/diaAv*7); fila['postpago_mes']=proy(postAct);
         }
         ws.addRow(fila);
       });
@@ -1354,7 +1358,7 @@ function rComparativo(){
         const color = PALETA_MES[i % PALETA_MES.length];
         [m+'_pre', m+'_post', m+'_cap'].forEach(k=> colorPorColumna[k]=color);
       });
-      if(hayProy){ ['proy_pre','proy_post','proy_tot'].forEach(k=> colorPorColumna[k]=COLOR_PROY); }
+      if(hayProy){ ['prepago_dia','prepago_sem','prepago_mes','postpago_dia','postpago_sem','postpago_mes'].forEach(k=> colorPorColumna[k]=COLOR_PROY); }
 
       ws.columns.forEach(col=>{
         const color = colorPorColumna[col.key];
@@ -1367,7 +1371,7 @@ function rComparativo(){
 
       // ---- Numeros en rojo si son negativos (Δ implicitos y, sobre todo, proyeccion) ----
       if(hayProy){
-        ['proy_pre','proy_post','proy_tot'].forEach(key=>{
+        ['prepago_dia','prepago_sem','prepago_mes','postpago_dia','postpago_sem','postpago_mes'].forEach(key=>{
           const colNum = ws.getColumn(key).number;
           for(let r=2; r<=ws.rowCount; r++){
             const cell = ws.getCell(r, colNum);
@@ -1424,19 +1428,35 @@ function rComparativo(){
       ${tots.map((v,i)=>`<td class="num b-tint-tot${i===0?' b-start':''}"><b>${fN(v)}</b></td>`).join('')}<td class="num b-tint-tot">${dTot}</td></tr>`;
   };
   const cajaProy = c=>{
+    // Prepago y Postpago son productos distintos: cada uno proyecta por su cuenta, nunca se suman.
     const pres = ult3.map(m=>getPre(c,m)), posts = ult3.map(m=>getPost(c,m));
-    const pPre = proy(pres[pres.length-1]), pPost = proy(posts[posts.length-1]);
-    const pTot = (pPre!=null && pPost!=null) ? pPre+pPost : null;
-    const chip = (lbl,val,color)=> `<div style="flex:1;min-width:120px;background:${color}15;border:1px solid ${color}40;border-radius:10px;padding:10px 14px;text-align:center">
-        <div style="font-size:11px;font-weight:700;letter-spacing:.03em;color:${color}">${lbl}</div>
-        <div style="font-size:24px;font-weight:800;margin-top:2px">${val==null?'—':fN(val)}</div>
-      </div>`;
+    const valPre = pres[pres.length-1], valPost = posts[posts.length-1];
+    const diaria  = v => (diaAv>0) ? Math.round(v/diaAv) : null;
+    const semanal = v => (diaAv>0) ? Math.round(v/diaAv*7) : null;
+    const mensual = v => proy(v);
+    const bloque = (lbl, val, color) => {
+      const d = diaria(val), s = semanal(val), m = mensual(val);
+      const mini = (t,v)=> `<div style="flex:1;min-width:90px;text-align:center">
+          <div style="font-size:10px;font-weight:700;letter-spacing:.04em;color:var(--ink2)">${t}</div>
+          <div style="font-size:22px;font-weight:800;margin-top:2px;color:${color}">${v==null?'—':fN(v)}</div>
+        </div>`;
+      return `<div style="flex:1;min-width:260px;background:${color}12;border:1px solid ${color}40;border-radius:12px;padding:12px 14px">
+          <div style="font-size:12px;font-weight:800;letter-spacing:.04em;color:${color};margin-bottom:8px">${lbl}</div>
+          <div style="display:flex;gap:6px">
+            ${mini('DIARIA', d)}${mini('SEMANAL', s)}${mini('MENSUAL', m)}
+          </div>
+        </div>`;
+    };
+    const avisoDiaHtml = diaAv>0
+      ? `<span style="display:inline-block;background:#FFF3CD;color:#8A6100;font-weight:800;font-size:13px;padding:4px 12px;border-radius:20px;margin-left:8px">AVANZA AL DÍA ${diaAv} DE ${diasDelMesActual}</span>`
+      : `<span style="display:inline-block;background:#FDECEA;color:#B5302E;font-weight:800;font-size:13px;padding:4px 12px;border-radius:20px;margin-left:8px">FALTA PONER EL DÍA DE AVANCE</span>`;
     return `<div class="card" style="margin-top:10px;margin-bottom:14px">
-      <div style="font-weight:700;margin-bottom:10px">${c.nombre||'—'} <span style="font-weight:400;color:var(--ink2);font-size:12px">· Proyección de cierre ${cabMes(ult3[ult3.length-1])}${diaAv>0?` (día ${diaAv} de ${diasDelMesActual})`:''}</span></div>
+      <div style="font-weight:700;margin-bottom:12px;display:flex;align-items:center;flex-wrap:wrap;gap:4px">
+        ${c.nombre||'—'} <span style="font-weight:400;color:var(--ink2);font-size:12px">· Proyección de cierre ${cabMes(ult3[ult3.length-1])}</span>${avisoDiaHtml}
+      </div>
       <div style="display:flex;gap:12px;flex-wrap:wrap">
-        ${chip('PREPAGO', pPre, '#3B4252')}
-        ${chip('POSTPAGO', pPost, '#B5302E')}
-        ${chip('TOTAL', pTot, '#1F8A55')}
+        ${bloque('PREPAGO', valPre, '#3B4252')}
+        ${bloque('POSTPAGO', valPost, '#B5302E')}
       </div>
     </div>`;
   };
