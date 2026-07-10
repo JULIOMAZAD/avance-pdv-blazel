@@ -672,7 +672,7 @@
           <div id="contratoActual" class="info-box small" style="margin-bottom:12px;"></div>
           <div class="row">
             <div class="col-3"><label>Fecha de inicio</label><input id="contratoInicio" type="date" onchange="calcContratoDuracion()" /></div>
-            <div class="col-3"><label>Fecha de vencimiento (déjalo vacío si es indefinido)</label><input id="contratoFin" type="date" onchange="calcContratoDuracion()" /></div>
+            <div class="col-3"><label>Fecha de vencimiento</label><input id="contratoFin" type="date" onchange="calcContratoDuracion()" /><div class="small muted" style="margin-top:4px;">Vacío = indefinido</div></div>
             <div class="col-3"><label>Duración (calculada)</label><input id="contratoDuracionCalc" readonly /></div>
             <div class="col-3"><label>N° de contrato / referencia</label><input id="contratoRef" placeholder="Opcional" /></div>
           </div>
@@ -2003,21 +2003,25 @@
       if (!inicio) { out.value = ''; return; }
       if (!fin) { out.value = 'Indefinido'; return; }
       const d1 = new Date(inicio + 'T00:00:00');
-      const d2 = new Date(fin + 'T00:00:00');
-      if (d2 <= d1) { out.value = 'Fecha de vencimiento inválida'; return; }
-      let meses = (d2.getFullYear() - d1.getFullYear()) * 12 + (d2.getMonth() - d1.getMonth());
-      if (d2.getDate() < d1.getDate()) meses -= 1;
-      const dias = Math.round((d2 - d1) / 86400000);
+      const finExclusivo = new Date(fin + 'T00:00:00');
+      finExclusivo.setDate(finExclusivo.getDate() + 1); // el contrato cubre todo el día de vencimiento
+      if (finExclusivo <= d1) { out.value = 'Fecha de vencimiento inválida'; return; }
+      let meses = (finExclusivo.getFullYear() - d1.getFullYear()) * 12 + (finExclusivo.getMonth() - d1.getMonth());
+      if (finExclusivo.getDate() < d1.getDate()) meses -= 1;
+      const checkpoint = new Date(d1);
+      checkpoint.setMonth(checkpoint.getMonth() + meses);
+      const diasRestantes = Math.round((finExclusivo - checkpoint) / 86400000);
       if (meses <= 0) {
-        out.value = dias + ' día(s)';
-      } else {
-        const anos = Math.floor(meses / 12);
-        const mesesRestantes = meses % 12;
-        let texto = '';
-        if (anos > 0) texto += anos + (anos === 1 ? ' año' : ' años');
-        if (mesesRestantes > 0) texto += (texto ? ' ' : '') + mesesRestantes + (mesesRestantes === 1 ? ' mes' : ' meses');
-        out.value = texto || '0 meses';
+        out.value = diasRestantes + ' día(s)';
+        return;
       }
+      const anos = Math.floor(meses / 12);
+      const mesesRestantes = meses % 12;
+      let texto = '';
+      if (anos > 0) texto += anos + (anos === 1 ? ' año' : ' años');
+      if (mesesRestantes > 0) texto += (texto ? ' ' : '') + mesesRestantes + (mesesRestantes === 1 ? ' mes' : ' meses');
+      if (diasRestantes > 0) texto += (texto ? ' y ' : '') + diasRestantes + ' día(s)';
+      out.value = texto || '0 meses';
     }
 
     function selectForContrato(id) {
