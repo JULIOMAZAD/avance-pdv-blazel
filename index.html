@@ -69,6 +69,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
 .tchip.all{border-color:#1a1a2e;color:#1a1a2e}
 .tchip.all.on{background:#1a1a2e;border-color:#1a1a2e;color:#fff}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:1rem}
+.kpis-compact{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,220px));gap:10px;margin-bottom:1rem}
 .kpi{background:#fff;border-radius:14px;padding:1rem 1.25rem;border-left:4px solid #cc0000}
 .kpi .lbl{font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px}
 .kpi .val{font-size:24px;font-weight:800;color:#1a1a2e;margin-top:4px}
@@ -721,7 +722,7 @@ function comisionCardsHtml(comis, filtroPv, filtroList){
     });
   }
   if(!cards) return "";
-  return `<div class="kpis" style="margin-top:14px">${cards}</div>`;
+  return `<div class="kpis-compact" style="margin-top:14px">${cards}</div>`;
 }
 async function renderComisionGerencia(sel){
   const el=document.getElementById("gerComision");
