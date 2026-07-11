@@ -695,42 +695,21 @@ async function fetchComisiones(){
   COMIS_CACHE=j.comisiones||{};
   return COMIS_CACHE;
 }
-function comisionCardsFragment(comis, filtroPv, filtroList){
-  const meses=Object.keys(comis);
-  if(!meses.length) return "";
+function comisionCardsFragment(comis, filtroPv, filtroList, mesSel){
+  if(!mesSel || !Array.isArray(comis[mesSel])) return "";
   const wantSet = (filtroList && filtroList.length) ? new Set(filtroList.map(x=>x.trim().toUpperCase())) : null;
-  const filas={}; const orden=[];
-  meses.forEach(m=>{
-    if(!Array.isArray(comis[m])) return;
-    (comis[m]||[]).forEach(f=>{
-      const key=f.pv.trim().toUpperCase();
-      if(filtroPv && key!==filtroPv.trim().toUpperCase()) return;
-      if(wantSet && !wantSet.has(key)) return;
-      if(!filas[key]){ filas[key]={pv:f.pv, vals:{}}; orden.push(key); }
-      filas[key].vals[m]=f.comision;
-    });
-  });
-  if(!orden.length) return "";
+  const lbl = mesSel.charAt(0).toUpperCase()+mesSel.slice(1);
   let cards="";
-  if(orden.length===1){
-    const f=filas[orden[0]];
-    meses.forEach(m=>{
-      if(f.vals[m]==null) return;
-      const lbl=m.charAt(0).toUpperCase()+m.slice(1);
-      cards += kpiCard("💰 Comisión "+lbl, "S/ "+fmt(f.vals[m]), f.pv);
-    });
-  } else {
-    const ultMes = meses[meses.length-1];
-    orden.forEach(k=>{
-      const f=filas[k];
-      if(f.vals[ultMes]==null) return;
-      cards += kpiCard(f.pv, "S/ "+fmt(f.vals[ultMes]), "Comisión "+ultMes.charAt(0).toUpperCase()+ultMes.slice(1));
-    });
-  }
+  comis[mesSel].forEach(f=>{
+    const key=f.pv.trim().toUpperCase();
+    if(filtroPv && key!==filtroPv.trim().toUpperCase()) return;
+    if(wantSet && !wantSet.has(key)) return;
+    cards += kpiCard("💰 Comisión "+lbl, "S/ "+fmt(f.comision), f.pv);
+  });
   return cards;
 }
-function comisionCardsHtml(comis, filtroPv, filtroList){
-  const cards = comisionCardsFragment(comis, filtroPv, filtroList);
+function comisionCardsHtml(comis, filtroPv, filtroList, mesSel){
+  const cards = comisionCardsFragment(comis, filtroPv, filtroList, mesSel);
   if(!cards) return "";
   return `<div class="kpis-compact" style="margin-top:14px">${cards}</div>`;
 }
@@ -738,15 +717,15 @@ async function comisionKpiFragmentGerencia(sel){
   try{
     const comis=await fetchComisiones();
     if(gerMode==="gustavo"){
-      return comisionCardsFragment(comis, "Coordinador Comercial (Gustavo)");
+      return comisionCardsFragment(comis, "Coordinador Comercial (Gustavo)", null, gerMes);
     }
     const isGlobal = gerMode==="all";
     if(!isGlobal && sel && sel.length){
-      return comisionCardsFragment(comis, null, sel);
+      return comisionCardsFragment(comis, null, sel, gerMes);
     } else if(comercialMode){
-      return comisionCardsFragment(comis, "Gerente Comercial (Julio)");
+      return comisionCardsFragment(comis, "Gerente Comercial (Julio)", null, gerMes);
     } else {
-      return comisionCardsFragment(comis, "Coordinador Comercial (Gustavo)");
+      return comisionCardsFragment(comis, "Coordinador Comercial (Gustavo)", null, gerMes);
     }
   }catch(e){ return ""; }
 }
@@ -755,7 +734,7 @@ async function renderComisionTienda(){
   if(!el) return;
   try{
     const comis=await fetchComisiones();
-    el.innerHTML = comisionCardsHtml(comis, curTienda);
+    el.innerHTML = comisionCardsHtml(comis, curTienda, null, curMes);
   }catch(e){ el.innerHTML=""; }
 }
 
