@@ -701,6 +701,7 @@ function comisionCardsFragment(comis, filtroPv, filtroList){
   const wantSet = (filtroList && filtroList.length) ? new Set(filtroList.map(x=>x.trim().toUpperCase())) : null;
   const filas={}; const orden=[];
   meses.forEach(m=>{
+    if(!Array.isArray(comis[m])) return;
     (comis[m]||[]).forEach(f=>{
       const key=f.pv.trim().toUpperCase();
       if(filtroPv && key!==filtroPv.trim().toUpperCase()) return;
