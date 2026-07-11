@@ -543,7 +543,9 @@ function renderGerChips(){
   const isAll = gerMode==="all";
   const isGustavo = gerMode==="gustavo";
   let html=`<div class="tchip all${isAll?" on":""}" onclick="setAll()">${isAll?"✓ ":""}Todas — Cuota Global</div>`;
-  html+=`<div class="tchip${isGustavo?" on":""}" onclick="pickGustavo()">${isGustavo?"✓ ":""}Gustavo</div>`;
+  if(comercialMode){
+    html+=`<div class="tchip${isGustavo?" on":""}" onclick="pickGustavo()">${isGustavo?"✓ ":""}Gustavo</div>`;
+  }
   html+=GER_ALL.map(t=>{
     const on = gerMode==="custom" && gerSel.has(t);
     return `<div class="tchip${on?" on":""}" onclick="toggleStore('${t.replace(/'/g,"\\'")}')">${on?"✓ ":""}${TIENDA_LABEL[t]}</div>`;
@@ -576,7 +578,9 @@ async function fetchInBatches(items, size, fn){
 }
 
 async function loadGerencia(){
-  const sel = gerMode==="custom" ? [...gerSel] : (gerMode==="gustavo" ? GER_GLOBAL.filter(t=>t!=="Call Center") : GER_GLOBAL.slice());
+  const sel = gerMode==="custom" ? [...gerSel]
+    : (gerMode==="gustavo" || (gerMode==="all" && !comercialMode)) ? GER_GLOBAL.filter(t=>t!=="Call Center")
+    : GER_GLOBAL.slice();
   const km=document.getElementById("gerKpis");
   const ts=document.getElementById("gerTableSection");
   const info=document.getElementById("gerInfoRow");
@@ -660,19 +664,19 @@ async function loadGerencia(){
     const tEnMeta=storeStats.filter(x=>x.pct>=1).length, best=storeStats[0];
     const jefInd=`<div class="kpi ${tEnMeta/ok.length>=0.5?'green':(tEnMeta>0?'amber':'red')}"><div class="lbl">Tiendas en meta</div><div class="val">${tEnMeta} / ${ok.length}</div><div class="sub">proyectadas</div></div>`+
       (best?`<div class="kpi green"><div class="lbl">Mejor tienda</div><div class="val" style="font-size:16px;margin-top:6px">${TIENDA_LABEL[best.ti]||best.ti}</div><div class="sub">${fmtPct(best.pct)} proyección</div></div>`:"");
+    const comisFrag = await comisionKpiFragmentGerencia(sel);
     document.getElementById("gerKpis").innerHTML= gaugesRow(struct,totalRow) + '<div class="kpis">' +
       kpiCard("Cuota total (S/)", fmt(totMeta), "Suma del TOTAL de cada tienda") +
       kpiCard("Avance total (S/)", fmt(totAv), fmtPct(avancePct)+" de la cuota") +
       kpiCard("Proyección", fmtPct(totPct), "a cierre de mes", clsByPct(totPct)) +
       kpiCard("Falta (S/)", fmt(totFalta>0?totFalta:0), totFalta>0?("≈ "+fmt(totVd)+" / día"):"Cuota cubierta ✅", totFalta>0?"red":"green") +
       kpiCard("Estado", "", estadoFromPct(totPct), clsByPct(totPct), getTag(estadoFromPct(totPct))) +
-      jefInd + '</div>';
+      jefInd + comisFrag + '</div>';
 
     document.getElementById("gerLoadMsg").innerHTML = failed.length
       ? `<div class="load-err">⚠️ No cargaron ${failed.length} tienda(s): <strong>${failed.map(r=>TIENDA_LABEL[r.t]).join(", ")}</strong>. El total de abajo NO las incluye. <button class="btn-out" style="margin-left:8px" onclick="loadGerencia()">Reintentar</button></div>`
       : "";
     document.getElementById("gerTableSection").innerHTML=buildTableHtml(struct,totalRow,true);
-    renderComisionGerencia(sel);
   }catch(ex){
     document.getElementById("gerLoadMsg").innerHTML="";
     document.getElementById("gerTableSection").innerHTML=`<div class="load-err">${ex.message||"Error al consolidar."}</div>`;
@@ -691,7 +695,7 @@ async function fetchComisiones(){
   COMIS_CACHE=j.comisiones||{};
   return COMIS_CACHE;
 }
-function comisionCardsHtml(comis, filtroPv, filtroList){
+function comisionCardsFragment(comis, filtroPv, filtroList){
   const meses=Object.keys(comis);
   if(!meses.length) return "";
   const wantSet = (filtroList && filtroList.length) ? new Set(filtroList.map(x=>x.trim().toUpperCase())) : null;
@@ -708,7 +712,6 @@ function comisionCardsHtml(comis, filtroPv, filtroList){
   if(!orden.length) return "";
   let cards="";
   if(orden.length===1){
-    // una sola entidad (una tienda, o Gustavo, o Julio): una tarjeta por mes
     const f=filas[orden[0]];
     meses.forEach(m=>{
       if(f.vals[m]==null) return;
@@ -716,7 +719,6 @@ function comisionCardsHtml(comis, filtroPv, filtroList){
       cards += kpiCard("💰 Comisión "+lbl, "S/ "+fmt(f.vals[m]), f.pv);
     });
   } else {
-    // varias entidades (vista global de Julio): una tarjeta por entidad, mes más reciente
     const ultMes = meses[meses.length-1];
     orden.forEach(k=>{
       const f=filas[k];
@@ -724,27 +726,28 @@ function comisionCardsHtml(comis, filtroPv, filtroList){
       cards += kpiCard(f.pv, "S/ "+fmt(f.vals[ultMes]), "Comisión "+ultMes.charAt(0).toUpperCase()+ultMes.slice(1));
     });
   }
+  return cards;
+}
+function comisionCardsHtml(comis, filtroPv, filtroList){
+  const cards = comisionCardsFragment(comis, filtroPv, filtroList);
   if(!cards) return "";
   return `<div class="kpis-compact" style="margin-top:14px">${cards}</div>`;
 }
-async function renderComisionGerencia(sel){
-  const el=document.getElementById("gerComision");
-  if(!el) return;
+async function comisionKpiFragmentGerencia(sel){
   try{
     const comis=await fetchComisiones();
     if(gerMode==="gustavo"){
-      el.innerHTML = comisionCardsHtml(comis, "Coordinador Comercial (Gustavo)");
-      return;
+      return comisionCardsFragment(comis, "Coordinador Comercial (Gustavo)");
     }
     const isGlobal = gerMode==="all";
     if(!isGlobal && sel && sel.length){
-      el.innerHTML = comisionCardsHtml(comis, null, sel);
+      return comisionCardsFragment(comis, null, sel);
     } else if(comercialMode){
-      el.innerHTML = comisionCardsHtml(comis, "Gerente Comercial (Julio)");
+      return comisionCardsFragment(comis, "Gerente Comercial (Julio)");
     } else {
-      el.innerHTML = comisionCardsHtml(comis, "Coordinador Comercial (Gustavo)");
+      return comisionCardsFragment(comis, "Coordinador Comercial (Gustavo)");
     }
-  }catch(e){ el.innerHTML=""; }
+  }catch(e){ return ""; }
 }
 async function renderComisionTienda(){
   const el=document.getElementById("storeComision");
