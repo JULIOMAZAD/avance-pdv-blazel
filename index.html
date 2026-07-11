@@ -687,11 +687,10 @@ async function fetchComisiones(){
   COMIS_CACHE=j.comisiones||{};
   return COMIS_CACHE;
 }
-function comisionTablaHtml(comis, filtroPv, filtroList){
+function comisionCardsHtml(comis, filtroPv, filtroList){
   const meses=Object.keys(comis);
   if(!meses.length) return "";
   const wantSet = (filtroList && filtroList.length) ? new Set(filtroList.map(x=>x.trim().toUpperCase())) : null;
-  // pv -> {mes: valor}
   const filas={}; const orden=[];
   meses.forEach(m=>{
     (comis[m]||[]).forEach(f=>{
@@ -703,15 +702,26 @@ function comisionTablaHtml(comis, filtroPv, filtroList){
     });
   });
   if(!orden.length) return "";
-  const th=meses.map(m=>`<th style="text-align:right">${m[0].toUpperCase()+m.slice(1)}</th>`).join("");
-  const trs=orden.map(k=>{
-    const f=filas[k];
-    const tds=meses.map(m=>`<td style="text-align:right">${f.vals[m]!=null?fmt(f.vals[m]):"—"}</td>`).join("");
-    return `<tr><td style="text-align:left">${f.pv}</td>${tds}</tr>`;
-  }).join("");
-  return `<div class="table-card"><div class="table-wrap"><table>
-    <thead><tr><th style="text-align:left;min-width:200px">💰 Comisión</th>${th}</tr></thead>
-    <tbody>${trs}</tbody></table></div></div>`;
+  let cards="";
+  if(orden.length===1){
+    // una sola entidad (una tienda, o Gustavo, o Julio): una tarjeta por mes
+    const f=filas[orden[0]];
+    meses.forEach(m=>{
+      if(f.vals[m]==null) return;
+      const lbl=m.charAt(0).toUpperCase()+m.slice(1);
+      cards += kpiCard("💰 Comisión "+lbl, "S/ "+fmt(f.vals[m]), f.pv);
+    });
+  } else {
+    // varias entidades (vista global de Julio): una tarjeta por entidad, mes más reciente
+    const ultMes = meses[meses.length-1];
+    orden.forEach(k=>{
+      const f=filas[k];
+      if(f.vals[ultMes]==null) return;
+      cards += kpiCard(f.pv, "S/ "+fmt(f.vals[ultMes]), "Comisión "+ultMes.charAt(0).toUpperCase()+ultMes.slice(1));
+    });
+  }
+  if(!cards) return "";
+  return `<div class="kpis" style="margin-top:14px">${cards}</div>`;
 }
 async function renderComisionGerencia(sel){
   const el=document.getElementById("gerComision");
@@ -720,14 +730,11 @@ async function renderComisionGerencia(sel){
     const comis=await fetchComisiones();
     const isGlobal = gerMode==="all";
     if(!isGlobal && sel && sel.length){
-      // tienda(s) específica(s) seleccionada(s): todos ven la comisión de ESA tienda
-      el.innerHTML = comisionTablaHtml(comis, null, sel);
+      el.innerHTML = comisionCardsHtml(comis, null, sel);
     } else if(comercialMode){
-      // Julio en "Todas": ve el resumen completo (cada PDV + Gustavo + él)
-      el.innerHTML = comisionTablaHtml(comis, null);
+      el.innerHTML = comisionCardsHtml(comis, null);
     } else {
-      // Gustavo en "Todas": ve solo la suya
-      el.innerHTML = comisionTablaHtml(comis, "Coordinador Comercial (Gustavo)");
+      el.innerHTML = comisionCardsHtml(comis, "Coordinador Comercial (Gustavo)");
     }
   }catch(e){ el.innerHTML=""; }
 }
@@ -736,7 +743,7 @@ async function renderComisionTienda(){
   if(!el) return;
   try{
     const comis=await fetchComisiones();
-    el.innerHTML = comisionTablaHtml(comis, curTienda);
+    el.innerHTML = comisionCardsHtml(comis, curTienda);
   }catch(e){ el.innerHTML=""; }
 }
 
