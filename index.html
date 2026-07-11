@@ -141,6 +141,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
     <div id="storeVendFilter" style="margin-bottom:1rem"></div>
     <div id="loadMsg"></div>
     <div id="storeKpis"></div>
+    <div id="storeComision"></div>
     <div id="tableSection"></div>
   </div>
 </div>
@@ -167,6 +168,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
     </div>
     <div id="gerInfoRow" class="info-row"></div>
     <div id="gerKpis"></div>
+    <div id="gerComision"></div>
     <div id="gerLoadMsg"></div>
     <div id="gerTableSection"></div>
   </div>
@@ -666,6 +668,7 @@ async function loadGerencia(){
       ? `<div class="load-err">⚠️ No cargaron ${failed.length} tienda(s): <strong>${failed.map(r=>TIENDA_LABEL[r.t]).join(", ")}</strong>. El total de abajo NO las incluye. <button class="btn-out" style="margin-left:8px" onclick="loadGerencia()">Reintentar</button></div>`
       : "";
     document.getElementById("gerTableSection").innerHTML=buildTableHtml(struct,totalRow,true);
+    renderComisionGerencia();
   }catch(ex){
     document.getElementById("gerLoadMsg").innerHTML="";
     document.getElementById("gerTableSection").innerHTML=`<div class="load-err">${ex.message||"Error al consolidar."}</div>`;
@@ -673,6 +676,60 @@ async function loadGerencia(){
 }
 
 function clsByPct(p){return p>=1?"green":(p>=0.8?"amber":"red");}
+
+// ---------- Comisiones (pestaña COMISIONES de cada mes) ----------
+let COMIS_CACHE=null;
+async function fetchComisiones(){
+  if(COMIS_CACHE) return COMIS_CACHE;
+  const sep=SCRIPT_URL.includes('?')?'&':'?';
+  const r=await fetch(SCRIPT_URL+sep+'modo=comisiones',{cache:'no-store'});
+  const j=await r.json();
+  COMIS_CACHE=j.comisiones||{};
+  return COMIS_CACHE;
+}
+function comisionTablaHtml(comis, filtroPv){
+  const meses=Object.keys(comis);
+  if(!meses.length) return "";
+  // pv -> {mes: valor}
+  const filas={}; const orden=[];
+  meses.forEach(m=>{
+    (comis[m]||[]).forEach(f=>{
+      const key=f.pv.trim().toUpperCase();
+      if(filtroPv && key!==filtroPv.trim().toUpperCase()) return;
+      if(!filas[key]){ filas[key]={pv:f.pv, vals:{}}; orden.push(key); }
+      filas[key].vals[m]=f.comision;
+    });
+  });
+  if(!orden.length) return "";
+  const th=meses.map(m=>`<th style="text-align:right">${m[0].toUpperCase()+m.slice(1)}</th>`).join("");
+  const trs=orden.map(k=>{
+    const f=filas[k];
+    const tds=meses.map(m=>`<td style="text-align:right">${f.vals[m]!=null?fmt(f.vals[m]):"—"}</td>`).join("");
+    return `<tr><td style="text-align:left">${f.pv}</td>${tds}</tr>`;
+  }).join("");
+  return `<div class="table-card"><div class="table-wrap"><table>
+    <thead><tr><th style="text-align:left;min-width:200px">💰 Comisión</th>${th}</tr></thead>
+    <tbody>${trs}</tbody></table></div></div>`;
+}
+async function renderComisionGerencia(){
+  const el=document.getElementById("gerComision");
+  if(!el) return;
+  try{
+    const comis=await fetchComisiones();
+    el.innerHTML = comercialMode
+      ? comisionTablaHtml(comis, null)
+      : comisionTablaHtml(comis, "Coordinador Comercial (Gustavo)");
+  }catch(e){ el.innerHTML=""; }
+}
+async function renderComisionTienda(){
+  const el=document.getElementById("storeComision");
+  if(!el) return;
+  try{
+    const comis=await fetchComisiones();
+    el.innerHTML = comisionTablaHtml(comis, curTienda);
+  }catch(e){ el.innerHTML=""; }
+}
+
 function kpiCard(lbl,val,sub,cls,tag){
   const tagHtml = tag ? `<span class="tag ${tag.cls}" style="margin-top:8px;font-size:14px;padding:6px 12px;max-width:100%"><span class="dot ${tag.dot}"></span>${tag.lbl}</span>` : "";
   return `<div class="kpi ${cls||""}">
@@ -946,6 +1003,7 @@ function renderStoreView(sel){
   const team = (sel<0) ? teamKpis() : "";
   document.getElementById("storeKpis").innerHTML = gaugesRow(struct,total) + '<div class="kpis">' + storeKpiCards(total) + team + '</div>';
   document.getElementById("tableSection").innerHTML=buildTableHtml(struct,total,true);
+  renderComisionTienda();
 }
 async function loadStoreVendors(){
   const cont=document.getElementById("storeVendFilter"); const ti=STORE_TO_TI[curTienda];
