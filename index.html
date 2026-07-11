@@ -538,9 +538,12 @@ async function loadCampo(){
   RECAR_TGT={info:"recarInfo",kpis:"recarKpis",table:"recarTable",combine:false};
 }
 function pickCampo(){ gerMode="campo"; gerSel.clear(); renderGerChips(); loadCampo(); }
+function pickGustavo(){ gerMode="gustavo"; gerSel.clear(); renderGerChips(); loadGerencia(); }
 function renderGerChips(){
   const isAll = gerMode==="all";
+  const isGustavo = gerMode==="gustavo";
   let html=`<div class="tchip all${isAll?" on":""}" onclick="setAll()">${isAll?"✓ ":""}Todas — Cuota Global</div>`;
+  html+=`<div class="tchip${isGustavo?" on":""}" onclick="pickGustavo()">${isGustavo?"✓ ":""}Gustavo</div>`;
   html+=GER_ALL.map(t=>{
     const on = gerMode==="custom" && gerSel.has(t);
     return `<div class="tchip${on?" on":""}" onclick="toggleStore('${t.replace(/'/g,"\\'")}')">${on?"✓ ":""}${TIENDA_LABEL[t]}</div>`;
@@ -573,7 +576,7 @@ async function fetchInBatches(items, size, fn){
 }
 
 async function loadGerencia(){
-  const sel = gerMode==="custom" ? [...gerSel] : GER_GLOBAL.slice();
+  const sel = gerMode==="custom" ? [...gerSel] : (gerMode==="gustavo" ? GER_GLOBAL.filter(t=>t!=="Call Center") : GER_GLOBAL.slice());
   const km=document.getElementById("gerKpis");
   const ts=document.getElementById("gerTableSection");
   const info=document.getElementById("gerInfoRow");
@@ -729,11 +732,15 @@ async function renderComisionGerencia(sel){
   if(!el) return;
   try{
     const comis=await fetchComisiones();
+    if(gerMode==="gustavo"){
+      el.innerHTML = comisionCardsHtml(comis, "Coordinador Comercial (Gustavo)");
+      return;
+    }
     const isGlobal = gerMode==="all";
     if(!isGlobal && sel && sel.length){
       el.innerHTML = comisionCardsHtml(comis, null, sel);
     } else if(comercialMode){
-      el.innerHTML = comisionCardsHtml(comis, null);
+      el.innerHTML = comisionCardsHtml(comis, "Gerente Comercial (Julio)");
     } else {
       el.innerHTML = comisionCardsHtml(comis, "Coordinador Comercial (Gustavo)");
     }
