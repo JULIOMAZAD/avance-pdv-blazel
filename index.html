@@ -423,11 +423,20 @@ async function fetchTienda(sheet, mes){
   const cacheKey="raw_"+sheet+"_"+mes;
   if(cache[cacheKey]) return parseRows(cache[cacheKey]);
   const url=`${SCRIPT_URL}?tienda=${encodeURIComponent(sheet)}&mes=${mes}`;
-  const res=await fetch(url);
-  const json=await res.json();
-  if(json.error) throw new Error("Error: "+json.error);
-  cache[cacheKey]=json.data;
-  return parseRows(json.data);
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(), 15000);
+  try{
+    const res=await fetch(url, {signal: controller.signal});
+    const json=await res.json();
+    if(json.error) throw new Error("Error: "+json.error);
+    cache[cacheKey]=json.data;
+    return parseRows(json.data);
+  } catch(e){
+    if(e.name==="AbortError") throw new Error("Tiempo de espera agotado");
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function parseRows(rows){
@@ -800,9 +809,12 @@ async function renderTrendTables(sel, okActual){
   el.innerHTML='<div class="loading" style="padding:10px 0"><div class="spinner"></div><br>Cargando histórico...</div>';
   try{
     const idxActual = ultimos.length-1;
-    const aggs = await Promise.all(ultimos.map((m,i)=>
-      i===idxActual ? Promise.resolve(aggregateResults(okActual)) : fetchMonthAgg(sel, m.key)
-    ));
+    const aggs = await Promise.race([
+      Promise.all(ultimos.map((m,i)=>
+        i===idxActual ? Promise.resolve(aggregateResults(okActual)) : fetchMonthAgg(sel, m.key)
+      )),
+      new Promise((_,rej)=>setTimeout(()=>rej(new Error("timeout")), 45000))
+    ]);
     // mes más reciente con datos define el orden/lista canónica de productos
     let canon = null;
     for(let i=aggs.length-1;i>=0;i--){ if(aggs[i]){ canon=aggs[i]; break; } }
@@ -868,7 +880,10 @@ async function renderTrendTables(sel, okActual){
     el.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;font-size:13px">
       ${buildTable("cuota")}${buildTable("venta")}
     </div>`;
-  }catch(e){ el.innerHTML=""; }
+  }catch(e){
+    el.innerHTML = `<div class="load-err" style="margin-top:14px">No se pudo cargar el histórico (demoró demasiado o falló la conexión).
+      <span style="text-decoration:underline;cursor:pointer" onclick="renderTrendTables(LAST_SEL, LAST_OK)">Reintentar</span></div>`;
+  }
 }
 
 // ---------- Comisiones (pestaña COMISIONES de cada mes) ----------
