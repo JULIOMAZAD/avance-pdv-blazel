@@ -64,6 +64,9 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
 .falta-r{color:#cc0000;font-weight:600}.falta-g{color:#22a843;font-weight:600}
 .loading{text-align:center;padding:3rem;color:#888;font-size:14px}
 .spinner{display:inline-block;width:32px;height:32px;border:3px solid #eee;border-top-color:#cc0000;border-radius:50%;animation:spin .8s linear infinite;margin-bottom:12px}
+.loading-sm{display:flex;align-items:center;gap:8px;padding:4px 0;color:#888;font-size:12px}
+.spinner-sm{display:inline-block;width:13px;height:13px;border:2px solid #eee;border-top-color:#cc0000;border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0}
+.done-ok{display:flex;align-items:center;gap:6px;padding:4px 0;color:#1a7a33;font-size:12px;font-weight:600}
 @keyframes spin{to{transform:rotate(360deg)}}
 .load-err{background:#fff5f5;border:1px solid #fcc;border-radius:10px;padding:1rem;color:#cc0000;font-size:13px;margin-bottom:1rem}
 .ger-pick{background:#fff;border-radius:14px;padding:1rem 1.25rem;margin-bottom:1rem}
@@ -261,7 +264,8 @@ const GER_GLOBAL=[
 
 let MESES=[
   {label:"Mayo 2026", key:"mayo"},
-  {label:"Junio 2026", key:"junio"}
+  {label:"Junio 2026", key:"junio"},
+  {label:"Julio 2026", key:"julio"}
 ];
 const MES_ORDER={enero:1,febrero:2,marzo:3,abril:4,mayo:5,junio:6,julio:7,agosto:8,septiembre:9,setiembre:9,octubre:10,noviembre:11,diciembre:12};
 function extractMesFromRows(rows){
@@ -271,18 +275,24 @@ function extractMesFromRows(rows){
 async function cargarMeses(){
   const sep=SCRIPT_URL.includes('?')?'&':'?';
   const store="mega plaza"; // tienda de referencia para probar cada mes
-  const cand=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
-  const found=[];
-  await Promise.all(cand.map(async m=>{
-    try{
-      const r=await fetch(`${SCRIPT_URL}${sep}tienda=${encodeURIComponent(store)}&mes=${m}`);
-      const j=await r.json();
-      if(j && !j.error && Array.isArray(j.data) && j.data.length>3){
-        const mesResp=extractMesFromRows(j.data);          // el mes REAL que devolvió la hoja
-        if(mesResp && mesResp===m.toUpperCase()) found.push(m); // solo si coincide con lo pedido
-      }
-    }catch(e){}
-  }));
+  const ordenMeses=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+  const yaConocidos = MESES.map(m=>m.key);
+  const ultimoIdx = Math.max(...yaConocidos.map(k=>ordenMeses.indexOf(k)));
+  // solo probar los 2 meses siguientes al último ya confirmado (no los 12 del año)
+  const cand = ordenMeses.slice(ultimoIdx+1, ultimoIdx+3);
+  const found=[...yaConocidos];
+  if(cand.length){
+    await Promise.all(cand.map(async m=>{
+      try{
+        const r=await fetch(`${SCRIPT_URL}${sep}tienda=${encodeURIComponent(store)}&mes=${m}`);
+        const j=await r.json();
+        if(j && !j.error && Array.isArray(j.data) && j.data.length>3){
+          const mesResp=extractMesFromRows(j.data);          // el mes REAL que devolvió la hoja
+          if(mesResp && mesResp===m.toUpperCase()) found.push(m); // solo si coincide con lo pedido
+        }
+      }catch(e){}
+    }));
+  }
   if(!found.length) return;
   found.sort((a,b)=>MES_ORDER[a]-MES_ORDER[b]);
   const yr=new Date().getFullYear();
@@ -583,13 +593,23 @@ async function fetchInBatches(items, size, fn, isCurrent){
     out.push(...r);
     const done=Math.min(i+size,items.length);
     if(done<items.length && (!isCurrent || isCurrent())){
-      document.getElementById("gerLoadMsg").innerHTML='<div class="loading"><div class="spinner"></div><br>Sumando '+done+' de '+items.length+' tiendas...</div>';
+      document.getElementById("gerLoadMsg").innerHTML='<div class="loading-sm"><span class="spinner-sm"></span>Sumando '+done+' de '+items.length+' tiendas...</div>';
     }
   }
   return out;
 }
 
 let GER_GEN = 0;
+function flashDone(elId, text){
+  const el = document.getElementById(elId);
+  if(!el) return;
+  const marker = "flash-"+Date.now();
+  el.innerHTML = `<div class="done-ok" data-m="${marker}">✓ ${text||"Actualizado"}</div>`;
+  setTimeout(()=>{
+    const cur = el.querySelector(`[data-m="${marker}"]`);
+    if(cur) el.innerHTML = "";
+  }, 2000);
+}
 async function loadGerencia(){
   const myGen = ++GER_GEN;
   const isCurrent = () => myGen === GER_GEN;
@@ -606,7 +626,7 @@ async function loadGerencia(){
     return;
   }
   info.innerHTML=""; km.innerHTML=""; ts.innerHTML="";
-  document.getElementById("gerLoadMsg").innerHTML='<div class="loading"><div class="spinner"></div><br>Sumando '+sel.length+' tienda(s)...</div>';
+  document.getElementById("gerLoadMsg").innerHTML='<div class="loading-sm"><span class="spinner-sm"></span>Sumando '+sel.length+' tienda(s)...</div>';
   try{
     const results=await Promise.race([
       fetchInBatches(sel, 3, t=>fetchTienda(SHEET_NAME[t]||"", gerMes)
@@ -617,7 +637,7 @@ async function loadGerencia(){
     let ok=results.filter(r=>r.d);
     let failed=results.filter(r=>!r.d);
     if(failed.length){
-      document.getElementById("gerLoadMsg").innerHTML='<div class="loading"><div class="spinner"></div><br>Reintentando '+failed.length+' tienda(s)...</div>';
+      document.getElementById("gerLoadMsg").innerHTML='<div class="loading-sm"><span class="spinner-sm"></span>Reintentando '+failed.length+' tienda(s)...</div>';
       const retry=await fetchInBatches(failed.map(r=>r.t), 1, t=>fetchTienda(SHEET_NAME[t]||"", gerMes)
         .then(d=>({t,d})).catch(e=>({t,d:null,err:(e&&e.message)||"error"})), isCurrent);
       if(!isCurrent()) return;
@@ -694,9 +714,12 @@ async function loadGerencia(){
       kpiCard("Estado", "", estadoFromPct(totPct), clsByPct(totPct), getTag(estadoFromPct(totPct))) +
       jefInd + comisFrag + '</div>';
 
-    document.getElementById("gerLoadMsg").innerHTML = failed.length
-      ? `<div class="load-err">⚠️ No cargaron ${failed.length} tienda(s): <strong>${failed.map(r=>TIENDA_LABEL[r.t]).join(", ")}</strong>. El total de abajo NO las incluye. <button class="btn-out" style="margin-left:8px" onclick="loadGerencia()">Reintentar</button></div>`
-      : "";
+    if(failed.length){
+      document.getElementById("gerLoadMsg").innerHTML =
+        `<div class="load-err">⚠️ No cargaron ${failed.length} tienda(s): <strong>${failed.map(r=>TIENDA_LABEL[r.t]).join(", ")}</strong>. El total de abajo NO las incluye. <button class="btn-out" style="margin-left:8px" onclick="loadGerencia()">Reintentar</button></div>`;
+    } else {
+      flashDone("gerLoadMsg", "Datos actualizados");
+    }
     document.getElementById("gerTableSection").innerHTML=buildTableHtml(struct,totalRow,true);
     LAST_OK = ok; LAST_SEL = sel;
     document.getElementById("gerTrend").innerHTML =
@@ -813,7 +836,7 @@ async function renderTrendTables(sel, okActual){
   if(!el) return;
   if(!MESES || MESES.length<2){ el.innerHTML=""; return; }
   const ultimos = MESES.slice(-3);
-  el.innerHTML='<div class="loading" style="padding:10px 0"><div class="spinner"></div><br>Cargando histórico...</div>';
+  el.innerHTML='<div class="loading-sm"><span class="spinner-sm"></span>Cargando histórico...</div>';
   try{
     const idxActual = ultimos.length-1;
     const aggs = await Promise.race([
