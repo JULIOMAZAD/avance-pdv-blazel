@@ -608,8 +608,11 @@ async function loadGerencia(){
   info.innerHTML=""; km.innerHTML=""; ts.innerHTML="";
   document.getElementById("gerLoadMsg").innerHTML='<div class="loading"><div class="spinner"></div><br>Sumando '+sel.length+' tienda(s)...</div>';
   try{
-    const results=await fetchInBatches(sel, 3, t=>fetchTienda(SHEET_NAME[t]||"", gerMes)
-      .then(d=>({t,d})).catch(e=>({t,d:null,err:(e&&e.message)||"error"})));
+    const results=await Promise.race([
+      fetchInBatches(sel, 3, t=>fetchTienda(SHEET_NAME[t]||"", gerMes)
+        .then(d=>({t,d})).catch(e=>({t,d:null,err:(e&&e.message)||"error"}))),
+      new Promise((_,rej)=>setTimeout(()=>rej(new Error("La carga tardó demasiado. Intenta de nuevo.")), 60000))
+    ]);
     let ok=results.filter(r=>r.d);
     let failed=results.filter(r=>!r.d);
     if(failed.length){
