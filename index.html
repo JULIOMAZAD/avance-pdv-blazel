@@ -578,21 +578,24 @@ function toggleStore(t){
   renderGerChips(); loadGerencia();
 }
 
-async function fetchInBatches(items, size, fn){
+async function fetchInBatches(items, size, fn, isCurrent){
   const out=[];
   for(let i=0;i<items.length;i+=size){
     const batch=items.slice(i,i+size);
     const r=await Promise.all(batch.map(fn));
     out.push(...r);
     const done=Math.min(i+size,items.length);
-    if(done<items.length){
+    if(done<items.length && (!isCurrent || isCurrent())){
       document.getElementById("gerLoadMsg").innerHTML='<div class="loading"><div class="spinner"></div><br>Sumando '+done+' de '+items.length+' tiendas...</div>';
     }
   }
   return out;
 }
 
+let GER_GEN = 0;
 async function loadGerencia(){
+  const myGen = ++GER_GEN;
+  const isCurrent = () => myGen === GER_GEN;
   const sel = gerMode==="custom" ? [...gerSel]
     : (gerMode==="gustavo" || (gerMode==="all" && !comercialMode)) ? GER_GLOBAL.filter(t=>t!=="Call Center")
     : GER_GLOBAL.slice();
@@ -610,19 +613,22 @@ async function loadGerencia(){
   try{
     const results=await Promise.race([
       fetchInBatches(sel, 3, t=>fetchTienda(SHEET_NAME[t]||"", gerMes)
-        .then(d=>({t,d})).catch(e=>({t,d:null,err:(e&&e.message)||"error"}))),
+        .then(d=>({t,d})).catch(e=>({t,d:null,err:(e&&e.message)||"error"})), isCurrent),
       new Promise((_,rej)=>setTimeout(()=>rej(new Error("La carga tardó demasiado. Intenta de nuevo.")), 60000))
     ]);
+    if(!isCurrent()) return;
     let ok=results.filter(r=>r.d);
     let failed=results.filter(r=>!r.d);
     if(failed.length){
       document.getElementById("gerLoadMsg").innerHTML='<div class="loading"><div class="spinner"></div><br>Reintentando '+failed.length+' tienda(s)...</div>';
       const retry=await fetchInBatches(failed.map(r=>r.t), 1, t=>fetchTienda(SHEET_NAME[t]||"", gerMes)
-        .then(d=>({t,d})).catch(e=>({t,d:null,err:(e&&e.message)||"error"})));
+        .then(d=>({t,d})).catch(e=>({t,d:null,err:(e&&e.message)||"error"})), isCurrent);
+      if(!isCurrent()) return;
       ok=ok.concat(retry.filter(r=>r.d));
       failed=retry.filter(r=>!r.d);
     }
     if(!ok.length) throw new Error("No se pudo cargar ninguna de las tiendas seleccionadas. Reintenta en unos segundos.");
+    if(!isCurrent()) return;
 
     let avDia=0, diasMes=0, mesLabel="";
     for(const r of ok){
@@ -699,6 +705,7 @@ async function loadGerencia(){
     document.getElementById("gerTrend").innerHTML =
       '<div class="chip" style="cursor:pointer;display:inline-block;padding:8px 16px;font-size:13px" onclick="renderTrendTables(LAST_SEL, LAST_OK)">📊 Ver Cuota y Venta mes a mes</div>';
   }catch(ex){
+    if(!isCurrent()) return;
     document.getElementById("gerLoadMsg").innerHTML="";
     document.getElementById("gerTableSection").innerHTML=`<div class="load-err">${ex.message||"Error al consolidar."}</div>`;
   }
