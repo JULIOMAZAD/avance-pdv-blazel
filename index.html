@@ -160,7 +160,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
     <div class="top-bar">
       <div class="top-left">
         <h2>COORD. TIENDAS — Consolidado</h2>
-        <div class="pdv">Toca "Todas" para el global, o marca una o varias tiendas para sumarlas · <strong>v38</strong></div>
+        <div class="pdv">Toca "Todas" para el global, o marca una o varias tiendas para sumarlas · <strong>v39</strong></div>
       </div>
       <div class="top-actions">
         <button class="btn-vend" onclick="abrirVendedor()">📊 Ver por vendedor</button>
@@ -592,7 +592,7 @@ function renderGerChips(){
 }
 function setAll(){ gerMode="all"; gerSel.clear(); renderGerChips(); loadGerencia(); }
 function toggleStore(t){
-  if(gerMode==="all"){ gerMode="custom"; gerSel=new Set([t]); }
+  if(gerMode!=="custom"){ gerMode="custom"; gerSel=new Set([t]); }
   else { gerSel.has(t)?gerSel.delete(t):gerSel.add(t); if(!gerSel.size) gerMode="all"; }
   renderGerChips(); loadGerencia();
 }
