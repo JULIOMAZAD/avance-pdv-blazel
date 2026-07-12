@@ -39,6 +39,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;ba
 .chip strong{color:#1a1a2e;font-weight:600}
 .table-card{background:#fff;border-radius:14px;overflow:hidden;margin-bottom:1rem}
 .table-wrap{overflow-x:auto}
+.trend-table th:first-child, .trend-table td:first-child{position:sticky;left:0;z-index:2}
+.trend-table thead th:first-child{background:#1a1a2e;color:#fff}
+.trend-table tbody tr.cat-row td:first-child{background:#2d3561}
+.trend-table tbody tr.total-row td:first-child{background:#1a1a2e}
+.trend-table tbody tr:not(.cat-row):not(.total-row) td:first-child{background:#fff}
 table{width:100%;border-collapse:collapse;font-size:13px;min-width:700px}
 thead tr{background:#1a1a2e}
 thead th{padding:10px 12px;color:#fff;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px;text-align:center;white-space:nowrap}
@@ -172,6 +177,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
     <div id="gerComision"></div>
     <div id="gerLoadMsg"></div>
     <div id="gerTableSection"></div>
+    <div id="gerTrend"></div>
   </div>
 </div>
 
@@ -677,6 +683,7 @@ async function loadGerencia(){
       ? `<div class="load-err">⚠️ No cargaron ${failed.length} tienda(s): <strong>${failed.map(r=>TIENDA_LABEL[r.t]).join(", ")}</strong>. El total de abajo NO las incluye. <button class="btn-out" style="margin-left:8px" onclick="loadGerencia()">Reintentar</button></div>`
       : "";
     document.getElementById("gerTableSection").innerHTML=buildTableHtml(struct,totalRow,true);
+    renderTrendTables(sel, ok);
   }catch(ex){
     document.getElementById("gerLoadMsg").innerHTML="";
     document.getElementById("gerTableSection").innerHTML=`<div class="load-err">${ex.message||"Error al consolidar."}</div>`;
@@ -684,6 +691,182 @@ async function loadGerencia(){
 }
 
 function clsByPct(p){return p>=1?"green":(p>=0.8?"amber":"red");}
+
+// ---------- Cuota y Venta mes a mes, detalle por producto ----------
+const CATS = ["prepago","postpago","residencial","otros"];
+const CAT_LABEL = {prepago:"Prepago", postpago:"Postpago", residencial:"Residencial", otros:"Otros"};
+
+function aggregateResults(ok){
+  let avDia=0, diasMes=0;
+  for(const r of ok){
+    const a=parseInt(r.d.avance), dm=parseInt(r.d.dias);
+    if(!isNaN(a)&&a>0){avDia=a;}
+    if(!isNaN(dm)&&dm>0) diasMes=dm;
+    if(avDia&&diasMes) break;
+  }
+  const factor = (avDia>0) ? (diasMes/avDia) : 0;
+  const acc={prepago:{}, postpago:{}, residencial:{}, otros:{}};
+  const order={prepago:[], postpago:[], residencial:[], otros:[]};
+  for(const r of ok){
+    for(const cat of CATS){
+      for(const p of (r.d.struct[cat]||[])){
+        const key=p.name.toLowerCase().trim();
+        if(!acc[cat][key]){acc[cat][key]={name:p.name,meta:0,av:0};order[cat].push(key);}
+        const m=parseFloat(p.meta), a=parseFloat(p.av);
+        if(!isNaN(m)) acc[cat][key].meta+=m;
+        if(!isNaN(a)) acc[cat][key].av+=a;
+      }
+    }
+  }
+  let totMeta=0, totAv=0;
+  for(const r of ok){
+    const m=parseFloat(r.d.totalRow&&r.d.totalRow.meta), a=parseFloat(r.d.totalRow&&r.d.totalRow.av);
+    if(!isNaN(m)) totMeta+=m;
+    if(!isNaN(a)) totAv+=a;
+  }
+  const totProy = factor>0 ? totAv*factor : totAv;
+  return {acc, order, factor, totMeta, totAv, totProy};
+}
+async function fetchMonthAgg(sel, mesKey){
+  const results = await fetchInBatches(sel, 3, t=>fetchTienda(SHEET_NAME[t]||"", mesKey).then(d=>({t,d})).catch(e=>({t,d:null})));
+  const ok = results.filter(r=>r.d);
+  if(!ok.length) return null;
+  return aggregateResults(ok);
+}
+function fmtNum0(v){ return (v==null) ? "—" : fmt(v); }
+function diffCell(actual, anterior){
+  if(actual==null || anterior==null) return {diff:null, pct:null};
+  const diff = actual - anterior;
+  const pct = anterior>0 ? (diff/anterior*100) : 0;
+  return {diff, pct};
+}
+function mesShort(label){
+  return String(label||"").slice(0,3).toUpperCase();
+}
+function toggleTrendDetail(id, th){
+  const tb=document.getElementById(id);
+  if(!tb) return;
+  const opening = tb.style.display==="none";
+  tb.style.display = opening ? "table-row-group" : "none";
+  const span = th.querySelector("span");
+  if(span) span.textContent = opening ? "▾ ocultar detalle" : "▸ ver detalle";
+}
+function colored(txt, neg){
+  return neg ? `<span style="color:#c0392b;font-weight:600">${txt}</span>` : `<span>${txt}</span>`;
+}
+function diveHtml(text, value, baseline, dark){
+  if(value==null) return "—";
+  const delta = value-baseline;
+  const neg = delta<0;
+  const w = Math.max(3, Math.min(40, Math.abs(delta)*0.8)).toFixed(0);
+  const color = neg ? (dark?"#ff6b6b":"#c0392b") : (dark?"#7fb3ff":"#2f5fa8");
+  const bar = `<span style="display:inline-block;height:9px;width:${w}px;background:${color};border-radius:2px;vertical-align:middle"></span>`;
+  const txt = `<span style="color:${color};font-weight:600">${text}</span>`;
+  return neg
+    ? `<span style="display:inline-flex;align-items:center;gap:5px;justify-content:flex-end">${bar}${txt}</span>`
+    : `<span style="display:inline-flex;align-items:center;gap:5px;justify-content:flex-end">${txt}${bar}</span>`;
+}
+function ratioBarHtml(pct, dark){
+  if(pct==null) return "—";
+  const neg = pct<100;
+  const delta = pct-100;
+  const w = Math.max(3, Math.min(40, Math.abs(delta)*0.8)).toFixed(0);
+  const color = neg ? (dark?"#ff6b6b":"#c0392b") : (dark?"#7fb3ff":"#2f5fa8");
+  const bar = `<span style="display:inline-block;height:9px;width:${w}px;background:${color};border-radius:2px;vertical-align:middle"></span>`;
+  const txt = `<span style="color:${color};font-weight:600">${pct.toFixed(0)}%</span>`;
+  return neg
+    ? `<span style="display:inline-flex;align-items:center;gap:5px;justify-content:flex-end">${bar}${txt}</span>`
+    : `<span style="display:inline-flex;align-items:center;gap:5px;justify-content:flex-end">${txt}${bar}</span>`;
+}
+function pctBarHtml(pct, dark){
+  if(pct==null) return "—";
+  const neg = pct<0;
+  const w = Math.max(3, Math.min(40, Math.abs(pct)*0.8)).toFixed(0);
+  const color = neg ? (dark?"#ff6b6b":"#c0392b") : (dark?"#7fb3ff":"#2f5fa8");
+  const bar = `<span style="display:inline-block;height:9px;width:${w}px;background:${color};border-radius:2px;vertical-align:middle"></span>`;
+  const txt = `<span style="color:${color};font-weight:600">${(pct>=0?"+":"")}${pct.toFixed(0)}%</span>`;
+  return neg
+    ? `<span style="display:inline-flex;align-items:center;gap:5px;justify-content:flex-end">${bar}${txt}</span>`
+    : `<span style="display:inline-flex;align-items:center;gap:5px;justify-content:flex-end">${txt}${bar}</span>`;
+}
+async function renderTrendTables(sel, okActual){
+  const el=document.getElementById("gerTrend");
+  if(!el) return;
+  if(!MESES || MESES.length<2){ el.innerHTML=""; return; }
+  const ultimos = MESES.slice(-3);
+  el.innerHTML='<div class="loading" style="padding:10px 0"><div class="spinner"></div><br>Cargando histórico...</div>';
+  try{
+    const idxActual = ultimos.length-1;
+    const aggs = await Promise.all(ultimos.map((m,i)=>
+      i===idxActual ? Promise.resolve(aggregateResults(okActual)) : fetchMonthAgg(sel, m.key)
+    ));
+    // mes más reciente con datos define el orden/lista canónica de productos
+    let canon = null;
+    for(let i=aggs.length-1;i>=0;i--){ if(aggs[i]){ canon=aggs[i]; break; } }
+    if(!canon){ el.innerHTML=""; return; }
+
+    function buildTable(kind){ // 'cuota' | 'venta'
+      const n = ultimos.length;
+      const headCols = ultimos.map(m=>`<th style="text-align:right">${mesShort(m.label)}</th>`).join("");
+      const extraHead = kind==="cuota" ? `<th style="text-align:right">Diferencia</th><th style="text-align:right">%</th>`
+                                        : `<th style="text-align:right">Proyección</th><th style="text-align:right">%</th>`;
+      let body="";
+      const totMonth = ultimos.map((m,i)=> aggs[i] ? (kind==="cuota"? aggs[i].totMeta : aggs[i].totAv) : null);
+      const totProyActual = aggs[idxActual] ? aggs[idxActual].totProy : null;
+
+      for(const cat of CATS){
+        if(!canon.order[cat] || !canon.order[cat].length) continue;
+        body += `<tr class="cat-row"><td colspan="${n+3}">${CAT_LABEL[cat]}</td></tr>`;
+        for(const key of canon.order[cat]){
+          const name = canon.acc[cat][key].name;
+          const vals = ultimos.map((m,i)=>{
+            if(!aggs[i] || !aggs[i].acc[cat][key]) return null;
+            return kind==="cuota" ? aggs[i].acc[cat][key].meta : aggs[i].acc[cat][key].av;
+          });
+          const cols = vals.map(v=>`<td style="text-align:right">${fmtNum0(v)}</td>`).join("");
+          let extra;
+          if(kind==="cuota"){
+            const {diff,pct} = diffCell(vals[n-1], vals[n-2]);
+            extra = `<td style="text-align:right">${diff==null?"—":diveHtml((diff>=0?"+":"")+fmt(diff), pct, 0)}</td>
+                     <td style="text-align:right">${pctBarHtml(pct)}</td>`;
+          } else {
+            const proyProd = aggs[idxActual] && aggs[idxActual].acc[cat][key]!=null && aggs[idxActual].factor>0
+              ? aggs[idxActual].acc[cat][key].av*aggs[idxActual].factor
+              : (aggs[idxActual] && aggs[idxActual].acc[cat][key] ? aggs[idxActual].acc[cat][key].av : null);
+            const ventaPrev = vals[n-2];
+            const pct = (proyProd!=null && ventaPrev>0) ? (proyProd/ventaPrev*100) : null;
+            extra = `<td style="text-align:right">${proyProd==null?"—":fmt(proyProd)}</td>
+                     <td style="text-align:right">${ratioBarHtml(pct)}</td>`;
+          }
+          body += `<tr><td style="text-align:left">${name}</td>${cols}${extra}</tr>`;
+        }
+      }
+      // fila total
+      const totCols = totMonth.map(v=>`<td style="text-align:right">${fmtNum0(v)}</td>`).join("");
+      let totExtra;
+      if(kind==="cuota"){
+        const {diff,pct} = diffCell(totMonth[n-1], totMonth[n-2]);
+        totExtra = `<td style="text-align:right">${diff==null?"—":diveHtml((diff>=0?"+":"")+fmt(diff), pct, 0, true)}</td>
+                    <td style="text-align:right">${pctBarHtml(pct, true)}</td>`;
+      } else {
+        const pctTot = (totProyActual!=null && totMonth[n-2]>0) ? (totProyActual/totMonth[n-2]*100) : null;
+        totExtra = `<td style="text-align:right">${totProyActual==null?"—":fmt(totProyActual)}</td>
+                    <td style="text-align:right">${ratioBarHtml(pctTot, true)}</td>`;
+      }
+      const title = kind==="cuota" ? "Cuota" : "Venta";
+      const tbodyId = "trendDetail_"+kind;
+      return `<div class="table-card"><div class="table-wrap"><table class="trend-table">
+        <thead><tr><th style="text-align:left;min-width:170px;cursor:pointer" onclick="toggleTrendDetail('${tbodyId}', this)">${title} <span style="font-size:11px;font-weight:400;opacity:.85">▸ ver detalle</span></th>${headCols}${extraHead}</tr></thead>
+        <tbody id="${tbodyId}" style="display:none">${body}</tbody>
+        <tbody><tr class="total-row"><td style="text-align:left">TOTAL</td>${totCols}${totExtra}</tr></tbody>
+      </table></div></div>`;
+    }
+
+    el.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;font-size:13px">
+      ${buildTable("cuota")}${buildTable("venta")}
+    </div>`;
+  }catch(e){ el.innerHTML=""; }
+}
 
 // ---------- Comisiones (pestaña COMISIONES de cada mes) ----------
 let COMIS_CACHE=null;
