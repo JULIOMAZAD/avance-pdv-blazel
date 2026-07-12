@@ -589,7 +589,9 @@ async function fetchInBatches(items, size, fn, isCurrent){
   const out=[];
   for(let i=0;i<items.length;i+=size){
     const batch=items.slice(i,i+size);
+    const t0=Date.now();
     const r=await Promise.all(batch.map(fn));
+    console.log("[DIAG] lote "+(i/size+1)+" resuelto en "+(Date.now()-t0)+"ms, items="+JSON.stringify(batch));
     out.push(...r);
     const done=Math.min(i+size,items.length);
     if(done<items.length && (!isCurrent || isCurrent())){
@@ -612,6 +614,7 @@ function flashDone(elId, text){
 }
 async function loadGerencia(){
   const myGen = ++GER_GEN;
+  console.log("[DIAG] loadGerencia START gen="+myGen+" mes="+gerMes+" sel="+JSON.stringify(gerMode==="custom"?[...gerSel]:"("+gerMode+")"));
   const isCurrent = () => myGen === GER_GEN;
   const sel = gerMode==="custom" ? [...gerSel]
     : (gerMode==="gustavo" || (gerMode==="all" && !comercialMode)) ? GER_GLOBAL.filter(t=>t!=="Call Center")
@@ -633,19 +636,23 @@ async function loadGerencia(){
         .then(d=>({t,d})).catch(e=>({t,d:null,err:(e&&e.message)||"error"})), isCurrent),
       new Promise((_,rej)=>setTimeout(()=>rej(new Error("La carga tardó demasiado. Intenta de nuevo.")), 60000))
     ]);
-    if(!isCurrent()) return;
+    console.log("[DIAG] gen="+myGen+" fetchInBatches resuelto, results.length="+results.length);
+    if(!isCurrent()){ console.log("[DIAG] gen="+myGen+" DESCARTADO (ya no es el actual, actual="+GER_GEN+")"); return; }
     let ok=results.filter(r=>r.d);
     let failed=results.filter(r=>!r.d);
+    console.log("[DIAG] gen="+myGen+" ok="+ok.length+" failed="+failed.length);
     if(failed.length){
       document.getElementById("gerLoadMsg").innerHTML='<div class="loading-sm"><span class="spinner-sm"></span>Reintentando '+failed.length+' tienda(s)...</div>';
       const retry=await fetchInBatches(failed.map(r=>r.t), 1, t=>fetchTienda(SHEET_NAME[t]||"", gerMes)
         .then(d=>({t,d})).catch(e=>({t,d:null,err:(e&&e.message)||"error"})), isCurrent);
-      if(!isCurrent()) return;
+      console.log("[DIAG] gen="+myGen+" retry resuelto, retry.length="+retry.length);
+      if(!isCurrent()){ console.log("[DIAG] gen="+myGen+" DESCARTADO tras retry (actual="+GER_GEN+")"); return; }
       ok=ok.concat(retry.filter(r=>r.d));
       failed=retry.filter(r=>!r.d);
     }
     if(!ok.length) throw new Error("No se pudo cargar ninguna de las tiendas seleccionadas. Reintenta en unos segundos.");
-    if(!isCurrent()) return;
+    if(!isCurrent()){ console.log("[DIAG] gen="+myGen+" DESCARTADO antes de renderizar (actual="+GER_GEN+")"); return; }
+    console.log("[DIAG] gen="+myGen+" construyendo interfaz final...");
 
     let avDia=0, diasMes=0, mesLabel="";
     for(const r of ok){
@@ -724,8 +731,10 @@ async function loadGerencia(){
     LAST_OK = ok; LAST_SEL = sel;
     document.getElementById("gerTrend").innerHTML =
       '<div class="chip" style="cursor:pointer;display:inline-block;padding:8px 16px;font-size:13px" onclick="renderTrendTables(LAST_SEL, LAST_OK)">📊 Ver Cuota y Venta mes a mes</div>';
+    console.log("[DIAG] gen="+myGen+" TERMINADO OK");
   }catch(ex){
-    if(!isCurrent()) return;
+    console.log("[DIAG] gen="+myGen+" ERROR CAPTURADO: "+(ex&&ex.message));
+    if(!isCurrent()){ console.log("[DIAG] gen="+myGen+" (error descartado, ya no es actual)"); return; }
     document.getElementById("gerLoadMsg").innerHTML="";
     document.getElementById("gerTableSection").innerHTML=`<div class="load-err">${ex.message||"Error al consolidar."}</div>`;
   }
