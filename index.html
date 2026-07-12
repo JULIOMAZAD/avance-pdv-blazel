@@ -419,24 +419,21 @@ async function loadData(mes){
   }
 }
 
+function withTimeout(promise, ms, msg){
+  return Promise.race([
+    promise,
+    new Promise((_,rej)=>setTimeout(()=>rej(new Error(msg||"Tiempo de espera agotado")), ms))
+  ]);
+}
 async function fetchTienda(sheet, mes){
   const cacheKey="raw_"+sheet+"_"+mes;
   if(cache[cacheKey]) return parseRows(cache[cacheKey]);
   const url=`${SCRIPT_URL}?tienda=${encodeURIComponent(sheet)}&mes=${mes}`;
-  const controller=new AbortController();
-  const timer=setTimeout(()=>controller.abort(), 15000);
-  try{
-    const res=await fetch(url, {signal: controller.signal});
-    const json=await res.json();
-    if(json.error) throw new Error("Error: "+json.error);
-    cache[cacheKey]=json.data;
-    return parseRows(json.data);
-  } catch(e){
-    if(e.name==="AbortError") throw new Error("Tiempo de espera agotado");
-    throw e;
-  } finally {
-    clearTimeout(timer);
-  }
+  const res=await withTimeout(fetch(url), 15000);
+  const json=await withTimeout(res.json(), 15000);
+  if(json.error) throw new Error("Error: "+json.error);
+  cache[cacheKey]=json.data;
+  return parseRows(json.data);
 }
 
 function parseRows(rows){
