@@ -683,7 +683,9 @@ async function loadGerencia(){
       ? `<div class="load-err">⚠️ No cargaron ${failed.length} tienda(s): <strong>${failed.map(r=>TIENDA_LABEL[r.t]).join(", ")}</strong>. El total de abajo NO las incluye. <button class="btn-out" style="margin-left:8px" onclick="loadGerencia()">Reintentar</button></div>`
       : "";
     document.getElementById("gerTableSection").innerHTML=buildTableHtml(struct,totalRow,true);
-    renderTrendTables(sel, ok);
+    LAST_OK = ok; LAST_SEL = sel;
+    document.getElementById("gerTrend").innerHTML =
+      '<div class="chip" style="cursor:pointer;display:inline-block;padding:8px 16px;font-size:13px" onclick="renderTrendTables(LAST_SEL, LAST_OK)">📊 Ver Cuota y Venta mes a mes</div>';
   }catch(ex){
     document.getElementById("gerLoadMsg").innerHTML="";
     document.getElementById("gerTableSection").innerHTML=`<div class="load-err">${ex.message||"Error al consolidar."}</div>`;
@@ -691,6 +693,7 @@ async function loadGerencia(){
 }
 
 function clsByPct(p){return p>=1?"green":(p>=0.8?"amber":"red");}
+let LAST_OK = null, LAST_SEL = null;
 
 // ---------- Cuota y Venta mes a mes, detalle por producto ----------
 const CATS = ["prepago","postpago","residencial","otros"];
