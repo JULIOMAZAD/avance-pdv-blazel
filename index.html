@@ -160,7 +160,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
     <div class="top-bar">
       <div class="top-left">
         <h2>COORD. TIENDAS — Consolidado</h2>
-        <div class="pdv">Toca "Todas" para el global, o marca una o varias tiendas para sumarlas · <strong>v36</strong></div>
+        <div class="pdv">Toca "Todas" para el global, o marca una o varias tiendas para sumarlas · <strong>v37</strong></div>
       </div>
       <div class="top-actions">
         <button class="btn-vend" onclick="abrirVendedor()">📊 Ver por vendedor</button>
@@ -439,11 +439,23 @@ async function fetchTienda(sheet, mes){
   const cacheKey="raw_"+sheet+"_"+mes;
   if(cache[cacheKey]) return parseRows(cache[cacheKey]);
   const url=`${SCRIPT_URL}?tienda=${encodeURIComponent(sheet)}&mes=${mes}`;
-  const res=await withTimeout(fetch(url), 15000);
-  const json=await withTimeout(res.json(), 15000);
-  if(json.error) throw new Error("Error: "+json.error);
-  cache[cacheKey]=json.data;
-  return parseRows(json.data);
+  // AbortController real: si se pasa el tiempo, corta la conexión de verdad
+  // (antes solo se "ignoraba" la promesa pero el fetch seguía vivo de fondo,
+  // acumulando conexiones y pisando el mensaje "Sumando X de 9..." más tarde)
+  const ctrl = new AbortController();
+  const killer = setTimeout(()=>ctrl.abort(), 20000); // 20s total para fetch+parseo de UNA tienda
+  try{
+    const res = await fetch(url, {signal: ctrl.signal});
+    const json = await res.json();
+    if(json.error) throw new Error("Error: "+json.error);
+    cache[cacheKey]=json.data;
+    return parseRows(json.data);
+  }catch(ex){
+    if(ex.name==="AbortError") throw new Error("Tiempo de espera agotado");
+    throw ex;
+  }finally{
+    clearTimeout(killer);
+  }
 }
 
 function parseRows(rows){
@@ -588,6 +600,10 @@ function toggleStore(t){
 async function fetchInBatches(items, size, fn, isCurrent){
   const out=[];
   for(let i=0;i<items.length;i+=size){
+    if(isCurrent && !isCurrent()){
+      console.log("[DIAG] fetchInBatches: consulta obsoleta, deteniendo lotes restantes");
+      break;
+    }
     const batch=items.slice(i,i+size);
     const t0=Date.now();
     const r=await Promise.all(batch.map(fn));
@@ -642,7 +658,7 @@ async function loadGerencia(){
     const results=await withLock(()=>Promise.race([
       fetchInBatches(sel, 3, t=>fetchTienda(SHEET_NAME[t]||"", gerMes)
         .then(d=>({t,d})).catch(e=>({t,d:null,err:(e&&e.message)||"error"})), isCurrent),
-      new Promise((_,rej)=>setTimeout(()=>rej(new Error("La carga tardó demasiado. Intenta de nuevo.")), 60000))
+      new Promise((_,rej)=>setTimeout(()=>rej(new Error("La carga tardó demasiado. Intenta de nuevo.")), 90000))
     ]));
     console.log("[DIAG] gen="+myGen+" fetchInBatches resuelto, results.length="+results.length);
     if(!isCurrent()){ console.log("[DIAG] gen="+myGen+" DESCARTADO (ya no es el actual, actual="+GER_GEN+")"); return; }
