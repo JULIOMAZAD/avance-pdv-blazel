@@ -602,6 +602,14 @@ async function fetchInBatches(items, size, fn, isCurrent){
 }
 
 let GER_GEN = 0;
+let FETCH_LOCK = Promise.resolve();
+async function withLock(fn){
+  const prev = FETCH_LOCK;
+  let release;
+  FETCH_LOCK = new Promise(res=>{ release=res; });
+  await prev;
+  try{ return await fn(); } finally{ release(); }
+}
 function flashDone(elId, text){
   const el = document.getElementById(elId);
   if(!el) return;
@@ -631,11 +639,11 @@ async function loadGerencia(){
   info.innerHTML=""; km.innerHTML=""; ts.innerHTML="";
   document.getElementById("gerLoadMsg").innerHTML='<div class="loading-sm"><span class="spinner-sm"></span>Sumando '+sel.length+' tienda(s)...</div>';
   try{
-    const results=await Promise.race([
+    const results=await withLock(()=>Promise.race([
       fetchInBatches(sel, 3, t=>fetchTienda(SHEET_NAME[t]||"", gerMes)
         .then(d=>({t,d})).catch(e=>({t,d:null,err:(e&&e.message)||"error"})), isCurrent),
       new Promise((_,rej)=>setTimeout(()=>rej(new Error("La carga tardó demasiado. Intenta de nuevo.")), 60000))
-    ]);
+    ]));
     console.log("[DIAG] gen="+myGen+" fetchInBatches resuelto, results.length="+results.length);
     if(!isCurrent()){ console.log("[DIAG] gen="+myGen+" DESCARTADO (ya no es el actual, actual="+GER_GEN+")"); return; }
     let ok=results.filter(r=>r.d);
@@ -643,8 +651,8 @@ async function loadGerencia(){
     console.log("[DIAG] gen="+myGen+" ok="+ok.length+" failed="+failed.length);
     if(failed.length){
       document.getElementById("gerLoadMsg").innerHTML='<div class="loading-sm"><span class="spinner-sm"></span>Reintentando '+failed.length+' tienda(s)...</div>';
-      const retry=await fetchInBatches(failed.map(r=>r.t), 1, t=>fetchTienda(SHEET_NAME[t]||"", gerMes)
-        .then(d=>({t,d})).catch(e=>({t,d:null,err:(e&&e.message)||"error"})), isCurrent);
+      const retry=await withLock(()=>fetchInBatches(failed.map(r=>r.t), 1, t=>fetchTienda(SHEET_NAME[t]||"", gerMes)
+        .then(d=>({t,d})).catch(e=>({t,d:null,err:(e&&e.message)||"error"})), isCurrent));
       console.log("[DIAG] gen="+myGen+" retry resuelto, retry.length="+retry.length);
       if(!isCurrent()){ console.log("[DIAG] gen="+myGen+" DESCARTADO tras retry (actual="+GER_GEN+")"); return; }
       ok=ok.concat(retry.filter(r=>r.d));
@@ -848,12 +856,12 @@ async function renderTrendTables(sel, okActual){
   el.innerHTML='<div class="loading-sm"><span class="spinner-sm"></span>Cargando histórico...</div>';
   try{
     const idxActual = ultimos.length-1;
-    const aggs = await Promise.race([
+    const aggs = await withLock(()=>Promise.race([
       Promise.all(ultimos.map((m,i)=>
         i===idxActual ? Promise.resolve(aggregateResults(okActual)) : fetchMonthAgg(sel, m.key)
       )),
       new Promise((_,rej)=>setTimeout(()=>rej(new Error("timeout")), 45000))
-    ]);
+    ]));
     // mes más reciente con datos define el orden/lista canónica de productos
     let canon = null;
     for(let i=aggs.length-1;i>=0;i--){ if(aggs[i]){ canon=aggs[i]; break; } }
