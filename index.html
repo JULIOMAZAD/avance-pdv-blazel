@@ -160,7 +160,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
     <div class="top-bar">
       <div class="top-left">
         <h2>COORD. TIENDAS — Consolidado</h2>
-        <div class="pdv">Toca "Todas" para el global, o marca una o varias tiendas para sumarlas · <strong>v37</strong></div>
+        <div class="pdv">Toca "Todas" para el global, o marca una o varias tiendas para sumarlas · <strong>v38</strong></div>
       </div>
       <div class="top-actions">
         <button class="btn-vend" onclick="abrirVendedor()">📊 Ver por vendedor</button>
@@ -597,8 +597,9 @@ function toggleStore(t){
   renderGerChips(); loadGerencia();
 }
 
-async function fetchInBatches(items, size, fn, isCurrent){
+async function fetchInBatches(items, size, fn, isCurrent, msgElId){
   const out=[];
+  const useMsg = msgElId===undefined ? "gerLoadMsg" : msgElId; // undefined = comportamiento previo; null = no tocar ningún mensaje
   for(let i=0;i<items.length;i+=size){
     if(isCurrent && !isCurrent()){
       console.log("[DIAG] fetchInBatches: consulta obsoleta, deteniendo lotes restantes");
@@ -610,8 +611,9 @@ async function fetchInBatches(items, size, fn, isCurrent){
     console.log("[DIAG] lote "+(i/size+1)+" resuelto en "+(Date.now()-t0)+"ms, items="+JSON.stringify(batch));
     out.push(...r);
     const done=Math.min(i+size,items.length);
-    if(done<items.length && (!isCurrent || isCurrent())){
-      document.getElementById("gerLoadMsg").innerHTML='<div class="loading-sm"><span class="spinner-sm"></span>Sumando '+done+' de '+items.length+' tiendas...</div>';
+    if(done<items.length && useMsg && (!isCurrent || isCurrent())){
+      const elMsg=document.getElementById(useMsg);
+      if(elMsg) elMsg.innerHTML='<div class="loading-sm"><span class="spinner-sm"></span>Sumando '+done+' de '+items.length+' tiendas...</div>';
     }
   }
   return out;
@@ -803,7 +805,7 @@ function aggregateResults(ok){
   return {acc, order, factor, totMeta, totAv, totProy};
 }
 async function fetchMonthAgg(sel, mesKey){
-  const results = await fetchInBatches(sel, 3, t=>fetchTienda(SHEET_NAME[t]||"", mesKey).then(d=>({t,d})).catch(e=>({t,d:null})));
+  const results = await fetchInBatches(sel, 3, t=>fetchTienda(SHEET_NAME[t]||"", mesKey).then(d=>({t,d})).catch(e=>({t,d:null})), null, null);
   const ok = results.filter(r=>r.d);
   if(!ok.length) return null;
   return aggregateResults(ok);
@@ -864,6 +866,14 @@ function pctBarHtml(pct, dark){
     ? `<span style="display:inline-flex;align-items:center;gap:5px;justify-content:flex-end">${bar}${txt}</span>`
     : `<span style="display:inline-flex;align-items:center;gap:5px;justify-content:flex-end">${txt}${bar}</span>`;
 }
+let TREND_LOCK = Promise.resolve();
+async function withTrendLock(fn){
+  const prev = TREND_LOCK;
+  let release;
+  TREND_LOCK = new Promise(res=>{ release=res; });
+  await prev;
+  try{ return await fn(); } finally{ release(); }
+}
 async function renderTrendTables(sel, okActual){
   const el=document.getElementById("gerTrend");
   if(!el) return;
@@ -872,7 +882,7 @@ async function renderTrendTables(sel, okActual){
   el.innerHTML='<div class="loading-sm"><span class="spinner-sm"></span>Cargando histórico...</div>';
   try{
     const idxActual = ultimos.length-1;
-    const aggs = await withLock(()=>Promise.race([
+    const aggs = await withTrendLock(()=>Promise.race([
       Promise.all(ultimos.map((m,i)=>
         i===idxActual ? Promise.resolve(aggregateResults(okActual)) : fetchMonthAgg(sel, m.key)
       )),
