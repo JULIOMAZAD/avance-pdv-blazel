@@ -25,6 +25,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;ba
 .info-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem}
 .chip{background:#fff;border:1px solid #e8e8e8;border-radius:8px;padding:6px 14px;font-size:12px;color:#666}
 .chip strong{color:#1a1a2e;font-weight:600}
+.trend-tab-btn{cursor:pointer;font-weight:600;font-size:13px;padding:8px 18px}
+.trend-tab-btn.on{border-color:#cc0000;background:#cc0000;color:#fff}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:1rem}
 .kpi{background:#fff;border-radius:14px;padding:1rem 1.25rem;border-left:4px solid #cc0000}
 .kpi .lbl{font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px}
@@ -66,7 +68,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
 <div class="wrap">
   <div class="head">
     <h2>Avance por Vendedor</h2>
-    <div class="sub">Elige la tienda y toca un vendedor para ver su cuota · <strong>v21</strong> · <span id="liveStatus" style="color:#22a843;font-weight:700">cargando…</span></div>
+    <div class="sub">Elige la tienda y toca un vendedor para ver su cuota · <strong>v22</strong> · <span id="liveStatus" style="color:#22a843;font-weight:700">cargando…</span></div>
   </div>
   <div class="mes-tabs" id="mesTabs"></div>
   <div class="pick">
@@ -149,7 +151,7 @@ const CF_AVANCE="Avance Cargo Fijo", CF_PROM="Promedio Cargo Fijo";
 
 function cleanName(n){ return String(n).replace(/Portabiilidad/gi,"Portabilidad").replace(/Portabilidaad/gi,"Portabilidad"); }
 function fmtUp(v){ if(v===""||v===undefined||v===null||v===" ")return "-"; const n=parseFloat(String(v)); if(isNaN(n))return String(v); return Math.ceil(n).toLocaleString("es-PE"); }
-function fmt(v){const n=parseFloat(v);if(isNaN(n))return "-";return n%1===0?n.toLocaleString("es-PE"):n.toLocaleString("es-PE",{maximumFractionDigits:2});}
+function fmt(v){const n=parseFloat(v);if(isNaN(n))return "-";return Math.round(n).toLocaleString("es-PE");}
 function fmtPct(v){const n=parseFloat(v);if(isNaN(n))return "-";return (n*100).toFixed(1)+"%";}
 function estadoFromPct(p){if(p>=1)return"Excelente";if(p>=0.8)return"Vamos regular";return"Ponle punche";}
 function getTag(e){e=String(e).toLowerCase();if(e.includes("excelente"))return{cls:"t-exc",dot:"dg",lbl:"Excelente ✅"};if(e.includes("regular"))return{cls:"t-reg",dot:"dy",lbl:"Vamos regular 🟡"};return{cls:"t-pun",dot:"dr",lbl:"Ponle punche 🔴"};}
@@ -374,7 +376,23 @@ function renderVendTrend(){
       <tbody><tr class="total-row"><td style="text-align:left">TOTAL (Cargo Fijo S/)</td>${totColsHtml}${totExtra}</tr></tbody>
     </table></div></div>`;
   }
-  el.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;font-size:13px">${buildTable("cuota")}${buildTable("venta")}</div>`;
+  el.innerHTML = `<div style="margin-top:14px;font-size:13px">
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <button id="vendTrendTabBtn_cuota" class="chip trend-tab-btn on" onclick="showVendTrendTab('cuota')">Cuota</button>
+      <button id="vendTrendTabBtn_venta" class="chip trend-tab-btn" onclick="showVendTrendTab('venta')">Venta</button>
+    </div>
+    <div id="vendTrendTable_cuota" style="display:block">${buildTable("cuota")}</div>
+    <div id="vendTrendTable_venta" style="display:none">${buildTable("venta")}</div>
+  </div>`;
+}
+function showVendTrendTab(kind){
+  const isCuota = kind==="cuota";
+  const tc=document.getElementById("vendTrendTable_cuota"), tv=document.getElementById("vendTrendTable_venta");
+  const bc=document.getElementById("vendTrendTabBtn_cuota"), bv=document.getElementById("vendTrendTabBtn_venta");
+  if(tc) tc.style.display = isCuota ? "block" : "none";
+  if(tv) tv.style.display = isCuota ? "none" : "block";
+  if(bc) bc.classList.toggle("on", isCuota);
+  if(bv) bv.classList.toggle("on", !isCuota);
 }
 
 renderMes(); fillTiendas(); loadLive();
