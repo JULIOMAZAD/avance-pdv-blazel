@@ -341,7 +341,7 @@ function resumenMes(ym){
   const pct = (cuota && proy!=null) ? proy/cuota : null;
   const pctReal = cuota ? sig/cuota : null;
   const promDia = dt>0 ? sig/dt : null;
-  const falta = cuota!=null ? cuota - sig : null;
+  const falta = (cuota!=null && proy!=null) ? cuota - proy : null;
   const restantes = Math.max(0, dCal - dt);
   const reqDia = (falta!=null && falta>0 && restantes>0) ? falta/restantes : null;
   return {ym,y,m,dCal,dt,act,sig,cuota,proy,pct,pctReal,promDia,falta,reqDia,restantes,bloque:b,oficial:!!(b&&b.act!=null)};
