@@ -37,6 +37,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;ba
 .info-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem}
 .chip{background:#fff;border:1px solid #e8e8e8;border-radius:8px;padding:6px 14px;font-size:12px;color:#666}
 .chip strong{color:#1a1a2e;font-weight:600}
+.trend-tab-btn{cursor:pointer;font-weight:600;font-size:13px;padding:8px 18px}
+.trend-tab-btn.on{border-color:#cc0000;background:#cc0000;color:#fff}
 .table-card{background:#fff;border-radius:14px;overflow:hidden;margin-bottom:1rem}
 .table-wrap{overflow-x:auto}
 .trend-table th:first-child, .trend-table td:first-child{position:sticky;left:0;z-index:2}
@@ -152,6 +154,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
     <div id="storeKpis"></div>
     <div id="storeComision"></div>
     <div id="tableSection"></div>
+    <div id="storeTrend"></div>
   </div>
 </div>
 
@@ -160,7 +163,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
     <div class="top-bar">
       <div class="top-left">
         <h2>COORD. TIENDAS — Consolidado</h2>
-        <div class="pdv">Toca "Todas" para el global, o marca una o varias tiendas para sumarlas · <strong>v40</strong></div>
+        <div class="pdv">Toca "Todas" para el global, o marca una o varias tiendas para sumarlas · <strong>v42</strong></div>
       </div>
       <div class="top-actions">
         <button class="btn-vend" onclick="abrirVendedor()">📊 Ver por vendedor</button>
@@ -950,13 +953,27 @@ async function renderTrendTables(sel, okActual){
       </table></div></div>`;
     }
 
-    el.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;font-size:13px">
-      ${buildTable("cuota")}${buildTable("venta")}
+    el.innerHTML = `<div style="margin-top:14px;font-size:13px">
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <button id="trendTabBtn_cuota" class="chip trend-tab-btn on" onclick="showTrendTab('cuota')">Cuota</button>
+        <button id="trendTabBtn_venta" class="chip trend-tab-btn" onclick="showTrendTab('venta')">Venta</button>
+      </div>
+      <div id="trendTable_cuota" style="display:block">${buildTable("cuota")}</div>
+      <div id="trendTable_venta" style="display:none">${buildTable("venta")}</div>
     </div>`;
   }catch(e){
     el.innerHTML = `<div class="load-err" style="margin-top:14px">No se pudo cargar el histórico (demoró demasiado o falló la conexión).
       <span style="text-decoration:underline;cursor:pointer" onclick="renderTrendTables(LAST_SEL, LAST_OK)">Reintentar</span></div>`;
   }
+}
+function showTrendTab(kind){
+  const isCuota = kind==="cuota";
+  const tc=document.getElementById("trendTable_cuota"), tv=document.getElementById("trendTable_venta");
+  const bc=document.getElementById("trendTabBtn_cuota"), bv=document.getElementById("trendTabBtn_venta");
+  if(tc) tc.style.display = isCuota ? "block" : "none";
+  if(tv) tv.style.display = isCuota ? "none" : "block";
+  if(bc) bc.classList.toggle("on", isCuota);
+  if(bv) bv.classList.toggle("on", !isCuota);
 }
 
 // ---------- Comisiones (pestaña COMISIONES de cada mes) ----------
@@ -1286,6 +1303,14 @@ function renderStoreView(sel){
   document.getElementById("storeKpis").innerHTML = gaugesRow(struct,total) + '<div class="kpis">' + storeKpiCards(total) + team + '</div>';
   document.getElementById("tableSection").innerHTML=buildTableHtml(struct,total,true);
   renderComisionTienda();
+  const st=document.getElementById("storeTrend");
+  if(st){
+    if(sel<0){
+      st.innerHTML = '<div class="chip" style="cursor:pointer;display:inline-block;padding:8px 16px;font-size:13px" onclick="renderStoreTrendTables()">📊 Ver Cuota y Venta mes a mes</div>';
+    } else {
+      st.innerHTML = "";
+    }
+  }
 }
 async function loadStoreVendors(){
   const cont=document.getElementById("storeVendFilter"); const ti=STORE_TO_TI[curTienda];
@@ -1317,6 +1342,114 @@ function gauge(label,pct,meta,av){
     <text x="45" y="42" text-anchor="middle" font-size="17" font-weight="800" fill="#1a1a2e">${(pct*100).toFixed(0)}%</text>
     <text x="45" y="58" text-anchor="middle" font-size="8" fill="#999">proy</text>
   </svg><div class="glbl">${label}</div>${nums}</div>`;
+}
+let STORE_TREND_LOCK = Promise.resolve();
+async function withStoreTrendLock(fn){
+  const prev = STORE_TREND_LOCK;
+  let release;
+  STORE_TREND_LOCK = new Promise(res=>{ release=res; });
+  await prev;
+  try{ return await fn(); } finally{ release(); }
+}
+async function renderStoreTrendTables(){
+  const el=document.getElementById("storeTrend");
+  if(!el) return;
+  if(!MESES || MESES.length<2){ return; }
+  const ultimos = MESES.slice(-3);
+  const btnHtml = '<div class="chip" style="cursor:pointer;display:inline-block;padding:8px 16px;font-size:13px;margin-bottom:10px" onclick="renderStoreTrendTables()">📊 Ver Cuota y Venta mes a mes</div>';
+  el.innerHTML = btnHtml + '<div class="loading-sm"><span class="spinner-sm"></span>Cargando histórico...</div>';
+  try{
+    const idxActual = ultimos.length-1;
+    const aggs = await withStoreTrendLock(()=>Promise.race([
+      Promise.all(ultimos.map(async m=>{
+        try{
+          const d = await fetchTienda(SHEET_NAME[curTienda]||"", m.key);
+          return aggregateResults([{t:curTienda,d}]);
+        }catch(e){ return null; }
+      })),
+      new Promise((_,rej)=>setTimeout(()=>rej(new Error("timeout")), 90000))
+    ]));
+    let canon = null;
+    for(let i=aggs.length-1;i>=0;i--){ if(aggs[i]){ canon=aggs[i]; break; } }
+    if(!canon){ el.innerHTML = btnHtml; return; }
+
+    function buildTable(kind){
+      const n = ultimos.length;
+      const headCols = ultimos.map(m=>`<th style="text-align:right">${mesShort(m.label)}</th>`).join("");
+      const extraHead = kind==="cuota" ? `<th style="text-align:right">Diferencia</th><th style="text-align:right">%</th>`
+                                        : `<th style="text-align:right">Proyección</th><th style="text-align:right">%</th>`;
+      let body="";
+      const totMonth = ultimos.map((m,i)=> aggs[i] ? (kind==="cuota"? aggs[i].totMeta : aggs[i].totAv) : null);
+      const totProyActual = aggs[idxActual] ? aggs[idxActual].totProy : null;
+
+      for(const cat of CATS){
+        if(!canon.order[cat] || !canon.order[cat].length) continue;
+        body += `<tr class="cat-row"><td colspan="${n+3}">${CAT_LABEL[cat]}</td></tr>`;
+        for(const key of canon.order[cat]){
+          const name = canon.acc[cat][key].name;
+          const vals = ultimos.map((m,i)=>{
+            if(!aggs[i] || !aggs[i].acc[cat][key]) return null;
+            return kind==="cuota" ? aggs[i].acc[cat][key].meta : aggs[i].acc[cat][key].av;
+          });
+          const cols = vals.map(v=>`<td style="text-align:right">${fmtNum0(v)}</td>`).join("");
+          let extra;
+          if(kind==="cuota"){
+            const {diff,pct} = diffCell(vals[n-1], vals[n-2]);
+            extra = `<td style="text-align:right">${diff==null?"—":diveHtml((diff>=0?"+":"")+fmt(diff), pct, 0)}</td>
+                     <td style="text-align:right">${pctBarHtml(pct)}</td>`;
+          } else {
+            const proyProd = aggs[idxActual] && aggs[idxActual].acc[cat][key]!=null && aggs[idxActual].factor>0
+              ? aggs[idxActual].acc[cat][key].av*aggs[idxActual].factor
+              : (aggs[idxActual] && aggs[idxActual].acc[cat][key] ? aggs[idxActual].acc[cat][key].av : null);
+            const ventaPrev = vals[n-2];
+            const pct = (proyProd!=null && ventaPrev>0) ? (proyProd/ventaPrev*100) : null;
+            extra = `<td style="text-align:right">${proyProd==null?"—":fmt(proyProd)}</td>
+                     <td style="text-align:right">${ratioBarHtml(pct)}</td>`;
+          }
+          body += `<tr><td style="text-align:left">${name}</td>${cols}${extra}</tr>`;
+        }
+      }
+      const totCols = totMonth.map(v=>`<td style="text-align:right">${fmtNum0(v)}</td>`).join("");
+      let totExtra;
+      if(kind==="cuota"){
+        const {diff,pct} = diffCell(totMonth[n-1], totMonth[n-2]);
+        totExtra = `<td style="text-align:right">${diff==null?"—":diveHtml((diff>=0?"+":"")+fmt(diff), pct, 0, true)}</td>
+                    <td style="text-align:right">${pctBarHtml(pct, true)}</td>`;
+      } else {
+        const pctTot = (totProyActual!=null && totMonth[n-2]>0) ? (totProyActual/totMonth[n-2]*100) : null;
+        totExtra = `<td style="text-align:right">${totProyActual==null?"—":fmt(totProyActual)}</td>
+                    <td style="text-align:right">${ratioBarHtml(pctTot, true)}</td>`;
+      }
+      const title = kind==="cuota" ? "Cuota" : "Venta";
+      const tbodyId = "storeTrendDetail_"+kind;
+      return `<div class="table-card"><div class="table-wrap"><table class="trend-table">
+        <thead><tr><th style="text-align:left;min-width:170px;cursor:pointer" onclick="toggleTrendDetail('${tbodyId}', this)">${title} <span style="font-size:11px;font-weight:400;opacity:.85">▸ ver detalle</span></th>${headCols}${extraHead}</tr></thead>
+        <tbody id="${tbodyId}" style="display:none">${body}</tbody>
+        <tbody><tr class="total-row"><td style="text-align:left">TOTAL</td>${totCols}${totExtra}</tr></tbody>
+      </table></div></div>`;
+    }
+
+    el.innerHTML = btnHtml + `<div style="font-size:13px">
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <button id="storeTrendTabBtn_cuota" class="chip trend-tab-btn on" onclick="showStoreTrendTab('cuota')">Cuota</button>
+        <button id="storeTrendTabBtn_venta" class="chip trend-tab-btn" onclick="showStoreTrendTab('venta')">Venta</button>
+      </div>
+      <div id="storeTrendTable_cuota" style="display:block">${buildTable("cuota")}</div>
+      <div id="storeTrendTable_venta" style="display:none">${buildTable("venta")}</div>
+    </div>`;
+  }catch(e){
+    el.innerHTML = btnHtml + `<div class="load-err">No se pudo cargar el histórico (demoró demasiado o falló la conexión).
+      <span style="text-decoration:underline;cursor:pointer" onclick="renderStoreTrendTables()">Reintentar</span></div>`;
+  }
+}
+function showStoreTrendTab(kind){
+  const isCuota = kind==="cuota";
+  const tc=document.getElementById("storeTrendTable_cuota"), tv=document.getElementById("storeTrendTable_venta");
+  const bc=document.getElementById("storeTrendTabBtn_cuota"), bv=document.getElementById("storeTrendTabBtn_venta");
+  if(tc) tc.style.display = isCuota ? "block" : "none";
+  if(tv) tv.style.display = isCuota ? "none" : "block";
+  if(bc) bc.classList.toggle("on", isCuota);
+  if(bv) bv.classList.toggle("on", !isCuota);
 }
 function findProd(struct,names){
   const want=names.map(n=>n.toLowerCase().trim());
