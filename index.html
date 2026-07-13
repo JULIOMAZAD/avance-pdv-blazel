@@ -160,7 +160,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
     <div class="top-bar">
       <div class="top-left">
         <h2>COORD. TIENDAS — Consolidado</h2>
-        <div class="pdv">Toca "Todas" para el global, o marca una o varias tiendas para sumarlas · <strong>v39</strong></div>
+        <div class="pdv">Toca "Todas" para el global, o marca una o varias tiendas para sumarlas · <strong>v40</strong></div>
       </div>
       <div class="top-actions">
         <button class="btn-vend" onclick="abrirVendedor()">📊 Ver por vendedor</button>
@@ -519,7 +519,7 @@ function fmt(v){
   if(v===""||v===undefined||v===null||v===" ") return "-";
   const n=parseFloat(String(v));
   if(isNaN(n)) return String(v);
-  return n%1===0?n.toLocaleString("es-PE"):n.toLocaleString("es-PE",{maximumFractionDigits:2});
+  return Math.round(n).toLocaleString("es-PE");
 }
 function fmtUp(v){
   if(v===""||v===undefined||v===null||v===" ") return "-";
