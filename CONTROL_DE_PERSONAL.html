@@ -729,7 +729,7 @@
     // Para agregar una tienda o distrito nuevo: búscalo dentro del grupo que corresponda
     // (MOVIL, MULTIMARCA, etc.), agrega la línea con el nombre entre comillas y coma,
     // guarda el archivo y vuelve a subirlo a GitHub.
-    const AREAS = ['Móvil', 'Multimarca', 'Administrativo', 'Otro'];
+    const AREAS = ['Móvil', 'Multimarca', 'Mesa de Control', 'Administrativo', 'Otro'];
 
     const TIENDAS_POR_AREA = {
       'Móvil': [
@@ -740,6 +740,7 @@
         'Distrito Comas', 'Distrito San Martín de Porres', 'Distrito Rímac',
         'Distrito Bellavista', 'Todos los distritos (Multimarca)'
       ],
+      'Mesa de Control': ['Mesa de Control'],
       'Administrativo': ['Administrativo'],
       'Otro': ['Otro']
     };
@@ -788,6 +789,22 @@
       if (e3) e3.innerHTML = opts;
     }
     populateTiendaSelects();
+
+    function initUppercaseInputs() {
+      document.querySelectorAll('input, textarea').forEach(function(el) {
+        const type = (el.getAttribute('type') || 'text').toLowerCase();
+        if (['date', 'email', 'file', 'hidden', 'button', 'submit'].indexOf(type) !== -1) return;
+        if (el.readOnly) return;
+        el.addEventListener('input', function() {
+          const pos = el.selectionStart, posEnd = el.selectionEnd;
+          el.value = el.value.toUpperCase();
+          if (pos !== null && el.setSelectionRange) {
+            try { el.setSelectionRange(pos, posEnd); } catch (e) { /* ignore */ }
+          }
+        });
+      });
+    }
+    initUppercaseInputs();
     const META_KEY = 'control_personal_postulantes_meta_v2';
     const BACKUP_KEY = 'control_personal_postulantes_backups_v2';
     const SESSION_KEY = 'control_personal_session_v1';
