@@ -130,6 +130,12 @@ tr.cur td{background:#FDF1F1}
 .mCell .mSub{font-size:10.5px;color:var(--ink2)}
 .mCell .mTrack{width:100%;height:5px;background:var(--grisC);border-radius:3px;overflow:hidden}
 .mCell .mFill{height:100%;border-radius:3px}
+.grid4{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+@media (max-width:820px){ .grid4{grid-template-columns:1fr} }
+.segRow{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.segBtn{padding:9px 18px;border-radius:20px;border:1px solid var(--line);background:#fff;font-weight:700;font-size:12.5px;cursor:pointer;color:var(--ink2);transition:.15s}
+.segBtn:hover{border-color:#1B1B1F;color:#1B1B1F}
+.segBtn.on{background:#1B1B1F;color:#fff;border-color:#1B1B1F}
 .chartbox .ch{position:relative;height:300px}
 .two{grid-template-columns:1fr 1fr}
 @media(max-width:820px){.two{grid-template-columns:1fr}}
@@ -960,6 +966,7 @@ function rHistorico(){
     return;
   }
   const METS = [
+    {k:'todas',      n:'Todas juntas'},
     {k:'venta_pre',  n:'Venta Prepago'},
     {k:'cap_pre',    n:'Capilaridad Pre'},
     {k:'venta_post', n:'Venta Postpago'},
@@ -967,14 +974,53 @@ function rHistorico(){
   ];
   if(!METS.some(m=>m.k===histMetSel)) histMetSel = 'venta_pre';
   const distritos = [...new Set(H.flatMap(b=>b.distritos.map(d=>d.d)))];
-  const selHTML = `<div class="secHead" style="margin-top:0">
-    <select id="selHistMet">${METS.map(m=>`<option value="${m.k}" ${m.k===histMetSel?'selected':''}>${m.n}</option>`).join('')}</select>
-  </div>`;
-  const totales = H.map(b=>b.total ? (b.total[histMetSel]||0) : b.distritos.reduce((s,d)=>s+(d[histMetSel]||0),0));
+  const selHTML = `<div class="segRow" id="selHistMet">${METS.map(m=>`<button class="segBtn ${m.k===histMetSel?'on':''}" data-k="${m.k}">${m.n}</button>`).join('')}</div>`;
+  const wireSel = () => document.querySelectorAll('#selHistMet .segBtn').forEach(b=>b.onclick=()=>{ histMetSel=b.dataset.k; rHistorico(); });
   const palette = ['#D81F26','#1B1B1F','#8E939B','#B5151B','#4A4F5A','#E6A817','#7A8290','#C9CCD2','#1F8A55','#3B4252'];
+  const mesColors = ['#3B4252','#B5302E','#1F8A55','#8E44AD','#2D6CDF','#C77D17','#0E7C7B','#A6303E'];
+  const mesTints  = ['#EEF1F6','#FBEAE9','#E7F6ED','#F3EAF8','#E9F0FD','#FCF3E3','#E4F5F4','#F7EBEC'];
+
+  if(histMetSel === 'todas'){
+    const METS4 = METS.slice(1);
+    const filasTodas = distritos.map(d=>{
+      const cols = H.map((b,mi)=>{
+        const dd = b.distritos.find(x=>x.d===d);
+        return METS4.map(m=>`<td class="num" style="background:${mesTints[mi%mesTints.length]}">${dd?fN(dd[m.k]||0):'—'}</td>`).join('');
+      }).join('');
+      return `<tr><td>${d}</td>${cols}</tr>`;
+    }).join('');
+    const totCols = H.map((b,mi)=>{
+      const t = b.total || {};
+      return METS4.map(m=>`<td class="num" style="background:${mesTints[mi%mesTints.length]}">${fN(t[m.k]||0)}</td>`).join('');
+    }).join('');
+    el.innerHTML = `
+    <h2>Histórico <span class="tag">multimarca mes a mes · fuente: MULTIMARCA MES VS MES</span></h2>
+    ${selHTML}
+    <div class="grid4">${METS4.map(m=>`<div class="chartbox"><div style="font-weight:700;font-size:13px;margin-bottom:8px">${m.n}</div><div class="ch" style="height:220px"><canvas id="chHist_${m.k}"></canvas></div></div>`).join('')}</div>
+    <h2 style="margin-top:22px">Por distrito</h2>
+    <div class="twrap"><table class="distTable">
+      <thead>
+        <tr><th rowspan="2">Distrito</th>${H.map((b,mi)=>`<th colspan="4" style="background:${mesColors[mi%mesColors.length]};color:#fff">${b.mes}</th>`).join('')}</tr>
+        <tr>${H.map((b,mi)=>METS4.map((m,i)=>`<th class="${i===0?'b-start':''}" style="background:${mesTints[mi%mesTints.length]};color:#3A3D42">${m.n.replace('Venta ','V.').replace('Capilaridad ','Cap.')}</th>`).join('')).join('')}</tr>
+      </thead>
+      <tbody>${filasTodas}
+        <tr class="tot"><td>TOTAL</td>${totCols}</tr>
+      </tbody>
+    </table></div>`;
+    wireSel();
+    METS4.forEach(m=>{
+      mkChart('chHist_'+m.k,{type:'bar',data:{labels:H.map(b=>b.mes),datasets:distritos.map((d,i)=>({
+        label:d, backgroundColor:palette[i%palette.length],
+        data:H.map(b=>{ const dd=b.distritos.find(x=>x.d===d); return dd?(dd[m.k]||0):0; })
+      }))},options:{maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{stacked:false},y:{stacked:false}}}});
+    });
+    return;
+  }
+
+  const totales = H.map(b=>b.total ? (b.total[histMetSel]||0) : b.distritos.reduce((s,d)=>s+(d[histMetSel]||0),0));
   const filas = distritos.map((d,i)=>{
     const vals = H.map(b=>{ const dd=b.distritos.find(x=>x.d===d); return dd?(dd[histMetSel]||0):null; });
-    return `<tr><td>${d}</td>${vals.map(v=>`<td class="num">${v==null?'—':fN(v)}</td>`).join('')}</tr>`;
+    return `<tr><td>${d}</td>${vals.map((v,mi)=>`<td class="num" style="background:${mesTints[mi%mesTints.length]}">${v==null?'—':fN(v)}</td>`).join('')}</tr>`;
   }).join('');
   el.innerHTML = `
   <h2>Histórico <span class="tag">multimarca mes a mes · fuente: MULTIMARCA MES VS MES</span></h2>
@@ -982,12 +1028,12 @@ function rHistorico(){
   <div class="chartbox"><div class="ch"><canvas id="chHistMM"></canvas></div></div>
   <h2 style="margin-top:22px">Por distrito</h2>
   <div class="twrap"><table>
-    <thead><tr><th>Distrito</th>${H.map(b=>`<th>${b.mes}</th>`).join('')}</tr></thead>
+    <thead><tr><th>Distrito</th>${H.map((b,mi)=>`<th style="background:${mesColors[mi%mesColors.length]};color:#fff">${b.mes}</th>`).join('')}</tr></thead>
     <tbody>${filas}
-      <tr class="tot"><td>TOTAL</td>${totales.map(v=>`<td class="num">${fN(v)}</td>`).join('')}</tr>
+      <tr class="tot"><td>TOTAL</td>${totales.map((v,mi)=>`<td class="num" style="background:${mesTints[mi%mesTints.length]}">${fN(v)}</td>`).join('')}</tr>
     </tbody>
   </table></div>`;
-  document.getElementById('selHistMet').onchange = e=>{ histMetSel = e.target.value; rHistorico(); };
+  wireSel();
   mkChart('chHistMM',{type:'bar',data:{labels:H.map(b=>b.mes),datasets:distritos.map((d,i)=>({
     label:d, backgroundColor:palette[i%palette.length],
     data:H.map(b=>{ const dd=b.distritos.find(x=>x.d===d); return dd?(dd[histMetSel]||0):0; })
