@@ -979,7 +979,7 @@ function rHistorico(){
   el.innerHTML = `
   <h2>Histórico <span class="tag">multimarca mes a mes · fuente: MULTIMARCA MES VS MES</span></h2>
   ${selHTML}
-  <div class="chartbox"><div class="ch"><canvas id="chHist"></canvas></div></div>
+  <div class="chartbox"><div class="ch"><canvas id="chHistMM"></canvas></div></div>
   <h2 style="margin-top:22px">Por distrito</h2>
   <div class="twrap"><table>
     <thead><tr><th>Distrito</th>${H.map(b=>`<th>${b.mes}</th>`).join('')}</tr></thead>
@@ -988,7 +988,7 @@ function rHistorico(){
     </tbody>
   </table></div>`;
   document.getElementById('selHistMet').onchange = e=>{ histMetSel = e.target.value; rHistorico(); };
-  mkChart('chHist',{type:'bar',data:{labels:H.map(b=>b.mes),datasets:distritos.map((d,i)=>({
+  mkChart('chHistMM',{type:'bar',data:{labels:H.map(b=>b.mes),datasets:distritos.map((d,i)=>({
     label:d, backgroundColor:palette[i%palette.length],
     data:H.map(b=>{ const dd=b.distritos.find(x=>x.d===d); return dd?(dd[histMetSel]||0):0; })
   }))},options:{maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},scales:{x:{stacked:false},y:{stacked:false}}}});
