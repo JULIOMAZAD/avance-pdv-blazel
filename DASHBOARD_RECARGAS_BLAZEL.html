@@ -368,6 +368,7 @@ function tabs(){
     document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
     bt.classList.add('on');
     document.getElementById('tab-'+bt.dataset.t).classList.add('on');
+    if(bt.dataset.t==='historico'){ try{ rHistorico(); }catch(e){} }
     requestAnimationFrame(()=>Object.values(charts).forEach(c=>{try{c.resize();c.draw();}catch(e){}}));
   });
 }
