@@ -117,6 +117,19 @@ tr.cur td{background:#FDF1F1}
 .cmpTable td.b-tint-post{background:#FBEAE9}
 .cmpTable td.b-tint-tot{background:#E7F6ED}
 .chartbox{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px;box-shadow:var(--sombra)}
+
+.distTable th{text-align:center}
+.distTable th:first-child, .distTable td:first-child{text-align:left}
+.distTable th:nth-child(2), .distTable td:nth-child(2){text-align:left}
+.distTable .grpHead{border-radius:0;padding:8px 10px;font-size:10.5px;letter-spacing:.8px;text-transform:uppercase}
+.distTable .g-pre{background:#3B4252;color:#fff}
+.distTable .g-post{background:#B5302E;color:#fff}
+.distTable td.b-start{border-left:2px solid var(--line)}
+.mCell{display:inline-flex;flex-direction:column;align-items:center;gap:4px;min-width:86px}
+.mCell .mNum{font-weight:700;font-variant-numeric:tabular-nums}
+.mCell .mSub{font-size:10.5px;color:var(--ink2)}
+.mCell .mTrack{width:100%;height:5px;background:var(--grisC);border-radius:3px;overflow:hidden}
+.mCell .mFill{height:100%;border-radius:3px}
 .chartbox .ch{position:relative;height:300px}
 .two{grid-template-columns:1fr 1fr}
 @media(max-width:820px){.two{grid-template-columns:1fr}}
@@ -198,6 +211,7 @@ tr.cur td{background:#FDF1F1}
   <button data-t="evolutivo">Evolutivo</button>
   <button data-t="asesores">Asesores</button>
   <button data-t="multimarca">Multimarca</button>
+  <button data-t="historico">Histórico</button>
   <button data-t="comparativo">Comparativo</button>
 </nav>
 
@@ -211,6 +225,7 @@ tr.cur td{background:#FDF1F1}
   <section class="tab" id="tab-evolutivo"></section>
   <section class="tab" id="tab-asesores"></section>
   <section class="tab" id="tab-multimarca"></section>
+  <section class="tab" id="tab-historico"></section>
   <section class="tab" id="tab-comparativo"></section>
 </main>
 
@@ -869,21 +884,22 @@ function rMultimarca(ym){
     </div></div>`;
   }).join('');
   // Tabla por distrito: prepago y postpago (chips + capilaridad), con avance si existe
-  const filaDist = d => {
-    const cell = (cuota,ava) => {
-      if(ava!=null && cuota){ const p=ava/cuota; return `<td class="num">${fN(ava)} <span style="color:var(--ink2);font-size:11px">/ ${fN(cuota)}</span> <span class="pill ${semClass(p)}" style="margin-left:4px">${fP(p)}</span></td>`; }
-      return `<td class="num">${fN(cuota)}${ava!=null?' / '+fN(ava):' <span style="color:var(--ink2);font-size:10px">meta</span>'}</td>`;
-    };
-    return `<tr><td>${d.d}</td><td>${d.resp||''}</td>
-      ${cell(d.chips_pre,d.ava_pre)}${cell(d.cap_pre,d.ava_cap_pre)}
-      ${cell(d.chips_post,d.ava_chip_post)}${cell(d.cap_post,d.ava_cap_post)}</tr>`;
+  const cell = (cuota,ava,cls) => {
+    const p = (ava && cuota) ? ava/cuota : null;
+    const pct = p!=null ? Math.min(p,1)*100 : 0;
+    const color = p==null ? 'var(--grisC)' : p>=1 ? 'var(--verde)' : p>=0.85 ? 'var(--ambar)' : 'var(--rojo)';
+    const numHTML = ava
+      ? `<span class="mNum num">${fN(ava)}</span><span class="mSub">de ${fN(cuota)} · ${fP(p)}</span>`
+      : `<span class="mNum num" style="color:var(--ink2)">${fN(cuota)}</span><span class="mSub">meta</span>`;
+    return `<td class="${cls||''}"><div class="mCell">${numHTML}<div class="mTrack"><div class="mFill" style="width:${pct}%;background:${color}"></div></div></div></td>`;
   };
+  const filaDist = d => `<tr><td>${d.d}</td><td>${d.resp||''}</td>
+      ${cell(d.chips_pre,d.ava_pre,'b-start')}${cell(d.cap_pre,d.ava_cap_pre)}
+      ${cell(d.chips_post,d.ava_chip_post,'b-start')}${cell(d.cap_post,d.ava_cap_post)}</tr>`;
   const t = mm.total;
   const totFila = t ? `<tr class="tot"><td>TOTAL</td><td></td>
-    <td class="num">${fN(t.chips_pre)}${t.ava_pre!=null?' / '+fN(t.ava_pre):''}</td>
-    <td class="num">${fN(t.cap_pre)}${t.ava_cap_pre!=null?' / '+fN(t.ava_cap_pre):''}</td>
-    <td class="num">${fN(t.chips_post)}${t.ava_chip_post!=null?' / '+fN(t.ava_chip_post):''}</td>
-    <td class="num">${fN(t.cap_post)}${t.ava_cap_post!=null?' / '+fN(t.ava_cap_post):''}</td></tr>` : '';
+    ${cell(t.chips_pre,t.ava_pre,'b-start')}${cell(t.cap_pre,t.ava_cap_pre)}
+    ${cell(t.chips_post,t.ava_chip_post,'b-start')}${cell(t.cap_post,t.ava_cap_post)}</tr>` : '';
   const diaAvHtml = (USUARIO_REC==='jmaza')
     ? `<input id="inpDiaAvMM" type="number" min="1" max="31" placeholder="día" value="${window._diaAvanceMM||''}"
          style="width:64px;padding:6px 8px;border:1px solid #3A3A42;border-radius:6px;background:#1b1c22;color:#e8e8ea">
@@ -899,8 +915,13 @@ function rMultimarca(ym){
   <div class="grid kpis">${kpis}</div>
   <div class="chartbox"><div class="ch"><canvas id="chMM"></canvas></div></div>
   <h2 style="margin-top:22px">Por distrito <span class="tag">chips y capilaridad · prepago y postpago</span></h2>
-  <div class="twrap"><table>
-    <thead><tr><th>Distrito</th><th>Responsable</th><th>Chips prepago</th><th>Capilaridad pre</th><th>Chips postpago</th><th>Capilaridad post</th></tr></thead>
+  <div class="twrap"><table class="distTable">
+    <thead>
+      <tr><th rowspan="2">Distrito</th><th rowspan="2">Responsable</th>
+        <th colspan="2" class="grpHead g-pre">Prepago</th>
+        <th colspan="2" class="grpHead g-post">Postpago</th></tr>
+      <tr><th class="b-start">Chips</th><th>Capilaridad</th><th class="b-start">Chips</th><th>Capilaridad</th></tr>
+    </thead>
     <tbody>${mm.distritos.map(filaDist).join('')}${totFila}</tbody>
   </table></div>
   <p class="note">${hayAvance?'Cada celda muestra avance / meta y su %.':'Las columnas muestran la <b>meta</b>. Cuando llenes las columnas AVA (avance) en la hoja MULTIMARCA, aparecerá el avance y el % automáticamente.'}</p>`;
@@ -925,6 +946,51 @@ function rMultimarca(ym){
     {label:'Avance',data:mm.indicadores.map(x=>avanceDe(x.n)),backgroundColor:'#D81F26',borderRadius:5,labelColor:'#1B1B1F'}
   ]},options:{maintainAspectRatio:false,animation:false,layout:{padding:{top:18}},
     plugins:{legend:{position:'bottom'},barLabels:{on:true,fmt:'n'}},scales:{y:{grace:'10%'}}}});
+}
+
+/* ================= HISTÓRICO MULTIMARCA ================= */
+let histMetSel = 'venta_pre';
+function rHistorico(){
+  const el = document.getElementById('tab-historico');
+  const H = DATA.multimarcaHistorico;
+  if(!H || !H.length){
+    el.innerHTML = `<h2>Histórico <span class="tag">multimarca mes a mes</span></h2>
+      <div class="card">Todavía no hay datos históricos conectados. En cuanto el driver publique la hoja <b>MULTIMARCA MES VS MES</b>, aquí aparecerá la evolución mes a mes por distrito.</div>`;
+    return;
+  }
+  const METS = [
+    {k:'venta_pre',  n:'Venta Prepago'},
+    {k:'cap_pre',    n:'Capilaridad Pre'},
+    {k:'venta_post', n:'Venta Postpago'},
+    {k:'cap_post',   n:'Capilaridad Post'}
+  ];
+  if(!METS.some(m=>m.k===histMetSel)) histMetSel = 'venta_pre';
+  const distritos = [...new Set(H.flatMap(b=>b.distritos.map(d=>d.d)))];
+  const selHTML = `<div class="secHead" style="margin-top:0">
+    <select id="selHistMet">${METS.map(m=>`<option value="${m.k}" ${m.k===histMetSel?'selected':''}>${m.n}</option>`).join('')}</select>
+  </div>`;
+  const totales = H.map(b=>b.total ? (b.total[histMetSel]||0) : b.distritos.reduce((s,d)=>s+(d[histMetSel]||0),0));
+  const palette = ['#D81F26','#1B1B1F','#8E939B','#B5151B','#4A4F5A','#E6A817','#7A8290','#C9CCD2','#1F8A55','#3B4252'];
+  const filas = distritos.map((d,i)=>{
+    const vals = H.map(b=>{ const dd=b.distritos.find(x=>x.d===d); return dd?(dd[histMetSel]||0):null; });
+    return `<tr><td>${d}</td>${vals.map(v=>`<td class="num">${v==null?'—':fN(v)}</td>`).join('')}</tr>`;
+  }).join('');
+  el.innerHTML = `
+  <h2>Histórico <span class="tag">multimarca mes a mes · fuente: MULTIMARCA MES VS MES</span></h2>
+  ${selHTML}
+  <div class="chartbox"><div class="ch"><canvas id="chHist"></canvas></div></div>
+  <h2 style="margin-top:22px">Por distrito</h2>
+  <div class="twrap"><table>
+    <thead><tr><th>Distrito</th>${H.map(b=>`<th>${b.mes}</th>`).join('')}</tr></thead>
+    <tbody>${filas}
+      <tr class="tot"><td>TOTAL</td>${totales.map(v=>`<td class="num">${fN(v)}</td>`).join('')}</tr>
+    </tbody>
+  </table></div>`;
+  document.getElementById('selHistMet').onchange = e=>{ histMetSel = e.target.value; rHistorico(); };
+  mkChart('chHist',{type:'bar',data:{labels:H.map(b=>b.mes),datasets:distritos.map((d,i)=>({
+    label:d, backgroundColor:palette[i%palette.length],
+    data:H.map(b=>{ const dd=b.distritos.find(x=>x.d===d); return dd?(dd[histMetSel]||0):0; })
+  }))},options:{maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},scales:{x:{stacked:false},y:{stacked:false}}}});
 }
 
 /* ================= ASESORES ================= */
@@ -1486,7 +1552,7 @@ function renderAll(){
   const cur = curMonth();
   sel.innerHTML = ms.map(m=>{const [y,mm]=m.split('-');return `<option value="${m}" ${m===cur?'selected':''}>${MESN[+mm]} ${y}</option>`}).join('');
   actualizarIndicador();
-  rResumen(cur); rOperativos(cur); rDesabasto(cur); rDiario(cur); rDistritos(cur); rCanales(cur); rEvolutivo(); rMultimarca(cur); rComparativo(); rAsesores(cur);
+  rResumen(cur); rOperativos(cur); rDesabasto(cur); rDiario(cur); rDistritos(cur); rCanales(cur); rEvolutivo(); rMultimarca(cur); rHistorico(); rComparativo(); rAsesores(cur);
 }
 document.getElementById('selMes').onchange = renderAll;
 
@@ -1682,6 +1748,7 @@ async function cargarLiveV2(){
     if(live.asesoresMensual) DATA.asesoresMensual = live.asesoresMensual;
     if(live.desabastoMensual) DATA.desabastoMensual = live.desabastoMensual;
     if(live.multimarca) DATA.multimarcaBloques = live.multimarca;
+    if(live.multimarcaHistorico) DATA.multimarcaHistorico = live.multimarcaHistorico;
     if(live.comparativo) DATA.comparativo = live.comparativo;
     if(live.deb) EMB_MEDIDAS.deb = live.deb;
     if(live.ope) EMB_MEDIDAS.ope = { tot: live.ope.tot, dist: live.ope.dist, vend: EMB_MEDIDAS.ope.vend };
@@ -1690,7 +1757,7 @@ async function cargarLiveV2(){
       localStorage.setItem('blazel_v2_last_ok', JSON.stringify({
         cuotas: DATA.cuotas, bloques: DATA.bloques, canalesMensual: DATA.canalesMensual,
         asesoresMensual: DATA.asesoresMensual, desabastoMensual: DATA.desabastoMensual,
-        multimarcaBloques: DATA.multimarcaBloques, comparativo: DATA.comparativo,
+        multimarcaBloques: DATA.multimarcaBloques, multimarcaHistorico: DATA.multimarcaHistorico, comparativo: DATA.comparativo,
         deb: EMB_MEDIDAS.deb, ope: EMB_MEDIDAS.ope, diaAvanceMM: window._diaAvanceMM,
         fecha: new Date().toISOString()
       }));
@@ -1706,7 +1773,7 @@ async function cargarLiveV2(){
       if(c){
         DATA.cuotas = c.cuotas; DATA.bloques = c.bloques; DATA.canalesMensual = c.canalesMensual;
         DATA.asesoresMensual = c.asesoresMensual; DATA.desabastoMensual = c.desabastoMensual;
-        DATA.multimarcaBloques = c.multimarcaBloques; DATA.comparativo = c.comparativo;
+        DATA.multimarcaBloques = c.multimarcaBloques; DATA.multimarcaHistorico = c.multimarcaHistorico; DATA.comparativo = c.comparativo;
         if(c.deb) EMB_MEDIDAS.deb = c.deb;
         if(c.ope) EMB_MEDIDAS.ope = { tot: c.ope.tot, dist: c.ope.dist, vend: EMB_MEDIDAS.ope.vend };
         if(c.diaAvanceMM!=null) window._diaAvanceMM = c.diaAvanceMM;
