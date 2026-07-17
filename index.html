@@ -1129,6 +1129,7 @@ function aParse(rows,mes,anio){
 }
 async function aFetchJSON(u){const r=await fetch(u);if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}
 const STORE_TO_TI={"Tienda - Mall Bellavista":"Mall Bellavista","Tienda - Mall del Sur 1":"Mall del Sur I","Tienda - Mall del Sur 2":"Mall del Sur II","Tienda - Mega Plaza":"Mega Plaza","Tienda - Plaza Norte":"Plaza Norte","Tienda - Primavera":"Primavera","Tienda - Rambla Brasil":"La Rambla","Tienda - Santa Anita":"Santa Anita"};
+const UNIT_CATS=["Alta Prepago","Portabilidad Prepago","Packs Prepago","Portabilidad Postpago","Altas Postpago","Packs Postpago","Líneas Adicionales Postpago","HFC","UGIS Inalámbricos","OLO","Accesorios","Portabilidad CF >=95.50"];
 let asesorCache={};
 async function getAsesorData(mesKey){
   if(asesorCache[mesKey]) return asesorCache[mesKey];
@@ -1151,31 +1152,28 @@ async function loadAsesores(){
 }
 function renderAsesores(recs){
   const byV={}; recs.forEach(r=>{(byV[r.n]=byV[r.n]||[]).push(r);});
-  const dia=recs[0].d, dm=recs[0].dm, factor=dia>0?dm/dia:0;
-  _asesorRows=Object.keys(byV).map(n=>{
-    const rs=byV[n]; const cf=rs.find(x=>x.c==='Avance Cargo Fijo')||{av:0,ob:0};
-    const proy=factor>0?cf.av*factor:cf.av; const pct=cf.ob>0?proy/cf.ob:0; const cumpl=cf.ob>0?cf.av/cf.ob:0;
-    return {n,tipo:rs[0].t,cf,proy,pct,cumpl,estado:estadoFromPct(pct),rs};
+  const rankRows=Object.keys(byV).map(n=>{
+    const rs=byV[n];
+    let avU=0,obU=0;
+    rs.forEach(r=>{ if(UNIT_CATS.includes(r.c)){ avU+=r.av; obU+=r.ob; } });
+    const pct=obU>0?avU/obU:0;
+    return {n,tipo:rs[0].t,avU,obU,pct,estado:estadoFromPct(pct)};
   }).sort((a,b)=>b.pct-a.pct);
-  let html=`<div class="ases-head">👥 Asesores de ${STORE_TO_TI[curTienda]} <span style="font-weight:400;color:#888;font-size:12px">· ${_asesorRows.length} asesores</span></div>`;
-  html+=`<div class="ger-pick"><h3>Filtrar por vendedor</h3><div class="ger-chips" id="asesChips">`;
-  html+=`<div class="tchip all on" onclick="pickAsesor(-1)">Ver ranking</div>`;
-  _asesorRows.forEach((v,i)=>{ html+=`<div class="tchip" onclick="pickAsesor(${i})">${v.n}</div>`; });
-  html+=`</div></div>`;
-  html+=`<div id="asesPanel"></div>`;
-  html+=`<div id="asesRanking"><div class="table-card"><div class="table-wrap"><table><thead><tr>
+  let html=`<div class="ases-head">👥 Ranking de ${STORE_TO_TI[curTienda]} <span style="font-weight:400;color:#888;font-size:12px">· ${rankRows.length} asesores · % cumplimiento en unidades (12 productos, sin Cargo Fijo)</span></div>`;
+  html+=`<div class="table-card"><div class="table-wrap"><table><thead><tr>
     <th style="text-align:left">#</th><th style="text-align:left;min-width:170px">Asesor</th><th>Tipo</th>
-    <th>Avance CF (S/)</th><th>Cuota CF (S/)</th><th>Cumpl.</th><th>Proyección</th><th>Estado</th></tr></thead><tbody>`;
-  _asesorRows.forEach((v,i)=>{
+    <th>Avance (und)</th><th>Objetivo (und)</th><th>% Cumpl.</th><th>Estado</th></tr></thead><tbody>`;
+  rankRows.forEach((v,i)=>{
     const t=getTag(v.estado);
-    html+=`<tr class="ases-row" style="cursor:pointer" onclick="pickAsesor(${i})">
+    const rowCls=i===0?" style=\"background:#e6f4ea\"":(i===rankRows.length-1&&rankRows.length>1?" style=\"background:#fdecea\"":"");
+    html+=`<tr${rowCls}>
       <td style="text-align:left">${i+1}</td>
-      <td style="text-align:left">▸ ${v.n}</td><td>${v.tipo}</td>
-      <td>${fmt(v.cf.av)}</td><td>${fmt(v.cf.ob)}</td><td>${fmtPct(v.cumpl)}</td>
+      <td style="text-align:left">${v.n}</td><td>${v.tipo}</td>
+      <td>${fmt(v.avU)}</td><td>${fmt(v.obU)}</td>
       <td><span style="display:inline-flex;align-items:center;gap:4px"><span class="dot ${t.dot}"></span>${fmtPct(v.pct)}</span></td>
       <td><span class="tag ${t.cls}">${t.lbl}</span></td></tr>`;
   });
-  html+=`</tbody></table></div></div></div>`;
+  html+=`</tbody></table></div></div>`;
   document.getElementById("asesoresSection").innerHTML=html;
 }
 function pickAsesor(i){
