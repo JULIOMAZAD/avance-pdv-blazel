@@ -87,6 +87,9 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
 .kpi.green{border-left-color:#22a843}.kpi.amber{border-left-color:#e0a82e}.kpi.red{border-left-color:#cc0000}
 @media(max-width:600px){.main-wrap{padding:1rem .5rem}td,th{padding:7px 8px;font-size:12px}.kpi .val{font-size:20px}}
 .ases-head{font-size:15px;font-weight:700;color:#1a1a2e;margin:0 0 10px}
+.view-tabs{display:flex;gap:6px;margin-bottom:1rem}
+.view-tab{padding:8px 18px;border-radius:20px;font-size:13px;font-weight:700;cursor:pointer;border:1.5px solid #e0e0e0;background:#fff;color:#555}
+.view-tab.on{border-color:#cc0000;background:#cc0000;color:#fff}
 .ases-row:hover{background:#fff3f3 !important}
 .ases-row td{font-weight:500}
 .gauges{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;background:#fff;border-radius:14px;padding:16px;margin-bottom:1rem}
@@ -148,6 +151,11 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
       </div>
     </div>
     <div class="mes-tabs" id="mesTabs"></div>
+    <div class="view-tabs">
+      <button class="view-tab on" id="mainViewBtn_tienda" onclick="switchMainView('tienda')">Avance de tienda</button>
+      <button class="view-tab" id="mainViewBtn_ranking" onclick="switchMainView('ranking')">Ranking</button>
+    </div>
+    <div id="mainViewTienda">
     <div id="infoRow" class="info-row"></div>
     <div id="storeVendFilter" style="margin-bottom:1rem"></div>
     <div id="loadMsg"></div>
@@ -155,6 +163,10 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
     <div id="storeComision"></div>
     <div id="tableSection"></div>
     <div id="storeTrend"></div>
+    </div>
+    <div id="mainViewRanking" style="display:none">
+      <div id="asesoresSection"></div>
+    </div>
   </div>
 </div>
 
@@ -358,6 +370,7 @@ function doLogin(){
   curTienda=t;
   document.getElementById("dispTienda").textContent=t;
   showScreen("mainScreen");
+  switchMainView("tienda");
   renderTabs();
   loadData(curMes);
 }
@@ -415,7 +428,18 @@ function renderTabs(){
     `<button class="mes-tab${m.key===curMes?" active":""}" onclick="selectMes('${m.key}')">${m.label}</button>`
   ).join("");
 }
-function selectMes(mes){curMes=mes;renderTabs();loadData(mes);}
+function selectMes(mes){
+  curMes=mes;renderTabs();loadData(mes);
+  if(document.getElementById("mainViewRanking").style.display!=="none") loadAsesores();
+}
+function switchMainView(v){
+  const isTienda=v==="tienda";
+  document.getElementById("mainViewTienda").style.display=isTienda?"block":"none";
+  document.getElementById("mainViewRanking").style.display=isTienda?"none":"block";
+  document.getElementById("mainViewBtn_tienda").classList.toggle("on",isTienda);
+  document.getElementById("mainViewBtn_ranking").classList.toggle("on",!isTienda);
+  if(!isTienda) loadAsesores();
+}
 
 async function loadData(mes){
   const cacheKey=curTienda+"_"+mes;
