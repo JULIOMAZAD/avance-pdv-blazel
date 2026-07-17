@@ -171,6 +171,63 @@ const GROUPS=[
 ];
 const CF_AVANCE="Avance Cargo Fijo", CF_PROM="Promedio Cargo Fijo";
 const UNIT_CATS=["Alta Prepago","Portabilidad Prepago","Packs Prepago","Portabilidad Postpago","Altas Postpago","Packs Postpago","Líneas Adicionales Postpago","HFC","UGIS Inalámbricos","OLO","Accesorios","Portabilidad CF >=95.50"];
+const TI_TO_STORE={"Mall Bellavista":"Tienda - Mall Bellavista","Mall del Sur I":"Tienda - Mall del Sur 1","Mall del Sur II":"Tienda - Mall del Sur 2","Mega Plaza":"Tienda - Mega Plaza","Plaza Norte":"Tienda - Plaza Norte","Primavera":"Tienda - Primavera","La Rambla":"Tienda - Rambla Brasil","Santa Anita":"Tienda - Santa Anita"};
+let COMIS_CACHE=null;
+async function fetchComisiones(){
+  if(COMIS_CACHE) return COMIS_CACHE;
+  const sep=SCRIPT_URL.includes('?')?'&':'?';
+  const r=await fetch(SCRIPT_URL+sep+'modo=comisiones',{cache:'no-store'});
+  const j=await r.json();
+  COMIS_CACHE=j.comisiones||{};
+  return COMIS_CACHE;
+}
+function computeVendorRanking(recs){
+  const byV={}; recs.forEach(r=>{(byV[r.n]=byV[r.n]||[]).push(r);});
+  return Object.keys(byV).map(n=>{
+    const rs=byV[n];
+    const cf=rs.find(x=>x.c===CF_AVANCE)||{av:0,ob:0};
+    const cfPct=cf.ob>0?cf.av/cf.ob:0;
+    let avU=0,obU=0;
+    rs.forEach(r=>{ if(UNIT_CATS.includes(r.c)){ avU+=Math.min(r.av,r.ob); obU+=r.ob; } });
+    const unitsPct=obU>0?avU/obU:0;
+    const rankScore=Math.min(unitsPct,cfPct);
+    return {n,cf,cfPct,unitsPct,rankScore};
+  }).sort((a,b)=>b.rankScore-a.rankScore);
+}
+function topInProductV(recs,cat){
+  const rows=recs.filter(r=>r.c===cat && r.ob>0);
+  if(!rows.length) return null;
+  return rows.slice().sort((a,b)=>(b.av/b.ob)-(a.av/a.ob))[0];
+}
+async function renderStoreLevelKpis(){
+  const kpisEl=document.getElementById("kpis");
+  if(!kpisEl || !curTienda) return;
+  const recs=DATA.filter(r=>r.m===curMes&&r.ti===curTienda);
+  if(!recs.length) return;
+  const ranking=computeVendorRanking(recs);
+  const top=ranking[0];
+  let html="";
+  if(top){
+    html+=`<div class="kpi green"><div class="lbl">Mejor vendedor</div><div class="val" style="font-size:15px;line-height:1.2;margin-top:6px">${top.n}</div><div class="sub">${fmtPct(top.rankScore)} cumplimiento</div></div>`;
+  }
+  const hfcTop=topInProductV(recs,"HFC");
+  if(hfcTop){
+    const hfcPct=hfcTop.ob>0?hfcTop.av/hfcTop.ob:0;
+    html+=`<div class="kpi ${clsByPct(hfcPct)}"><div class="lbl">Líder en HFC</div><div class="val" style="font-size:15px;line-height:1.2;margin-top:6px">${hfcTop.n}</div><div class="sub">${fmt(hfcTop.av)} / ${fmt(hfcTop.ob)} · ${fmtPct(hfcPct)}</div></div>`;
+  }
+  if(html) kpisEl.insertAdjacentHTML("beforeend", html);
+  try{
+    const comis=await fetchComisiones();
+    const mesKey=Object.keys(MES_MAP).find(k=>MES_MAP[k]===curMes);
+    const storeKey=(TI_TO_STORE[curTienda]||curTienda).trim().toUpperCase();
+    const list=(mesKey&&Array.isArray(comis[mesKey]))?comis[mesKey]:[];
+    const f=list.find(x=>x.pv.trim().toUpperCase()===storeKey);
+    if(f && document.getElementById("kpis")){
+      document.getElementById("kpis").insertAdjacentHTML("beforeend",
+        `<div class="kpi"><div class="lbl">💰 Comisión ${mesKey.charAt(0).toUpperCase()+mesKey.slice(1)}</div><div class="val">S/ ${fmt(f.comision)}</div><div class="sub">${curTienda}</div></div>`);
+    }
+  }catch(e){}
+}
 let rkMes=6, rkTienda="";
 function switchView(v){
   const isVend=v==="vendedor";
@@ -281,6 +338,7 @@ function render(){
     kpi("Proyección",fmtPct(cfPct),"a cierre de mes",clsByPct(cfPct))+
     kpi("Falta (S/)",fmt(cfFalta>0?cfFalta:0),cfFalta>0?("≈ "+fmt(cfVd)+" / día"):"Cuota cubierta ✅",cfFalta>0?"red":"green")+
     `<div class="kpi ${clsByPct(cfPct)}"><div class="lbl">Estado</div><span class="tag ${t.cls}" style="margin-top:8px;font-size:16px;padding:8px 16px"><span class="dot ${t.dot}"></span>${t.lbl}</span></div>`;
+  renderStoreLevelKpis();
 
   document.getElementById("gaugesV").innerHTML=gaugesRowV(byC,cf);
   // Tabla por producto (unidades)
