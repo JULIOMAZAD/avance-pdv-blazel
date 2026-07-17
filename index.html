@@ -1176,46 +1176,6 @@ function renderAsesores(recs){
   html+=`</tbody></table></div></div>`;
   document.getElementById("asesoresSection").innerHTML=html;
 }
-function pickAsesor(i){
-  document.querySelectorAll("#asesChips .tchip").forEach((c,idx)=>c.classList.toggle("on", idx===(i+1)));
-  const panel=document.getElementById("asesPanel"), rank=document.getElementById("asesRanking");
-  if(i<0){ panel.innerHTML=""; rank.style.display=""; return; }
-  rank.style.display="none";
-  const v=_asesorRows[i];
-  panel.innerHTML=`<div class="ases-head" style="margin-top:6px">📋 ${v.n} <span style="font-weight:400;color:#888;font-size:12px">· ${v.tipo} · ${STORE_TO_TI[curTienda]}</span></div>`+buildAsesorDetail(v);
-}
-function toggleAsesor(i){
-  const det=document.getElementById('asdet-'+i); if(!det) return;
-  const cell=det.querySelector('td');
-  if(det.style.display==='none'){
-    if(!det.dataset.loaded){ cell.innerHTML=buildAsesorDetail(_asesorRows[i]); det.dataset.loaded='1'; }
-    det.style.display='';
-  } else det.style.display='none';
-}
-function buildAsesorDetail(v){
-  const rs=v.rs, dia=rs[0].d, dm=rs[0].dm, factor=dia>0?dm/dia:0, diasRest=dm>dia?dm-dia:0;
-  const byC={}; rs.forEach(r=>byC[r.c]=r);
-  const GR=[["prepago","Prepago",["Alta Prepago","Portabilidad Prepago","Packs Prepago"]],
-            ["postpago","Postpago",["Altas Postpago","Portabilidad Postpago","Packs Postpago","Líneas Adicionales Postpago"]],
-            ["residencial","Residencial",["HFC","UGIS Inalámbricos"]],
-            ["otros","Otros",["OLO","Accesorios","Portabilidad CF >=95.50"]]];
-  const struct={prepago:[],postpago:[],residencial:[],otros:[]};
-  for(const g of GR){ for(const p of g[2]){ const r=byC[p]; if(!r) continue;
-    const meta=r.ob,av=r.av,proy=factor>0?av*factor:av,pct=meta>0?proy/meta:0,falta=meta-av,vd=(falta>0&&diasRest>0)?falta/diasRest:0;
-    struct[g[0]].push({name:p,meta,av,pct,falta,vd,pf:proy,estado:estadoFromPct(pct)});
-  }}
-  const cf=v.cf, cfFalta=cf.ob-cf.av, cfVd=(cfFalta>0&&diasRest>0)?cfFalta/diasRest:0;
-  const totalRow={meta:cf.ob,av:cf.av,pct:v.pct,falta:cfFalta,vd:cfVd,pf:v.proy,estado:v.estado};
-  const t=getTag(v.estado), cls=v.pct>=1?'green':(v.pct>=0.8?'amber':'red');
-  let k=`<div class="kpis" style="margin:0 0 10px">`+
-    `<div class="kpi"><div class="lbl">Cuota CF (S/)</div><div class="val">${fmt(cf.ob)}</div></div>`+
-    `<div class="kpi"><div class="lbl">Avance CF (S/)</div><div class="val">${fmt(cf.av)}</div><div class="sub">${fmtPct(v.cumpl)} de la cuota</div></div>`+
-    `<div class="kpi ${cls}"><div class="lbl">Proyección</div><div class="val">${fmtPct(v.pct)}</div></div>`+
-    `<div class="kpi ${cfFalta>0?'red':'green'}"><div class="lbl">Falta (S/)</div><div class="val">${fmt(cfFalta>0?cfFalta:0)}</div><div class="sub">${cfFalta>0?('≈ '+fmt(cfVd)+' / día'):'Cubierta ✅'}</div></div>`+
-    `<div class="kpi ${cls}"><div class="lbl">Estado</div><span class="tag ${t.cls}" style="margin-top:8px;font-size:15px;padding:7px 14px"><span class="dot ${t.dot}"></span>${t.lbl}</span></div>`+
-    `</div>`;
-  return k+buildTableHtml(struct,totalRow,true);
-}
 
 let recarMes="junio";
 function renderRecarMes(){ document.getElementById("recarMesTabs").innerHTML=MESES.map(m=>`<button class="mes-tab${m.key===recarMes?' active':''}" onclick="selRecarMes('${m.key}')">${m.label}</button>`).join(""); }
