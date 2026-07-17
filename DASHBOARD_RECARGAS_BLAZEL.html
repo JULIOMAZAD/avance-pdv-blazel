@@ -1853,7 +1853,7 @@ const URL_MASIVO = 'https://juliomazad.github.io/avance-pdv-blazel/DASHBOARD_BLA
     if(USUARIOS_REC[u].masivo){ bm.style.display=''; bm.href=URL_MASIVO; } else { bm.style.display='none'; }
     if(USUARIOS_REC[u].soloMM){
       document.querySelectorAll('nav button').forEach(bt=>{
-        if(bt.dataset.t!=='multimarca' && bt.dataset.t!=='comparativo') bt.style.display='none';
+        if(bt.dataset.t!=='multimarca' && bt.dataset.t!=='comparativo' && bt.dataset.t!=='historico') bt.style.display='none';
       });
       document.querySelectorAll('nav button').forEach(x=>x.classList.remove('on'));
       document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
