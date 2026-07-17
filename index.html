@@ -1139,6 +1139,28 @@ async function getAsesorData(mesKey){
   asesorCache[mesKey]=recs; return recs;
 }
 let _asesorRows=[];
+let _lastAsesorRecs=[];
+function computeAsesorRanking(recs){
+  const byV={}; recs.forEach(r=>{(byV[r.n]=byV[r.n]||[]).push(r);});
+  const dia=recs[0].d, dm=recs[0].dm, factor=dia>0?dm/dia:0;
+  return Object.keys(byV).map(n=>{
+    const rs=byV[n];
+    const cf=rs.find(x=>x.c==='Avance Cargo Fijo')||{av:0,ob:0};
+    const proy=factor>0?cf.av*factor:cf.av;
+    const cfProyPct=cf.ob>0?proy/cf.ob:0;
+    const cfPct=cf.ob>0?cf.av/cf.ob:0;
+    let avU=0,obU=0;
+    rs.forEach(r=>{ if(UNIT_CATS.includes(r.c)){ avU+=Math.min(r.av,r.ob); obU+=r.ob; } });
+    const unitsPct=obU>0?avU/obU:0;
+    const rankScore=Math.min(unitsPct,cfPct);
+    return {n,tipo:rs[0].t,cf,proy,pct:cfProyPct,cumpl:cfPct,avU,obU,unitsPct,rankScore,estado:estadoFromPct(rankScore),rs};
+  }).sort((a,b)=>b.rankScore-a.rankScore);
+}
+function topInProduct(recs,cat){
+  const rows=recs.filter(r=>r.c===cat && r.ob>0);
+  if(!rows.length) return null;
+  return rows.slice().sort((a,b)=>(b.av/b.ob)-(a.av/a.ob))[0];
+}
 async function loadAsesores(){
   const cont=document.getElementById("asesoresSection"); if(!cont) return;
   const ti=STORE_TO_TI[curTienda];
@@ -1151,27 +1173,20 @@ async function loadAsesores(){
   }catch(e){ cont.innerHTML='<div class="load-err">No se pudo cargar el avance de los asesores.</div>'; }
 }
 function renderAsesores(recs){
-  const byV={}; recs.forEach(r=>{(byV[r.n]=byV[r.n]||[]).push(r);});
-  const rankRows=Object.keys(byV).map(n=>{
-    const rs=byV[n];
-    let avU=0,obU=0;
-    rs.forEach(r=>{ if(UNIT_CATS.includes(r.c)){ avU+=r.av; obU+=r.ob; } });
-    const pct=obU>0?avU/obU:0;
-    return {n,tipo:rs[0].t,avU,obU,pct,estado:estadoFromPct(pct)};
-  }).sort((a,b)=>b.pct-a.pct);
-  let html=`<div class="ases-head">👥 Ranking de ${STORE_TO_TI[curTienda]} <span style="font-weight:400;color:#888;font-size:12px">· ${rankRows.length} asesores · % cumplimiento en unidades (12 productos, sin Cargo Fijo)</span></div>`;
+  const rankRows=computeAsesorRanking(recs);
+  let html=`<div class="ases-head">👥 Ranking de ${STORE_TO_TI[curTienda]} <span style="font-weight:400;color:#888;font-size:12px">· ${rankRows.length} asesores · usa el menor entre % unidades (tope 100% por producto) y % Cargo Fijo — hay que llegar a ambos</span></div>`;
   html+=`<div class="table-card"><div class="table-wrap"><table><thead><tr>
-    <th style="text-align:left">#</th><th style="text-align:left;min-width:170px">Asesor</th><th>Tipo</th>
-    <th>Avance (und)</th><th>Objetivo (und)</th><th>% Cumpl.</th><th>Estado</th></tr></thead><tbody>`;
+    <th style="text-align:left">#</th><th style="text-align:left;min-width:170px">Asesor</th>
+    <th>Avance (und)</th><th>Objetivo (und)</th><th>% Unidades</th><th>% Cargo Fijo</th><th>Estado</th></tr></thead><tbody>`;
   rankRows.forEach((v,i)=>{
     const t=getTag(v.estado);
     const rowCls=i===0?" style=\"background:#e6f4ea\"":(i===rankRows.length-1&&rankRows.length>1?" style=\"background:#fdecea\"":"");
     html+=`<tr${rowCls}>
       <td style="text-align:left">${i+1}</td>
-      <td style="text-align:left">${v.n}</td><td>${v.tipo}</td>
+      <td style="text-align:left">${v.n}</td>
       <td>${fmt(v.avU)}</td><td>${fmt(v.obU)}</td>
-      <td><span style="display:inline-flex;align-items:center;gap:4px"><span class="dot ${t.dot}"></span>${fmtPct(v.pct)}</span></td>
-      <td><span class="tag ${t.cls}">${t.lbl}</span></td></tr>`;
+      <td>${fmtPct(v.unitsPct)}</td><td>${fmtPct(v.cumpl)}</td>
+      <td><span class="tag ${t.cls}"><span class="dot ${t.dot}"></span>${t.lbl}</span></td></tr>`;
   });
   html+=`</tbody></table></div></div>`;
   document.getElementById("asesoresSection").innerHTML=html;
@@ -1296,15 +1311,14 @@ function renderStoreView(sel){
 }
 async function loadStoreVendors(){
   const cont=document.getElementById("storeVendFilter"); const ti=STORE_TO_TI[curTienda];
-  _asesorRows=[];
+  _asesorRows=[]; _lastAsesorRecs=[];
   if(!ti){ cont.innerHTML=""; return; }
   cont.innerHTML='<div style="color:#888;font-size:12px;padding:4px 2px">Cargando vendedores…</div>';
   try{
     const recs=(await getAsesorData(curMes)).filter(r=>r.ti===ti);
     if(!recs.length){ cont.innerHTML=""; return; }
-    const byV={}; recs.forEach(r=>{(byV[r.n]=byV[r.n]||[]).push(r);});
-    const dia=recs[0].d,dm=recs[0].dm,factor=dia>0?dm/dia:0;
-    _asesorRows=Object.keys(byV).map(n=>{const rs=byV[n];const cf=rs.find(x=>x.c==='Avance Cargo Fijo')||{av:0,ob:0};const proy=factor>0?cf.av*factor:cf.av;const pct=cf.ob>0?proy/cf.ob:0;const cumpl=cf.ob>0?cf.av/cf.ob:0;return {n,tipo:rs[0].t,cf,proy,pct,cumpl,estado:estadoFromPct(pct),rs};}).sort((a,b)=>b.pct-a.pct);
+    _lastAsesorRecs=recs;
+    _asesorRows=computeAsesorRanking(recs);
     let html=`<div class="ases-head" style="margin-bottom:6px">👁️ Ver avance de: <span style="font-weight:400;color:#888;font-size:12px">toca un vendedor y cambia todo (KPI + tabla)</span></div><div class="ger-chips">`;
     html+=`<div class="tchip all on" onclick="renderStoreView(-1)">🏬 Toda la tienda</div>`;
     _asesorRows.forEach((v,i)=>{ html+=`<div class="tchip" onclick="renderStoreView(${i})">${v.n}</div>`; });
@@ -1453,12 +1467,18 @@ function gaugesRow(struct,total){
 }
 function teamKpis(){
   if(!_asesorRows.length) return "";
-  const total=_asesorRows.length, enMeta=_asesorRows.filter(v=>v.pct>=1).length, top=_asesorRows[0];
-  const prom=_asesorRows.reduce((a,v)=>a+v.pct,0)/total;
+  const total=_asesorRows.length, enMeta=_asesorRows.filter(v=>v.rankScore>=1).length, top=_asesorRows[0];
+  const prom=_asesorRows.reduce((a,v)=>a+v.rankScore,0)/total;
   const ec=enMeta/total>=0.5?'green':(enMeta>0?'amber':'red');
-  return `<div class="kpi ${ec}"><div class="lbl">Asesores en meta</div><div class="val">${enMeta} / ${total}</div><div class="sub">${fmtPct(total>0?enMeta/total:0)} del equipo</div></div>`+
-    `<div class="kpi green"><div class="lbl">Mejor vendedor</div><div class="val" style="font-size:15px;line-height:1.2;margin-top:6px">${top.n}</div><div class="sub">${fmtPct(top.pct)} proyección</div></div>`+
-    `<div class="kpi ${clsByPct(prom)}"><div class="lbl">Promedio equipo</div><div class="val">${fmtPct(prom)}</div><div class="sub">proyección</div></div>`;
+  let html=`<div class="kpi ${ec}"><div class="lbl">Asesores en meta</div><div class="val">${enMeta} / ${total}</div><div class="sub">${fmtPct(total>0?enMeta/total:0)} del equipo</div></div>`+
+    `<div class="kpi green"><div class="lbl">Mejor vendedor</div><div class="val" style="font-size:15px;line-height:1.2;margin-top:6px">${top.n}</div><div class="sub">${fmtPct(top.rankScore)} cumplimiento</div></div>`+
+    `<div class="kpi ${clsByPct(prom)}"><div class="lbl">Promedio equipo</div><div class="val">${fmtPct(prom)}</div><div class="sub">cumplimiento</div></div>`;
+  const hfcTop=topInProduct(_lastAsesorRecs,"HFC");
+  if(hfcTop){
+    const hfcPct=hfcTop.ob>0?hfcTop.av/hfcTop.ob:0;
+    html+=`<div class="kpi ${clsByPct(hfcPct)}"><div class="lbl">Líder en HFC</div><div class="val" style="font-size:15px;line-height:1.2;margin-top:6px">${hfcTop.n}</div><div class="sub">${fmt(hfcTop.av)} / ${fmt(hfcTop.ob)} · ${fmtPct(hfcPct)}</div></div>`;
+  }
+  return html;
 }
 
 </script>
