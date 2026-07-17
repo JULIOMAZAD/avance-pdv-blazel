@@ -976,7 +976,7 @@ function rHistorico(){
   const distritos = [...new Set(H.flatMap(b=>b.distritos.map(d=>d.d)))];
   const selHTML = `<div class="segRow" id="selHistMet">${METS.map(m=>`<button class="segBtn ${m.k===histMetSel?'on':''}" data-k="${m.k}">${m.n}</button>`).join('')}</div>`;
   const wireSel = () => document.querySelectorAll('#selHistMet .segBtn').forEach(b=>b.onclick=()=>{ histMetSel=b.dataset.k; rHistorico(); });
-  const palette = ['#D81F26','#1B1B1F','#8E939B','#B5151B','#4A4F5A','#E6A817','#7A8290','#C9CCD2','#1F8A55','#3B4252'];
+  const palette = ['#E63946','#2A9D8F','#F4A300','#3B82F6','#8E44AD','#F72585','#06B6D4','#84CC16','#F97316','#264653'];
   const mesColors = ['#3B4252','#B5302E','#1F8A55','#8E44AD','#2D6CDF','#C77D17','#0E7C7B','#A6303E'];
   const mesTints  = ['#EEF1F6','#FBEAE9','#E7F6ED','#F3EAF8','#E9F0FD','#FCF3E3','#E4F5F4','#F7EBEC'];
 
