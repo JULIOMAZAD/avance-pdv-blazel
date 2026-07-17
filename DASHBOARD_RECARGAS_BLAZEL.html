@@ -495,7 +495,7 @@ const debPct = dmActual ? dmActual.pctGeneral*100 : (_dt.cli ? 100*_dt.deb/_dt.c
       <div class="dch"><canvas id="dnCuota"></canvas></div>
       <div class="info">
         <div class="t">Avance de cuota Claro · ${MESN[r.m]} ${r.y}</div>
-        <div class="big" style="color:${r.cuota==null?'var(--ink2)':semColor(r.pct)}">${r.cuota==null?'Cuota pendiente':(r.pct==null?'—':(r.pct*100).toFixed(1)+'%')} ${r.cuota==null?'':'<span style="font-size:15px;color:var(--ink2)">proyectado</span>'}</div>
+        <div class="big" style="color:${r.cuota==null?'var(--ink2)':semColor(r.pct)}">${r.cuota==null?'Cuota pendiente':(r.pct==null?'—':(r.pct*100).toFixed(2)+'%')} ${r.cuota==null?'':'<span style="font-size:15px;color:var(--ink2)">proyectado</span>'}</div>
         <div class="stats">
           <div class="s"><div class="sl">Cuota</div><div class="sv num">${fS(r.cuota)}</div></div>
           <div class="s"><div class="sl">Avance</div><div class="sv num" style="color:var(--rojo)">${fS(r.sig)}</div></div>
@@ -508,7 +508,7 @@ const debPct = dmActual ? dmActual.pctGeneral*100 : (_dt.cli ? 100*_dt.deb/_dt.c
       <div class="dch"><canvas id="dnPdv"></canvas></div>
       <div class="info">
         <div class="t">PDV operativos · ${MESN[r.m]} ${r.y}</div>
-        <div class="big" style="color:${pdvOpe==null?'var(--ink2)':semColor(pdvPct)}">${pdvOpe==null?'Cuota pendiente':(pdvPct==null?'—':fP(pdvPct))}</div>
+        <div class="big" style="color:${pdvOpe==null?'var(--ink2)':semColor(pdvPct)}">${pdvOpe==null?'Cuota pendiente':(pdvPct==null?'—':(pdvPct*100).toFixed(2)+'%')}</div>
         <div class="stats">
           <div class="s"><div class="sl">Nos piden</div><div class="sv num">${fN(pdvOpe)}</div></div>
           <div class="s"><div class="sl">Hacemos</div><div class="sv num" style="color:var(--rojo)">${fN(pdvAv)}</div></div>
@@ -521,7 +521,7 @@ const debPct = dmActual ? dmActual.pctGeneral*100 : (_dt.cli ? 100*_dt.deb/_dt.c
       <div class="dch"><canvas id="dnDebR"></canvas></div>
       <div class="info">
         <div class="t">Desabasto · saldo &lt; S/7${debShow?' · actual':''}</div>
-        ${debShow?`<div class="big" style="color:${debCol}">${debPct.toFixed(1)}% <span style="font-size:15px;color:var(--ink2)">de 10% meta</span></div>
+        ${debShow?`<div class="big" style="color:${debCol}">${debPct.toFixed(2)}% <span style="font-size:15px;color:var(--ink2)">de 10% meta</span></div>
         <div class="stats">
           <div class="s"><div class="sl">En desabasto</div><div class="sv num" style="color:var(--rojo)">${_dt.deb.toLocaleString()}</div></div>
           <div class="s"><div class="sl">Evaluados</div><div class="sv num">${_dt.cli.toLocaleString()}</div></div>
@@ -567,9 +567,9 @@ const debPct = dmActual ? dmActual.pctGeneral*100 : (_dt.cli ? 100*_dt.deb/_dt.c
   <div class="twrap" id="tCuotaMes"></div>
   <p class="note">Δ cuota = lo que Claro subió ▲ o bajó ▼ la meta vs el mes anterior. Cuota diaria = cuota ÷ días del mes.</p>`;
 
-  dona('dnCuota', r.pct, semColor(r.pct), r.pct==null?'—':(r.pct*100).toFixed(0)+'%', 'proyección');
-  dona('dnPdv', pdvPct, semColor(pdvPct), pdvPct==null?'—':(pdvPct*100).toFixed(0)+'%', pdvDif==null?'':(pdvDif>=0?'+':'')+fN(pdvDif)+' PDV');
-  dona('dnDebR', debShow?(_dt.cli?Math.min(1,(_dt.deb/_dt.cli)/0.10):0):0, debShow?(debBien?'#13A05F':'#D81F26'):'#C9CCD2', debShow?debPct.toFixed(1)+'%':'—', debShow?'desabasto':'sin histórico');
+  dona('dnCuota', r.pct, semColor(r.pct), r.pct==null?'—':(r.pct*100).toFixed(2)+'%', 'proyección');
+  dona('dnPdv', pdvPct, semColor(pdvPct), pdvPct==null?'—':(pdvPct*100).toFixed(2)+'%', pdvDif==null?'':(pdvDif>=0?'+':'')+fN(pdvDif)+' PDV');
+  dona('dnDebR', debShow?(_dt.cli?Math.min(1,(_dt.deb/_dt.cli)/0.10):0):0, debShow?(debBien?'#13A05F':'#D81F26'):'#C9CCD2', debShow?debPct.toFixed(2)+'%':'—', debShow?'desabasto':'sin histórico');
   document.getElementById('selAnioCuota').onchange = e=>{anioCuotaSel=+e.target.value; drawCuotaMes(ym);};
   drawCuotaMes(ym);
 }
