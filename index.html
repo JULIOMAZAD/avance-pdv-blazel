@@ -566,7 +566,7 @@ function estadoFromPct(pct){
   return "Ponle punche";
 }
 
-function showTable(data){
+async function showTable(data){
   document.getElementById("loadMsg").innerHTML="";
   storeStruct=data.struct; storeTotal=data.totalRow;
   document.getElementById("infoRow").innerHTML=
@@ -574,7 +574,7 @@ function showTable(data){
      <div class="chip">Mes: <strong>${data.mes||"-"}</strong></div>
      <div class="chip">Días del mes: <strong>${data.dias||"-"}</strong></div>
      <div class="chip">PDV: <strong>${data.pdvLabel||curTienda}</strong></div>`;
-  loadStoreVendors();
+  await loadStoreVendors();
   renderStoreView(-1);
 }
 
@@ -1046,10 +1046,14 @@ async function comisionKpiFragmentGerencia(sel){
 }
 async function renderComisionTienda(){
   const el=document.getElementById("storeComision");
+  const kpisEl=document.querySelector("#storeKpis .kpis");
   if(!el) return;
   try{
     const comis=await fetchComisiones();
-    el.innerHTML = comisionCardsHtml(comis, curTienda, null, curMes);
+    const cards=comisionCardsFragment(comis, curTienda, null, curMes);
+    el.innerHTML="";
+    if(kpisEl && cards) kpisEl.insertAdjacentHTML("beforeend", cards);
+    else el.innerHTML = comisionCardsHtml(comis, curTienda, null, curMes);
   }catch(e){ el.innerHTML=""; }
 }
 
