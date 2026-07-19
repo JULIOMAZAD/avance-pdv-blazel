@@ -191,7 +191,7 @@ function computeVendorRanking(recs){
     rs.forEach(r=>{ if(UNIT_CATS.includes(r.c)){ avU+=Math.min(r.av,r.ob); obU+=r.ob; } });
     const unitsPct=obU>0?avU/obU:0;
     const rankScore=Math.min(unitsPct,cfPct);
-    return {n,cf,cfPct,unitsPct,rankScore};
+    return {n,cf,cfPct,avU,obU,unitsPct,rankScore};
   }).sort((a,b)=>b.rankScore-a.rankScore);
 }
 function topInProductV(recs,cat){
@@ -254,22 +254,17 @@ function fillRankingTiendas(){
 function renderRanking(){
   const el=document.getElementById("rankingTable");
   if(!el) return;
-  const rows=DATA.filter(r=>r.m===rkMes&&r.ti===rkTienda&&UNIT_CATS.includes(r.c));
-  const byAsesor={};
-  rows.forEach(r=>{
-    if(!byAsesor[r.n]) byAsesor[r.n]={n:r.n,t:r.t,av:0,ob:0};
-    byAsesor[r.n].av+=r.av; byAsesor[r.n].ob+=r.ob;
-  });
-  const list=Object.values(byAsesor).map(a=>({...a,pct:a.ob>0?a.av/a.ob:0}));
-  list.sort((a,b)=>b.pct-a.pct);
-  if(!list.length){ el.innerHTML='<div class="empty">Sin datos para esta tienda.</div>'; return; }
+  const recs=DATA.filter(r=>r.m===rkMes&&r.ti===rkTienda);
+  if(!recs.length){ el.innerHTML='<div class="empty">Sin datos para esta tienda.</div>'; return; }
+  const list=computeVendorRanking(recs);
   const body=list.map((a,i)=>{
     const rowCls=i===0?"rk-first":(i===list.length-1&&list.length>1?"rk-last":"");
-    const tag=getTag(estadoFromPct(a.pct));
-    return `<tr class="${rowCls}"><td style="text-align:left"><span class="rk-pos">${i+1}</span></td><td style="text-align:left">${cleanName(a.n)}</td><td>${a.t}</td><td>${fmt(a.av)}</td><td>${fmt(a.ob)}</td><td>${fmtPct(a.pct)}</td><td><span class="tag ${tag.cls}"><span class="dot ${tag.dot}"></span>${tag.lbl}</span></td></tr>`;
+    const tag=getTag(estadoFromPct(a.rankScore));
+    return `<tr class="${rowCls}"><td style="text-align:left"><span class="rk-pos">${i+1}</span></td><td style="text-align:left">${cleanName(a.n)}</td><td>${fmt(a.avU)}</td><td>${fmt(a.obU)}</td><td>${fmtPct(a.unitsPct)}</td><td>${fmtPct(a.cfPct)}</td><td><span class="tag ${tag.cls}"><span class="dot ${tag.dot}"></span>${tag.lbl}</span></td></tr>`;
   }).join("");
-  el.innerHTML=`<div class="table-card"><div class="table-wrap"><table>
-    <thead><tr><th>#</th><th style="text-align:left">Asesor</th><th>Tipo</th><th>Avance</th><th>Objetivo</th><th>% Cumpl.</th><th>Estado</th></tr></thead>
+  el.innerHTML=`<div class="ases-head" style="margin-bottom:6px">👥 Ranking de ${cleanName(rkTienda)} <span style="font-weight:400;color:#888;font-size:12px">· ${list.length} asesores · usa el menor entre % unidades (tope 100% por producto) y % Cargo Fijo — hay que llegar a ambos</span></div>
+  <div class="table-card"><div class="table-wrap"><table>
+    <thead><tr><th>#</th><th style="text-align:left">Asesor</th><th>Avance (und)</th><th>Objetivo (und)</th><th>% Unidades</th><th>% Cargo Fijo</th><th>Estado</th></tr></thead>
     <tbody>${body}</tbody>
   </table></div></div>`;
 }
