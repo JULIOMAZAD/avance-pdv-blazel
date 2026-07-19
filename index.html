@@ -569,6 +569,7 @@ function estadoFromPct(pct){
 async function showTable(data){
   document.getElementById("loadMsg").innerHTML="";
   storeStruct=data.struct; storeTotal=data.totalRow;
+  storeInfoData=data;
   document.getElementById("infoRow").innerHTML=
     `<div class="chip">Avance día: <strong>${data.avance||"-"}</strong></div>
      <div class="chip">Mes: <strong>${data.mes||"-"}</strong></div>
@@ -1272,7 +1273,7 @@ function renderRecar(rows){
   document.getElementById(T.table).innerHTML=html;
 }
 
-let storeStruct=null, storeTotal=null;
+let storeStruct=null, storeTotal=null, storeInfoData=null;
 function storeKpiCards(total){
   const meta=parseFloat(total.meta)||0, av=parseFloat(total.av)||0, pct=parseFloat(total.pct)||0, falta=parseFloat(total.falta)||0, vd=parseFloat(total.vd)||0;
   const est=total.estado||estadoFromPct(pct); const t=getTag(est); const cls=pct>=1?'green':(pct>=0.8?'amber':'red');
@@ -1304,6 +1305,24 @@ function renderStoreView(sel){
   document.getElementById("storeKpis").innerHTML = gaugesRow(struct,total) + '<div class="kpis">' + storeKpiCards(total) + team + '</div>';
   document.getElementById("tableSection").innerHTML=buildTableHtml(struct,total,true);
   renderComisionTienda();
+  const infoRow=document.getElementById("infoRow");
+  if(infoRow){
+    if(sel<0 || !_asesorRows[sel]){
+      const d=storeInfoData||{};
+      infoRow.innerHTML=
+        `<div class="chip">Avance día: <strong>${d.avance||"-"}</strong></div>
+         <div class="chip">Mes: <strong>${d.mes||"-"}</strong></div>
+         <div class="chip">Días del mes: <strong>${d.dias||"-"}</strong></div>
+         <div class="chip">PDV: <strong>${d.pdvLabel||curTienda}</strong></div>`;
+    } else {
+      const v=_asesorRows[sel];
+      const r0=(v.rs&&v.rs[0])||{};
+      infoRow.innerHTML=
+        `<div class="chip">PDV: <strong>${v.n}</strong></div>
+         <div class="chip">Tipo: <strong>${v.tipo||"-"}</strong></div>
+         <div class="chip">Avance día: <strong>${r0.d||"-"}</strong> / ${r0.dm||"-"}</div>`;
+    }
+  }
   const st=document.getElementById("storeTrend");
   if(st){
     if(sel<0){
