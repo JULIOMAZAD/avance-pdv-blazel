@@ -134,6 +134,7 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
   <div class="tab" data-s="cargo">💰 Cargo Fijo</div>
   <div class="tab" data-s="hfc">📶 HFC</div>
   <div class="tab" data-s="mix">📡 Mix Fija</div>
+  <div class="tab" data-s="evolucion">📈 Evolución x Tienda</div>
   <div class="tab" data-s="cuotas">🎯 Cuotas</div>
   <div class="tab" data-s="asesores">🏆 Asesores</div>
   <div class="tab" data-s="dia">📅 Ventas × Día</div>
@@ -171,6 +172,18 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
   <div class="kpis" id="kpisMix"></div>
   <div class="card"><h3>MIX FIJA % mensual (HFC / Portabilidad+Renovación+Porta-AD)</h3><div class="cwrap"><canvas id="chMix"></canvas></div></div>
   <div class="card"><h3 id="tMixPdv">MIX FIJA por tienda</h3><div class="tscroll"><table id="tblMix"></table></div></div>
+</section>
+
+<section class="sec" id="s-evolucion">
+  <div style="font-size:12px;color:var(--mut);margin-bottom:12px">Detalle mes a mes por tienda, con variación % vs. el mes anterior. El último mes mostrado está en curso.</div>
+  <div class="card">
+    <h3 id="tEvoCargo">Cargo Fijo — mes a mes por tienda</h3>
+    <div class="tscroll"><table id="tblEvoCargo"></table></div>
+  </div>
+  <div class="card">
+    <h3 id="tEvoHfc">Fija (HFC) — mes a mes por tienda</h3>
+    <div class="tscroll"><table id="tblEvoHfc"></table></div>
+  </div>
 </section>
 
 <section class="sec" id="s-cuotas">
@@ -1517,6 +1530,65 @@ function renderMix(){
   document.getElementById('tblMix').innerHTML=rows;
 }
 
+// ===================== EVOLUCIÓN X TIENDA =====================
+function evoMonths(n){
+  const arr=[]; let a=DATA.anioActual, m=DATA.mesActual;
+  for(let i=0;i<n;i++){ arr.unshift([a,m]); m--; if(m<1){m=12;a--;} }
+  return arr;
+}
+function evoMensaje(vals){
+  const n=vals.length;
+  const closed = vals.slice(0,n-1); // excluye el mes en curso
+  const idx0 = closed.findIndex(v=>v>0);
+  if(idx0===-1) return 'Sin historial suficiente para evaluar.';
+  const monthsActive = closed.length-idx0;
+  if(monthsActive<=2) return 'Tienda nueva: monitorear tendencia post-apertura.';
+  const first = closed[idx0], last = closed[closed.length-1];
+  if(!first) return 'Sin datos suficientes.';
+  const pct = (last-first)/first*100;
+  if(pct<=-25) return 'Caída fuerte: activar cross-sell y campaña de recuperación local.';
+  if(pct<=-10) return 'Caída moderada: reforzar cross-sell móvil + fija.';
+  if(pct>=15) return 'Buen ritmo: mantener el enfoque actual como referencia.';
+  return 'Estable: sin cambios significativos.';
+}
+function evoPctCell(cur,prev){
+  if(!prev||prev<=0||cur==null) return '<span style="color:var(--mut)">–</span>';
+  const d=(cur-prev)/prev*100, up=d>=0;
+  return `<span style="color:${up?'var(--verde)':'var(--rojo2)'};font-weight:700;font-size:11px">${up?'+':''}${d.toFixed(0)}%</span>`;
+}
+function renderEvolucion(){
+  const months = evoMonths(9);
+  const n = months.length;
+  const stores = DATA.pdvs.filter(p=>p.startsWith('Tienda - '));
+
+  function buildTable(tblId, titleId, label, getVal, isMoney){
+    const rows = stores.map(p=>({p, vals: months.map(([a,m])=>getVal(a,m,p))}))
+      .filter(r=>r.vals.some(v=>v>0));
+    const lastClosedIdx = n-2;
+    rows.sort((x,y)=> (y.vals[lastClosedIdx]||y.vals[n-1]) - (x.vals[lastClosedIdx]||x.vals[n-1]));
+
+    document.getElementById(titleId).textContent = `${label} — mes a mes por tienda`;
+    let head = '<tr><th>Tienda</th>';
+    months.forEach(([a,m],i)=>{ head += `<th class="r">${MESES[m-1]} '${String(a).slice(2)}${i===n-1?' (en curso)':''}</th>`; });
+    head += '<th>Mensaje sugerido</th></tr>';
+
+    let body = '';
+    rows.forEach(r=>{
+      body += `<tr><td><b>${pdvShort(r.p)}</b></td>`;
+      r.vals.forEach((v,i)=>{
+        const shown = v>0 ? (isMoney? 'S/ '+fmt(v) : fmt(v)) : '–';
+        const pctHtml = i===0 ? '' : `<br>${evoPctCell(v, r.vals[i-1])}`;
+        body += `<td class="r">${shown}${pctHtml}</td>`;
+      });
+      body += `<td style="font-size:12px;color:var(--txt);max-width:260px">${evoMensaje(r.vals)}</td></tr>`;
+    });
+    document.getElementById(tblId).innerHTML = head+body;
+  }
+
+  buildTable('tblEvoCargo','tEvoCargo','Cargo Fijo', (a,m,p)=>cargoSumFor(a,m,p), true);
+  buildTable('tblEvoHfc','tEvoHfc','Fija (HFC)', (a,m,p)=>opsCountFor(a,m,'HFC',p), false);
+}
+
 // ===================== CUOTAS =====================
 const CUOTAS_MESES_ORDEN = ['2026-01','2026-02','2026-03','2026-04','2026-05','2026-06','2026-07','2026-08','2026-09','2026-10','2026-11','2026-12'];
 
@@ -1955,7 +2027,7 @@ function actualizarProjBox(){
     });
   }
 }
-function render(){actualizarProjBox();renderResumen();renderCargo();renderHfc();renderMix();renderCuotas();renderAse();renderDia();var _e=document.getElementById('s-equipos');if(_e&&_e.classList.contains('act')&&window.renderEquipos)window.renderEquipos();}
+function render(){actualizarProjBox();renderResumen();renderCargo();renderHfc();renderMix();renderEvolucion();renderCuotas();renderAse();renderDia();var _e=document.getElementById('s-equipos');if(_e&&_e.classList.contains('act')&&window.renderEquipos)window.renderEquipos();}
 
 // ===================== CARGA DE EXCEL Y PERSISTENCIA =====================
 function saveDataToStorage(data, key){
