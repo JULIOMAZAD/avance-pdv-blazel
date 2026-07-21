@@ -111,12 +111,14 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
     </div>
   </div>
   <div id="projAvCont" style="display:none">
-    <div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:9px 14px;display:flex;align-items:center;gap:10px">
-      <span style="font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:1px;font-weight:700;white-space:nowrap">Día de avance</span>
-      <input id="projAvInput" type="number" min="1" max="31" placeholder="auto"
-        title="Día hasta el que cargaste data. Calcula la proyección sin tocar el cargo."
-        style="background:var(--bg);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:13px;width:64px;outline:none">
-      <button id="projAvSaveBtn" style="background:var(--rojo);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">Guardar</button>
+    <div>
+      <label>DÍA DE AVANCE</label>
+      <div style="display:flex;gap:6px">
+        <input id="projAvInput" type="number" min="1" max="31" placeholder="auto"
+          title="Día hasta el que cargaste data. Calcula la proyección sin tocar el cargo."
+          style="background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:13px;width:64px;outline:none">
+        <button id="projAvSaveBtn" style="background:var(--rojo);color:#fff;border:1px solid var(--rojo);border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">Guardar</button>
+      </div>
     </div>
   </div>
   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
@@ -844,6 +846,7 @@ function setActiveData(data){
     F.tipo = Array.isArray(vista.tipo) ? vista.tipo : [];
     F.moda = Array.isArray(vista.moda) ? vista.moda : [];
     F.dia  = (typeof vista.dia==='number') ? vista.dia : 0;
+    window._tabPendiente = vista.tab || null;
   } else {
     // valores por defecto del filtro: año y mes actuales, todas las tiendas, todos los productos
     F.anio = [DATA.anioActual];
@@ -851,6 +854,7 @@ function setActiveData(data){
     F.pdv = [];
     F.prod = [];
     F.dia = 0;
+    window._tabPendiente = null;
   }
 }
 
@@ -1266,7 +1270,18 @@ function initTabs(){
     document.querySelectorAll('.sec').forEach(x=>x.classList.remove('act'));
     t.classList.add('act'); document.getElementById('s-'+t.dataset.s).classList.add('act');
     if(t.dataset.s==='equipos' && window.renderEquipos) window.renderEquipos();
+    guardarVistaFiltros();
   });
+}
+function activarTabGuardada(tabKey){
+  if(!tabKey) return;
+  const btn = document.querySelector(`.tab[data-s="${tabKey}"]`);
+  const sec = document.getElementById('s-'+tabKey);
+  if(!btn || !sec) return;
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('act'));
+  document.querySelectorAll('.sec').forEach(x=>x.classList.remove('act'));
+  btn.classList.add('act'); sec.classList.add('act');
+  if(tabKey==='equipos' && window.renderEquipos) window.renderEquipos();
 }
 
 // ===================== RESUMEN =====================
@@ -1538,21 +1553,6 @@ function evoMonths(n){
   for(let i=0;i<n;i++){ arr.unshift([a,m]); m--; if(m<1){m=12;a--;} }
   return arr;
 }
-function evoMensaje(vals){
-  const n=vals.length;
-  const closed = vals.slice(0,n-1); // excluye el mes en curso
-  const idx0 = closed.findIndex(v=>v>0);
-  if(idx0===-1) return 'Sin historial suficiente para evaluar.';
-  const monthsActive = closed.length-idx0;
-  if(monthsActive<=2) return 'Tienda nueva: monitorear tendencia post-apertura.';
-  const first = closed[idx0], last = closed[closed.length-1];
-  if(!first) return 'Sin datos suficientes.';
-  const pct = (last-first)/first*100;
-  if(pct<=-25) return 'Caída fuerte: activar cross-sell y campaña de recuperación local.';
-  if(pct<=-10) return 'Caída moderada: reforzar cross-sell móvil + fija.';
-  if(pct>=15) return 'Buen ritmo: mantener el enfoque actual como referencia.';
-  return 'Estable: sin cambios significativos.';
-}
 function evoPctCell(cur,prev){
   if(!prev||prev<=0||cur==null) return '<span style="color:var(--mut)">–</span>';
   const d=(cur-prev)/prev*100, up=d>=0;
@@ -1573,7 +1573,7 @@ function renderEvolucion(){
     document.getElementById(titleId).textContent = `${label} — mes a mes por tienda`;
     let head = '<tr><th>Tienda</th>';
     months.forEach(([a,m],i)=>{ head += `<th class="r">${MESES[m-1]} '${String(a).slice(2)}${i===n-1?' (en curso)':''}</th>`; });
-    head += '<th>Mensaje sugerido</th></tr>';
+    head += '</tr>';
 
     let body = '';
     rows.forEach(r=>{
@@ -1583,7 +1583,7 @@ function renderEvolucion(){
         const pctHtml = i===0 ? '' : `<br>${evoPctCell(v, r.vals[i-1])}`;
         body += `<td class="r">${shown}${pctHtml}</td>`;
       });
-      body += `<td style="font-size:12px;color:var(--txt);max-width:260px">${evoMensaje(r.vals)}</td></tr>`;
+      body += `</tr>`;
     });
     document.getElementById(tblId).innerHTML = head+body;
   }
@@ -1612,19 +1612,178 @@ function cuotasKeyActual(){
 function actualizarCuotasFallbackBanner(key, requestedKey){
   const banner = document.getElementById('cuotasFallbackBanner');
   if(!banner) return;
-  if(key && key !== requestedKey){
+  if(key && key === requestedKey){
     const C = CUOTAS_HIST[key];
-    const [ra, rm] = requestedKey.split('-');
-    const mesReq = MESES_FULL ? MESES_FULL[parseInt(rm,10)-1] : requestedKey;
-    banner.style.display = 'block';
-    banner.innerHTML = `⚠️ Estás viendo <b>${C ? C.mes+' '+C.anio : key}</b> porque aún no se ha cargado el Excel de cuotas de <b>${mesReq} ${ra}</b> (el filtro de arriba está en ${mesReq} ${ra}). Sube el Excel de cuotas del mes en curso para verlo actualizado aquí.`;
-  } else {
-    banner.style.display = 'none';
+    if(C && C._live){
+      banner.style.display = 'block';
+      banner.style.background = '#16302a';
+      banner.style.borderColor = '#1f8a5f';
+      banner.style.color = '#7fe0b8';
+      banner.innerHTML = `✓ Cuotas obtenidas en vivo desde el mismo sistema de asesores (sin necesidad de subir Excel).`;
+    } else {
+      banner.style.display = 'none';
+    }
+    return;
   }
+  banner.style.display = 'block';
+  banner.style.background = '#3a2a1a';
+  banner.style.borderColor = '#6b4a1f';
+  banner.style.color = '#f5b041';
+  const C = CUOTAS_HIST[key];
+  const [ra, rm] = requestedKey.split('-');
+  const mesReq = MESES_FULL ? MESES_FULL[parseInt(rm,10)-1] : requestedKey;
+  banner.innerHTML = `⏳ Buscando cuotas de <b>${mesReq} ${ra}</b> en vivo… mientras tanto se muestra <b>${C ? C.mes+' '+C.anio : key}</b>. Si no aparecen en unos segundos, sube el Excel de cuotas de ${mesReq} ${ra} como respaldo.`;
+}
+
+// ===================== CUOTAS EN VIVO (mismo backend Apps Script que index.html) =====================
+// Evita depender de subir un Excel manual: consulta directo la hoja de cuotas por tienda/mes.
+const CUOTAS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxlm0VRD8L88rtmDJStmEM1JkcOvO3DbZIQAM8VcVBbRF5nwbS_HpH35QsvNPK-RK9H/exec";
+// Nombres de hoja tal cual los usa index.html (incluye la variante "MALL DEL SU 2" tal como está en el Sheet).
+const CUOTAS_SHEET_NAME = {
+  "Tienda - Mall Bellavista": "mall bellavista",
+  "Tienda - Mall del Sur 1": "mall del sur 1",
+  "Tienda - Mall del Sur 2": "MALL DEL SU 2",
+  "Tienda - Mega Plaza": "mega plaza",
+  "Tienda - Plaza Norte": "plaza norte",
+  "Tienda - Primavera": "primavera",
+  "Tienda - Rambla Brasil": "rambla",
+  "Tienda - Santa Anita": "santa anita",
+};
+const CUOTAS_MES_KEYS = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+const cuotasLiveCache = {};
+const cuotasLiveInFlight = {};
+const cuotasLiveAttempted = {};
+
+function parseCuotasRows(rows){
+  let avance="", mes="", dias="";
+  for(let i=0;i<3;i++){
+    const r=rows[i]||[];
+    for(let j=0;j<r.length;j++){
+      const v=String(r[j]||"").trim().toUpperCase();
+      if(v==="AVANCE"&&rows[i+1]) avance=String(rows[i+1][j]||"").trim();
+      if(v==="MES"&&rows[i+1]) mes=String(rows[i+1][j]||"").trim();
+      if(v==="DIAS"&&rows[i+1]) dias=String(rows[i+1][j]||"").trim();
+    }
+  }
+  const CATS=["prepago","postpago","residencial","otros"];
+  const struct={prepago:[],postpago:[],residencial:[],otros:[]};
+  let curCat="prepago", totalRow=null;
+  let nameCol=2, metaCol=3, avCol=4, pctCol=5, faltaCol=6, vdCol=7, pfCol=8, estadoCol=9;
+  for(let i=5;i<15;i++){
+    const r=rows[i]||[];
+    for(let j=0;j<r.length;j++){
+      const v=String(r[j]||"").trim().toLowerCase();
+      if(v==="meta"){metaCol=j;nameCol=j-1;avCol=j+1;pctCol=j+2;faltaCol=j+3;vdCol=j+4;pfCol=j+5;estadoCol=j+6;break;}
+    }
+    if(metaCol!==3) break;
+  }
+  for(let i=10;i<rows.length;i++){
+    const r=rows[i]||[];
+    const name=String(r[nameCol]||"").trim();
+    if(!name) continue;
+    const nl=name.toLowerCase().trim();
+    if(CATS.includes(nl)||nl.startsWith("residencial")){curCat=nl.startsWith("residencial")?"residencial":nl;continue;}
+    if(nl.startsWith("total")){
+      totalRow={meta:r[metaCol],av:r[avCol],pct:r[pctCol],falta:r[faltaCol],vd:r[vdCol],pf:r[pfCol],estado:String(r[estadoCol]||"")};
+      continue;
+    }
+    if(nl.includes("coordinador")||nl.includes("jefe")||nl.includes("gerente")) continue;
+    if(typeof r[metaCol]!=="number"&&typeof r[avCol]!=="number") continue;
+    struct[curCat].push({name,meta:r[metaCol],av:r[avCol]});
+  }
+  return {struct, avance, mes, dias, totalRow};
+}
+
+async function fetchCuotasTiendaLive(sheet, mesKey){
+  const cacheKey = sheet+"_"+mesKey;
+  if(cuotasLiveCache[cacheKey]) return cuotasLiveCache[cacheKey];
+  if(cuotasLiveInFlight[cacheKey]) return cuotasLiveInFlight[cacheKey];
+  const url = `${CUOTAS_SCRIPT_URL}?tienda=${encodeURIComponent(sheet)}&mes=${mesKey}`;
+  const ctrl = new AbortController();
+  const killer = setTimeout(()=>ctrl.abort(), 15000);
+  const p = fetch(url, {signal: ctrl.signal})
+    .then(r=>r.json())
+    .then(json=>{
+      if(json.error) throw new Error(json.error);
+      const parsed = parseCuotasRows(json.data);
+      cuotasLiveCache[cacheKey] = parsed;
+      return parsed;
+    })
+    .finally(()=>{ clearTimeout(killer); delete cuotasLiveInFlight[cacheKey]; });
+  cuotasLiveInFlight[cacheKey] = p;
+  return p;
+}
+
+// Trae y arma, para TODAS las tiendas con hoja de cuotas, la misma forma que ya usa CUOTAS_HIST[key].
+async function fetchCuotasMesLive(anio, mes){
+  const mesKey = CUOTAS_MES_KEYS[mes-1];
+  if(!mesKey) return null;
+  const stores = Object.keys(CUOTAS_SHEET_NAME);
+  const results = await Promise.all(stores.map(async p=>{
+    try{ const d = await fetchCuotasTiendaLive(CUOTAS_SHEET_NAME[p], mesKey); return {p, d}; }
+    catch(e){ return {p, d:null}; }
+  }));
+  const ok = results.filter(r=>r.d && r.d.totalRow);
+  if(!ok.length) return null;
+
+  function flattenCats(struct){
+    const out=[];
+    ["prepago","postpago","residencial","otros"].forEach(c=>{
+      (struct[c]||[]).forEach(it=>{
+        const meta=parseFloat(it.meta), av=parseFloat(it.av);
+        out.push({cat: it.name, meta: isNaN(meta)?0:meta, avance: isNaN(av)?0:av});
+      });
+    });
+    return out;
+  }
+
+  const storesOut = {};
+  let metaTotal=0, avanceTotal=0;
+  const globalCatsMap = {};
+  let diasMes=null, avanceDia=null, mesLabel=null;
+
+  ok.forEach(({p,d})=>{
+    const m = parseFloat(d.totalRow.meta)||0;
+    const a = parseFloat(d.totalRow.av)||0;
+    metaTotal += m; avanceTotal += a;
+    const cats = flattenCats(d.struct);
+    storesOut[p] = { meta_total:m, avance_total:a, cats };
+    cats.forEach(c=>{
+      if(!globalCatsMap[c.cat]) globalCatsMap[c.cat]={cat:c.cat, meta:0, avance:0};
+      globalCatsMap[c.cat].meta += c.meta;
+      globalCatsMap[c.cat].avance += c.avance;
+    });
+    if(diasMes==null){ const dv=parseInt(d.dias,10); if(!isNaN(dv)) diasMes=dv; }
+    if(avanceDia==null){ const av=parseInt(d.avance,10); if(!isNaN(av)) avanceDia=av; }
+    if(mesLabel==null && d.mes) mesLabel = d.mes;
+  });
+
+  return {
+    mes: mesLabel || (MESES_FULL ? MESES_FULL[mes-1] : mesKey.toUpperCase()),
+    anio,
+    dias_mes: diasMes || 31,
+    avance_dia: avanceDia || 0,
+    global: { meta_total: metaTotal, avance_total: avanceTotal, cats: Object.values(globalCatsMap) },
+    stores: storesOut,
+    _live: true
+  };
+}
+
+function triggerCuotasLiveFetch(key){
+  if(cuotasLiveAttempted[key]) return;
+  cuotasLiveAttempted[key] = true;
+  const [a, m] = key.split('-').map(Number);
+  fetchCuotasMesLive(a, m).then(data=>{
+    if(data){
+      CUOTAS_HIST[key] = data;
+      render();
+    }
+  }).catch(()=>{});
 }
 
 function renderCuotas(){
   const requestedKey = cuotasKeyRequested();
+  if(!CUOTAS_HIST[requestedKey]) triggerCuotasLiveFetch(requestedKey);
   const key = cuotasKeyActual();
   actualizarCuotasFallbackBanner(key, requestedKey);
   const C = CUOTAS_HIST[key];
@@ -2090,8 +2249,10 @@ function loadDataFromStorage(key){
 const STORAGE_KEY_VISTA = 'blazel_ultima_vista_v1';
 function guardarVistaFiltros(){
   try{
+    const tabAct = document.querySelector('.tab.act');
     localStorage.setItem(STORAGE_KEY_VISTA, JSON.stringify({
-      anio:F.anio, mes:F.mes, pdv:F.pdv, prod:F.prod, tipo:F.tipo, moda:F.moda, dia:F.dia
+      anio:F.anio, mes:F.mes, pdv:F.pdv, prod:F.prod, tipo:F.tipo, moda:F.moda, dia:F.dia,
+      tab: tabAct ? tabAct.dataset.s : undefined
     }));
   }catch(e){ console.warn('No se pudo guardar la última vista', e); }
 }
@@ -2260,6 +2421,7 @@ function init(){
   document.getElementById('fcorte').textContent = `${DATA.maxDia} de ${MESES[DATA.mesActual-1]} ${DATA.anioActual}`;
   setUploadStatus('Datos al corte 19 de junio 2026 · fuente: PRUEBAS DE LINK', 'ok');
   render();
+  if(window._tabPendiente) activarTabGuardada(window._tabPendiente);
   fetchCuotasFromAPI();
 }
 
