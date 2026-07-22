@@ -219,7 +219,7 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
   <div style="font-size:12px;color:var(--mut);margin-bottom:12px">Estudio de equipos · usa los filtros de arriba (Año / Mes / Tienda) · periodo disponible 2025–2026</div>
   <div class="kpis" id="eqKpis"></div>
   <div id="eqPeriodoBanner" style="display:none"></div>
-  <div class="card">
+  <div class="card" id="cardEqMes">
     <h3>Equipos por mes</h3>
     <div id="eqMesNota" style="font-size:12px;color:var(--mut);padding:2px 0 10px">Top 5 marcas de cada mes, según los filtros de arriba. Útil cuando seleccionas varios meses en el filtro MES.</div>
     <div id="eqMesGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px"></div>
@@ -1561,7 +1561,8 @@ function evoMonths(n){
 function evoPctCell(cur,prev){
   if(!prev||prev<=0||cur==null) return '<span style="color:var(--mut)">–</span>';
   const d=(cur-prev)/prev*100, up=d>=0;
-  return `<span style="color:${up?'var(--verde)':'var(--rojo2)'};font-weight:700;font-size:11px">${up?'+':''}${d.toFixed(0)}%</span>`;
+  const bg = up ? '#1f8a3f' : '#c0392b';
+  return `<span style="display:inline-block;background:${bg};color:#ffffff;font-weight:700;font-size:11px;padding:2px 7px;border-radius:20px;line-height:1.5">${up?'+':''}${d.toFixed(0)}%</span>`;
 }
 function renderEvolucion(){
   const months = evoMonths(9);
@@ -2618,12 +2619,19 @@ const EQUIPOS_DATA = {"rows": [[2025, 1, "Santa Anita", "SIN MARCA", "Sin modelo
         if(r[3]!=='SIN MARCA') o.mk[r[3]] = (o.mk[r[3]]||0) + r[6];
       });
       const keys = Object.keys(byMes).sort();
+      const cardEqMes = document.getElementById('cardEqMes');
+      // limpiar gráficos de un render anterior, para no dejar instancias sueltas (aplica en ambos casos)
+      eqMesChartIds.forEach(id=>{ if(charts[id]){ charts[id].destroy(); delete charts[id]; } });
+      eqMesChartIds = [];
+      if(keys.length<=1){
+        // con 1 solo mes, esta tarjeta muestra exactamente lo mismo que Top Marcas: se oculta.
+        if(cardEqMes) cardEqMes.style.display = 'none';
+        return;
+      }
+      if(cardEqMes) cardEqMes.style.display = '';
       const grid = document.getElementById('eqMesGrid');
       if(!grid) return;
 
-      // limpiar gráficos de meses de un render anterior, para no dejar instancias sueltas
-      eqMesChartIds.forEach(id=>{ if(charts[id]){ charts[id].destroy(); delete charts[id]; } });
-      eqMesChartIds = [];
 
       if(!keys.length){ grid.innerHTML = '<div style="color:#8a97ab;padding:10px;grid-column:1/-1">Sin datos para el periodo/filtro seleccionado.</div>'; return; }
 
