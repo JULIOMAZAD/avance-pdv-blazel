@@ -218,10 +218,11 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
 <section class="sec" id="s-equipos">
   <div style="font-size:12px;color:var(--mut);margin-bottom:12px">Estudio de equipos · usa los filtros de arriba (Año / Mes / Tienda) · periodo disponible 2025–2026</div>
   <div class="kpis" id="eqKpis"></div>
+  <div id="eqPeriodoBanner" style="display:none"></div>
   <div class="card">
     <h3>Equipos por mes</h3>
-    <div id="eqMesNota" style="font-size:12px;color:var(--mut);padding:2px 0 8px">Desglose mes a mes según los filtros de arriba. Útil cuando seleccionas varios meses en el filtro MES.</div>
-    <div class="tscroll"><table id="tEqMes"></table></div>
+    <div id="eqMesNota" style="font-size:12px;color:var(--mut);padding:2px 0 10px">Top 5 marcas de cada mes, según los filtros de arriba. Útil cuando seleccionas varios meses en el filtro MES.</div>
+    <div id="eqMesGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px"></div>
   </div>
   <div class="card">
     <h3>Equipos por vendedor · consulta una tienda y verás a sus vendedores (mes ant. vs mes actual, mismo día)</h3>
@@ -240,11 +241,10 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
   </div>
   <div class="grid2">
     <div class="card"><h3>Top Modelos</h3><div class="tscroll" style="max-height:430px"><table id="tEqModelos"></table></div></div>
-    <div class="card"><h3>Comparativo por Tienda</h3><div class="tscroll" style="max-height:430px"><table id="tEqTiendas"></table></div></div>
+    <div class="card" id="cardEqComparativoTienda"><h3>Comparativo por Tienda</h3><div class="tscroll" style="max-height:430px"><table id="tEqTiendas"></table></div></div>
   </div>
-  <div class="card"><h3>Marca líder por Tienda</h3><div class="tscroll"><table id="tEqLider"></table></div>
+  <div class="card" id="cardEqLiderTienda"><h3>Marca líder por Tienda</h3><div class="tscroll"><table id="tEqLider"></table></div>
     <div style="font-size:11px;color:var(--mut);margin-top:10px" id="eqNote"></div></div>
-  <div class="card"><h3>Equipos por marca · Mes anterior vs Mes actual</h3><div id="eqCmpNota" style="font-size:12px;color:var(--mut);padding:2px 0 8px"></div><div class="tscroll"><table id="tEqCmpMarca"></table></div></div>
 </section>
 <div class="foot">BLAZEL A&M Ventas Corporativas · Fuente: PRUEBAS DE LINK · Datos al día <span id="fcorte"></span></div>
 </main>
@@ -2472,6 +2472,22 @@ const EQUIPOS_DATA = {"rows": [[2025, 1, "Santa Anita", "SIN MARCA", "Sin modelo
   function kpi(t,v,d,col){return '<div class="kpi"><div style="font-size:11px;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">'+t+'</div><div style="font-size:28px;font-weight:800;line-height:1;color:'+col+'">'+v+'</div><div style="font-size:12px;color:var(--mut);margin-top:6px">'+d+'</div></div>';}
   function draw(){
     const rows=filt(); const total=rows.reduce((s,r)=>s+r[6],0);
+    // Aviso claro de qué periodo están sumando los gráficos generales (Top Marcas, Mix de Gama, etc.)
+    {
+      const banner = document.getElementById('eqPeriodoBanner');
+      if(banner){
+        const mesesSel = F.mes.length ? F.mes.slice().sort((a,b)=>a-b) : null;
+        if(mesesSel && mesesSel.length>1){
+          const nombres = mesesSel.map(m=>MESES[m-1]).join(', ');
+          banner.style.display='block';
+          banner.style.background='#3a2a1a'; banner.style.border='1px solid #6b4a1f'; banner.style.color='#f5b041';
+          banner.style.borderRadius='10px'; banner.style.padding='10px 14px'; banner.style.marginBottom='12px'; banner.style.fontSize='13px';
+          banner.innerHTML = `⚠️ Los gráficos generales (Top Marcas, Mix de Gama, Top Modelos, Comparativo) están <b>sumando ${mesesSel.length} meses juntos</b>: ${nombres}. Para ver un mes específico, selecciona solo ese mes arriba — o mira el desglose mes a mes en "Equipos por mes" más abajo.`;
+        } else {
+          banner.style.display='none';
+        }
+      }
+    }
     const marca={}; rows.forEach(r=>marca[r[3]]=(marca[r[3]]||0)+r[6]);
     const marcaArr=Object.entries(marca).sort((a,b)=>b[1]-a[1]).filter(m=>m[0]!=='SIN MARCA');
     const lider=marcaArr[0]?marcaArr[0][0]:'-';
@@ -2506,6 +2522,11 @@ const EQUIPOS_DATA = {"rows": [[2025, 1, "Santa Anita", "SIN MARCA", "Sin modelo
       if(r[5]==='Gama alta')o.a+=r[6];else if(r[5]==='Gama media')o.m+=r[6];else if(r[5]==='Gama baja')o.b+=r[6];
       if(r[3]!=='SIN MARCA')o.mk[r[3]]=(o.mk[r[3]]||0)+r[6];});
     const tA=Object.entries(tn).sort((a,b)=>b[1].tot-a[1].tot);
+    const soloUnaTienda = F.pdv && F.pdv.length===1;
+    const cardCmpT = document.getElementById('cardEqComparativoTienda');
+    const cardLiderT = document.getElementById('cardEqLiderTienda');
+    if(cardCmpT) cardCmpT.style.display = soloUnaTienda ? 'none' : '';
+    if(cardLiderT) cardLiderT.style.display = soloUnaTienda ? 'none' : '';
     document.getElementById('tEqTiendas').innerHTML='<tr><th>Tienda</th><th style="text-align:right">Equipos</th><th style="text-align:right">Alta</th><th style="text-align:right">Media</th><th style="text-align:right">Baja</th></tr>'+
       tA.map(([t,o])=>'<tr><td>'+t.replace('PDV - ','')+'</td><td style="text-align:right"><b>'+fmt(o.tot)+'</b></td><td style="text-align:right;color:#f59e0b">'+pct(o.a,o.tot)+'</td><td style="text-align:right;color:#3b82f6">'+pct(o.m,o.tot)+'</td><td style="text-align:right;color:#8a97ab">'+pct(o.b,o.tot)+'</td></tr>').join('');
     document.getElementById('tEqLider').innerHTML='<tr><th>Tienda</th><th style="text-align:right">Equipos</th><th>1° marca</th><th>2° marca</th><th>3° marca</th></tr>'+
@@ -2573,47 +2594,72 @@ const EQUIPOS_DATA = {"rows": [[2025, 1, "Santa Anita", "SIN MARCA", "Sin modelo
       const vArr=vn.map(v=>{const c=vendCur[v]||0,p=vendPrev[v]||0;return{v,pdv:vendPdv[v]||'-',c,p};}).filter(x=>x.c||x.p).sort((a,b)=>b.c-a.c);
       const en=document.getElementById('eqVendNota'); if(en) en.innerHTML=nota;
       let h='<tr><th>#</th><th>Vendedor</th><th>Tienda</th><th style="text-align:right">'+MESES[pmM-1]+'</th><th style="text-align:right">'+MESES[refM-1]+'</th><th style="text-align:right">Proy. fin mes</th><th style="text-align:right">Δ mismo día</th></tr>';
-      vArr.forEach((x,i)=>{ h+='<tr><td style="color:#8a97ab">'+(i+1)+'</td><td>'+x.v+'</td><td>'+(x.pdv||'-')+'</td><td style="text-align:right">'+fmt(x.p)+'</td><td style="text-align:right"><b>'+fmt(x.c)+'</b></td><td style="text-align:right">'+(completo?'—':fmt(proyOf(x.c)))+'</td><td style="text-align:right">'+deltaCell(x.p,x.c)+'</td></tr>'; });
+      vArr.forEach((x,i)=>{ h+='<tr><td style="color:#8a97ab">'+(i+1)+'</td><td>'+x.v+'</td><td>'+(x.pdv||'-')+'</td><td style="text-align:right">'+fmt(x.p)+'</td><td style="text-align:right"><b>'+fmt(x.c)+'</b></td><td style="text-align:right">'+(completo?fmt(x.c):fmt(proyOf(x.c)))+'</td><td style="text-align:right">'+deltaCell(x.p,x.c)+'</td></tr>'; });
       const tv=document.getElementById('tEqVend'); if(tv) tv.innerHTML=vArr.length?h:'<tr><td style="color:#8a97ab;padding:10px">Sin equipos de ese tipo en el periodo/día.</td></tr>';
       // TIENDA
       const tnames=[...new Set([...Object.keys(tCur),...Object.keys(tPrev)])];
       const tArr=tnames.map(t=>{const c=tCur[t]||0,p=tPrev[t]||0;return{t,c,p};}).filter(x=>x.c||x.p).sort((a,b)=>b.c-a.c);
       const etn=document.getElementById('eqTiendaNota'); if(etn) etn.innerHTML=nota;
       let h2='<tr><th>#</th><th>Tienda</th><th style="text-align:right">'+MESES[pmM-1]+'</th><th style="text-align:right">'+MESES[refM-1]+'</th><th style="text-align:right">Proy. fin mes</th><th style="text-align:right">Δ mismo día</th></tr>';
-      tArr.forEach((x,i)=>{ h2+='<tr><td style="color:#8a97ab">'+(i+1)+'</td><td>'+x.t+'</td><td style="text-align:right">'+fmt(x.p)+'</td><td style="text-align:right"><b>'+fmt(x.c)+'</b></td><td style="text-align:right">'+(completo?'—':fmt(proyOf(x.c)))+'</td><td style="text-align:right">'+deltaCell(x.p,x.c)+'</td></tr>'; });
+      tArr.forEach((x,i)=>{ h2+='<tr><td style="color:#8a97ab">'+(i+1)+'</td><td>'+x.t+'</td><td style="text-align:right">'+fmt(x.p)+'</td><td style="text-align:right"><b>'+fmt(x.c)+'</b></td><td style="text-align:right">'+(completo?fmt(x.c):fmt(proyOf(x.c)))+'</td><td style="text-align:right">'+deltaCell(x.p,x.c)+'</td></tr>'; });
       const tt=document.getElementById('tEqTienda'); if(tt) tt.innerHTML=tArr.length?h2:'<tr><td style="color:#8a97ab;padding:10px">Sin datos.</td></tr>';
     }catch(e){}
   }
+  let eqMesChartIds = [];
   function renderEquMes(){
     try{
       const rows = filt(); // ya respeta F.anio / F.mes / F.pdv
       const byMes = {};
       rows.forEach(r=>{
         const k = r[0]+'-'+String(r[1]).padStart(2,'0');
-        if(!byMes[k]) byMes[k] = {a:r[0], m:r[1], tot:0, a1:0, m1:0, b1:0, mk:{}};
+        if(!byMes[k]) byMes[k] = {a:r[0], m:r[1], tot:0, mk:{}};
         const o = byMes[k];
         o.tot += r[6];
-        if(r[5]==='Gama alta') o.a1 += r[6];
-        else if(r[5]==='Gama media') o.m1 += r[6];
-        else if(r[5]==='Gama baja') o.b1 += r[6];
         if(r[3]!=='SIN MARCA') o.mk[r[3]] = (o.mk[r[3]]||0) + r[6];
       });
       const keys = Object.keys(byMes).sort();
-      const el = document.getElementById('tEqMes');
-      if(!el) return;
-      if(!keys.length){ el.innerHTML = '<tr><td style="color:#8a97ab;padding:10px">Sin datos para el periodo/filtro seleccionado.</td></tr>'; return; }
-      let h = '<tr><th>Mes</th><th style="text-align:right">Equipos</th><th style="text-align:right">Gama alta</th><th style="text-align:right">Gama media</th><th style="text-align:right">Gama baja</th><th>Marca líder</th></tr>';
-      keys.forEach(k=>{
+      const grid = document.getElementById('eqMesGrid');
+      if(!grid) return;
+
+      // limpiar gráficos de meses de un render anterior, para no dejar instancias sueltas
+      eqMesChartIds.forEach(id=>{ if(charts[id]){ charts[id].destroy(); delete charts[id]; } });
+      eqMesChartIds = [];
+
+      if(!keys.length){ grid.innerHTML = '<div style="color:#8a97ab;padding:10px;grid-column:1/-1">Sin datos para el periodo/filtro seleccionado.</div>'; return; }
+
+      let html = '';
+      keys.forEach((k,idx)=>{
         const o = byMes[k];
-        const lider = Object.entries(o.mk).sort((a,b)=>b[1]-a[1])[0];
-        h += '<tr><td><b>'+MESES[o.m-1]+' '+o.a+'</b></td><td style="text-align:right">'+fmt(o.tot)+'</td>'
-          +'<td style="text-align:right;color:#f59e0b">'+pct(o.a1,o.tot)+'</td>'
-          +'<td style="text-align:right;color:#3b82f6">'+pct(o.m1,o.tot)+'</td>'
-          +'<td style="text-align:right;color:#8a97ab">'+pct(o.b1,o.tot)+'</td>'
-          +'<td>'+(lider? lider[0]+' <span style="color:#8a97ab">('+fmt(lider[1])+')</span>' : '—')+'</td></tr>';
+        const cid = 'eqMesChart_'+idx;
+        html += `<div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px">
+          <div style="font-size:12px;font-weight:700;color:var(--txt)">${MESES[o.m-1]} ${o.a}</div>
+          <div style="font-size:11px;color:var(--mut);margin-bottom:6px">${fmt(o.tot)} equipos</div>
+          <div style="height:140px"><canvas id="${cid}"></canvas></div>
+        </div>`;
       });
-      el.innerHTML = h;
-    }catch(e){}
+      grid.innerHTML = html;
+
+      keys.forEach((k,idx)=>{
+        const o = byMes[k];
+        const top = Object.entries(o.mk).sort((a,b)=>b[1]-a[1]).slice(0,5);
+        const cid = 'eqMesChart_'+idx;
+        eqMesChartIds.push(cid);
+        if(!top.length) return;
+        mkChart(cid, {
+          type: 'bar',
+          data: { labels: top.map(t=>t[0]), datasets: [{ data: top.map(t=>t[1]), backgroundColor: PAL.slice(0,top.length) }] },
+          options: {
+            indexAxis: 'y',
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display:false } },
+            scales: {
+              x: { ticks:{color:'#8a97ab', font:{size:9}}, grid:{color:'#ffffff10'} },
+              y: { ticks:{color:'#c9d2e3', font:{size:10}}, grid:{display:false} }
+            }
+          }
+        });
+      });
+    }catch(e){ console.warn('renderEquMes error', e); }
   }
   window.renderEquipos=function(){ draw(); renderEquVendTienda(); renderEquMes(); };
 })();
