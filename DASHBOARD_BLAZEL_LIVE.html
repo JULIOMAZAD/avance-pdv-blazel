@@ -219,6 +219,11 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
   <div style="font-size:12px;color:var(--mut);margin-bottom:12px">Estudio de equipos · usa los filtros de arriba (Año / Mes / Tienda) · periodo disponible 2025–2026</div>
   <div class="kpis" id="eqKpis"></div>
   <div class="card">
+    <h3>Equipos por mes</h3>
+    <div id="eqMesNota" style="font-size:12px;color:var(--mut);padding:2px 0 8px">Desglose mes a mes según los filtros de arriba. Útil cuando seleccionas varios meses en el filtro MES.</div>
+    <div class="tscroll"><table id="tEqMes"></table></div>
+  </div>
+  <div class="card">
     <h3>Equipos por vendedor · consulta una tienda y verás a sus vendedores (mes ant. vs mes actual, mismo día)</h3>
     <div id="eqVendNota" style="font-size:12px;color:var(--mut);padding:2px 0 8px"></div>
     <div class="tscroll"><table id="tEqVend"></table></div>
@@ -1562,7 +1567,11 @@ function renderEvolucion(){
   const months = evoMonths(9);
   const n = months.length;
   const NON_STORE = new Set(['Call center','Multimarca','Campo','Otros']);
-  const stores = DATA.pdvs.filter(p => !NON_STORE.has(p));
+  let stores = DATA.pdvs.filter(p => !NON_STORE.has(p));
+  if(F.pdv && F.pdv.length){
+    const sel = new Set(F.pdv.map(x=>String(x).toLowerCase()));
+    stores = stores.filter(p => sel.has(String(p).toLowerCase()));
+  }
 
   function buildTable(tblId, titleId, label, getVal, isMoney){
     const rows = stores.map(p=>({p, vals: months.map(([a,m])=>getVal(a,m,p))}))
@@ -2562,7 +2571,38 @@ const EQUIPOS_DATA = {"rows": [[2025, 1, "Santa Anita", "SIN MARCA", "Sin modelo
       const tt=document.getElementById('tEqTienda'); if(tt) tt.innerHTML=tArr.length?h2:'<tr><td style="color:#8a97ab;padding:10px">Sin datos.</td></tr>';
     }catch(e){}
   }
-  window.renderEquipos=function(){ draw(); renderEquVendTienda(); };
+  function renderEquMes(){
+    try{
+      const rows = filt(); // ya respeta F.anio / F.mes / F.pdv
+      const byMes = {};
+      rows.forEach(r=>{
+        const k = r[0]+'-'+String(r[1]).padStart(2,'0');
+        if(!byMes[k]) byMes[k] = {a:r[0], m:r[1], tot:0, a1:0, m1:0, b1:0, mk:{}};
+        const o = byMes[k];
+        o.tot += r[6];
+        if(r[5]==='Gama alta') o.a1 += r[6];
+        else if(r[5]==='Gama media') o.m1 += r[6];
+        else if(r[5]==='Gama baja') o.b1 += r[6];
+        if(r[3]!=='SIN MARCA') o.mk[r[3]] = (o.mk[r[3]]||0) + r[6];
+      });
+      const keys = Object.keys(byMes).sort();
+      const el = document.getElementById('tEqMes');
+      if(!el) return;
+      if(!keys.length){ el.innerHTML = '<tr><td style="color:#8a97ab;padding:10px">Sin datos para el periodo/filtro seleccionado.</td></tr>'; return; }
+      let h = '<tr><th>Mes</th><th style="text-align:right">Equipos</th><th style="text-align:right">Gama alta</th><th style="text-align:right">Gama media</th><th style="text-align:right">Gama baja</th><th>Marca líder</th></tr>';
+      keys.forEach(k=>{
+        const o = byMes[k];
+        const lider = Object.entries(o.mk).sort((a,b)=>b[1]-a[1])[0];
+        h += '<tr><td><b>'+MESES[o.m-1]+' '+o.a+'</b></td><td style="text-align:right">'+fmt(o.tot)+'</td>'
+          +'<td style="text-align:right;color:#f59e0b">'+pct(o.a1,o.tot)+'</td>'
+          +'<td style="text-align:right;color:#3b82f6">'+pct(o.m1,o.tot)+'</td>'
+          +'<td style="text-align:right;color:#8a97ab">'+pct(o.b1,o.tot)+'</td>'
+          +'<td>'+(lider? lider[0]+' <span style="color:#8a97ab">('+fmt(lider[1])+')</span>' : '—')+'</td></tr>';
+      });
+      el.innerHTML = h;
+    }catch(e){}
+  }
+  window.renderEquipos=function(){ draw(); renderEquVendTienda(); renderEquMes(); };
 })();
 
 
