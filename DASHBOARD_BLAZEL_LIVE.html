@@ -178,7 +178,7 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
 </section>
 
 <section class="sec" id="s-evolucion">
-  <div style="font-size:12px;color:var(--mut);margin-bottom:12px">Detalle mes a mes por tienda, con variación % vs. el mes anterior. El último mes mostrado está en curso.</div>
+  <div style="font-size:12px;color:var(--mut);margin-bottom:12px">Detalle mes a mes por tienda, con variación % vs. el mes anterior. El último mes muestra la <b>proyección de cierre</b> (en base a los días transcurridos); el dato real al día de hoy aparece debajo, en gris.</div>
   <div class="card">
     <h3 id="tEvoCargo">Cargo Fijo — mes a mes por tienda</h3>
     <div class="tscroll"><table id="tblEvoCargo"></table></div>
@@ -1579,18 +1579,31 @@ function renderEvolucion(){
     const lastClosedIdx = n-2;
     rows.sort((x,y)=> (y.vals[lastClosedIdx]||y.vals[n-1]) - (x.vals[lastClosedIdx]||x.vals[n-1]));
 
+    const [curA, curM] = months[n-1];
+    const dm = diasMes(curM);
+    const da = (typeof DATA!=='undefined' && DATA.maxDia) ? DATA.maxDia : dm;
+
     document.getElementById(titleId).textContent = `${label} — mes a mes por tienda`;
     let head = '<tr><th>Tienda</th>';
-    months.forEach(([a,m],i)=>{ head += `<th class="r">${MESES[m-1]} '${String(a).slice(2)}${i===n-1?' (en curso)':''}</th>`; });
+    months.forEach(([a,m],i)=>{ head += `<th class="r">${MESES[m-1]} '${String(a).slice(2)}${i===n-1?' (proy. cierre)':''}</th>`; });
     head += '</tr>';
 
     let body = '';
     rows.forEach(r=>{
       body += `<tr><td><b>${pdvShort(r.p)}</b></td>`;
       r.vals.forEach((v,i)=>{
-        const shown = v>0 ? (isMoney? 'S/ '+fmt(v) : fmt(v)) : '–';
-        const pctHtml = i===0 ? '' : `<br>${evoPctCell(v, r.vals[i-1])}`;
-        body += `<td class="r">${shown}${pctHtml}</td>`;
+        const isCurrent = i===n-1;
+        if(isCurrent){
+          const proy = (v>0 && da>0) ? v/da*dm : 0;
+          const shownProy = proy>0 ? (isMoney? 'S/ '+fmt(Math.round(proy)) : fmt(Math.round(proy))) : '–';
+          const rawLine = v>0 ? `<div style="font-size:10px;color:var(--mut)">al día ${da}: ${isMoney?'S/ ':''}${fmt(Math.round(v))}</div>` : '';
+          const pctHtml = proy>0 ? `<br>${evoPctCell(proy, r.vals[i-1])}` : '';
+          body += `<td class="r">${shownProy}${pctHtml}${rawLine}</td>`;
+        } else {
+          const shown = v>0 ? (isMoney? 'S/ '+fmt(v) : fmt(v)) : '–';
+          const pctHtml = i===0 ? '' : `<br>${evoPctCell(v, r.vals[i-1])}`;
+          body += `<td class="r">${shown}${pctHtml}</td>`;
+        }
       });
       body += `</tr>`;
     });
