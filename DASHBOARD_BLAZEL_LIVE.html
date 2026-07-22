@@ -1581,7 +1581,7 @@ function renderEvolucion(){
 
     const [curA, curM] = months[n-1];
     const dm = diasMes(curM);
-    const da = (typeof DATA!=='undefined' && DATA.maxDia) ? DATA.maxDia : dm;
+    const da = (F.proj > 0) ? F.proj : ((typeof DATA!=='undefined' && DATA.maxDia) ? DATA.maxDia : dm);
 
     document.getElementById(titleId).textContent = `${label} — mes a mes por tienda`;
     let head = '<tr><th>Tienda</th>';
