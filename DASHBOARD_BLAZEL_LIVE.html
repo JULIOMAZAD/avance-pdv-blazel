@@ -2023,15 +2023,23 @@ function renderAseProd(){
     return;
   }
 
-  // lista de vendedores disponibles, según el filtro de TIENDA de arriba
+  // lista de vendedores disponibles: de la tienda filtrada Y con ventas en los últimos 12 meses
+  let cutA = DATA.anioActual, cutM = DATA.mesActual - 11;
+  while(cutM < 1){ cutM += 12; cutA--; }
+  const cutKey = cutA*100+cutM;
   const vendSet = new Set();
-  for(const r of DATA.aseProd){ const pdv=r[2], vend=r[3]; if(inPdv(pdv) && vend) vendSet.add(vend); }
+  for(const r of DATA.aseProd){
+    const a=r[0], m=r[1], pdv=r[2], vend=r[3];
+    if(!vend || !inPdv(pdv)) continue;
+    if((a*100+m) < cutKey) continue; // fuera de los últimos 12 meses
+    vendSet.add(vend);
+  }
   const vendList = [...vendSet].sort();
 
   if(!vendList.length){
     sel.innerHTML = '<option value="">(sin asesores)</option>';
     tbl.innerHTML = '';
-    if(nota) nota.innerHTML = '<div style="color:var(--mut);padding:8px">No hay asesores para la tienda/filtro seleccionado.</div>';
+    if(nota) nota.innerHTML = '<div style="color:var(--mut);padding:8px">No hay asesores con ventas en los últimos 12 meses para la tienda/filtro seleccionado.</div>';
     return;
   }
   if(!aseSelectedVend || !vendList.includes(aseSelectedVend)) aseSelectedVend = vendList[0];
@@ -2087,18 +2095,22 @@ function renderAseProd(){
 
   let h='<tr><th>Mes</th>';
   prods.forEach(p=>{ h+=`<th class="r">${p}</th>`; });
-  h+='<th class="r">Total</th><th class="r">Cargo Fijo (S/)</th></tr>';
+  h+='<th class="r">Total</th><th class="r">Var. % Total</th><th class="r">Cargo Fijo (S/)</th><th class="r">Var. % CF</th></tr>';
+  let prevTotal=null, prevCf=null;
   meses.forEach(x=>{
     h+=`<tr><td><b>${MESES[x.m-1]} ${x.a}</b></td>`;
     prods.forEach(p=>{ const val=x.prods[p]||0; h+=`<td class="r">${val||''}</td>`; });
-    h+=`<td class="r"><b>${x.total}</b></td><td class="r">S/ ${fmt(x.cf)}</td></tr>`;
+    const varTotal = prevTotal===null ? '<span style="color:var(--mut)">–</span>' : evoPctCell(x.total, prevTotal);
+    const varCf = prevCf===null ? '<span style="color:var(--mut)">–</span>' : evoPctCell(x.cf, prevCf);
+    h+=`<td class="r"><b>${x.total}</b></td><td class="r">${varTotal}</td><td class="r">S/ ${fmt(x.cf)}</td><td class="r">${varCf}</td></tr>`;
+    prevTotal = x.total; prevCf = x.cf;
   });
   // fila de totales por producto
   h+='<tr style="border-top:2px solid #2a3344"><td><b>TOTAL</b></td>';
   let gran=0, granCf=0;
   prods.forEach(p=>{ const s=meses.reduce((a,b)=>a+(b.prods[p]||0),0); gran+=s; h+=`<td class="r"><b>${s}</b></td>`; });
   granCf = meses.reduce((a,b)=>a+b.cf,0);
-  h+=`<td class="r"><b>${gran}</b></td><td class="r"><b>S/ ${fmt(granCf)}</b></td></tr>`;
+  h+=`<td class="r"><b>${gran}</b></td><td></td><td class="r"><b>S/ ${fmt(granCf)}</b></td><td></td></tr>`;
   tbl.innerHTML=h;
 }
 // ===================== VENTAS X DIA =====================
