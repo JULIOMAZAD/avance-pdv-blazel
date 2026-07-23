@@ -201,8 +201,12 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
   <div class="kpis" id="kpisAse"></div>
   <div class="card">
     <h3 id="tAseProd">Avance por producto · por asesor</h3>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:2px 0 10px">
+      <label style="font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:1px">Vendedor</label>
+      <select id="aseSelectVend" style="background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:13px;min-width:220px"></select>
+    </div>
     <div id="aseProdNota"></div>
-    <div class="tscroll"><table id="tblAseProd"></table></div>
+    <div class="tscroll" style="max-height:none;overflow:visible"><table id="tblAseProd"></table></div>
   </div>
 </section>
 
@@ -2007,64 +2011,93 @@ function renderHfcCmpVend(){
 }
 
 // ===================== PUNTO 3: AVANCE POR PRODUCTO × ASESOR (con Cargo Fijo) =====================
+let aseSelectedVend = null;
 function renderAseProd(){
+  const sel = document.getElementById('aseSelectVend');
   const tbl = document.getElementById('tblAseProd');
   const nota = document.getElementById('aseProdNota');
-  if(!tbl) return;
+  if(!tbl || !sel) return;
   if(!DATA.aseProd || !DATA.aseProd.length){
-    tbl.innerHTML='';
+    tbl.innerHTML=''; sel.innerHTML='';
     if(nota) nota.innerHTML='<div style="color:var(--mut);padding:8px">El detalle por <b>producto × asesor</b> se construye al cargar tu Excel BASE (arrástralo en la zona de carga). Los datos embebidos actuales no incluyen este cruce.</div>';
     return;
   }
+
+  // lista de vendedores disponibles, según el filtro de TIENDA de arriba
+  const vendSet = new Set();
+  for(const r of DATA.aseProd){ const pdv=r[2], vend=r[3]; if(inPdv(pdv) && vend) vendSet.add(vend); }
+  const vendList = [...vendSet].sort();
+
+  if(!vendList.length){
+    sel.innerHTML = '<option value="">(sin asesores)</option>';
+    tbl.innerHTML = '';
+    if(nota) nota.innerHTML = '<div style="color:var(--mut);padding:8px">No hay asesores para la tienda/filtro seleccionado.</div>';
+    return;
+  }
+  if(!aseSelectedVend || !vendList.includes(aseSelectedVend)) aseSelectedVend = vendList[0];
+  const vkey = vendList.join('|');
+  if(sel.dataset.built !== vkey){
+    sel.innerHTML = vendList.map(v=>`<option value="${v}"${v===aseSelectedVend?' selected':''}>${v}</option>`).join('');
+    sel.dataset.built = vkey;
+    sel.onchange = ()=>{ aseSelectedVend = sel.value; renderAseProd(); };
+  } else {
+    sel.value = aseSelectedVend;
+  }
+  const V = aseSelectedVend;
+
+  // Filas = meses. Columnas = productos (igual que antes) + Cargo Fijo.
   const dia = F.dia>0 ? F.dia : 0;
   const usaDia = dia>0 && DATA.aseProdDia && DATA.aseProdDia.length;
   const src = usaDia ? DATA.aseProdDia : DATA.aseProd;
-  const map={}; const prodSet=new Set();
+  const porMes = {}; const prodSet=new Set(); let pdvActual='';
   for(const r of src){
     let a,m,d,pdv,vend,op,c;
     if(usaDia){ [a,m,d,pdv,vend,op,c]=r; if(d!==dia) continue; }
     else { [a,m,pdv,vend,op,c]=r; }
+    if(vend!==V) continue;
     if(!inAnio(a)||!inMes(m)||!inPdv(pdv)) continue;
     if(F.prod.length && !F.prod.includes(op)) continue;
-    if(!map[vend]) map[vend]={pdv, prods:{}, total:0, cf:0};
-    map[vend].prods[op]=(map[vend].prods[op]||0)+c;
-    map[vend].total+=c;
-    if(map[vend].pdv!==pdv) map[vend].pdv='Varios';
+    const k=a+'-'+m;
+    if(!porMes[k]) porMes[k]={a,m,prods:{},total:0,cf:0};
+    porMes[k].prods[op]=(porMes[k].prods[op]||0)+c;
+    porMes[k].total+=c;
     prodSet.add(op);
+    pdvActual=pdv;
   }
-  // Cargo Fijo por asesor, del mismo periodo/filtro (desde DATA.ases: [a,m,pdv,vend,n,cf,hfc])
+  // Cargo Fijo por mes, para ese mismo vendedor (desde DATA.ases: [a,m,pdv,vend,n,cf,hfc])
   for(const r of DATA.ases){
     const [a,m,pdv,vend,,cf] = r;
+    if(vend!==V) continue;
     if(!inAnio(a)||!inMes(m)||!inPdv(pdv)) continue;
-    if(!map[vend]) continue; // solo asesores que ya aparecen en el cruce por producto
-    map[vend].cf += cf;
+    const k=a+'-'+m;
+    if(!porMes[k]) porMes[k]={a,m,prods:{},total:0,cf:0};
+    porMes[k].cf += cf;
   }
+
   const prods=[...prodSet].sort();
-  const vendors=Object.entries(map).map(([v,d])=>({v,...d})).sort((a,b)=>b.total-a.total);
-  const mesesSel = (F.mes.length?F.mes:[DATA.mesActual]).slice().sort((a,b)=>a-b).map(m=>MESES[m-1]).join(', ');
+  const meses = Object.values(porMes).sort((x,y)=> x.a-y.a || x.m-y.m);
 
   if(nota) nota.innerHTML = `<div style="color:var(--mut);font-size:12px;padding:2px 0 8px">`
+    + `Tienda: <b>${pdvActual?pdvShort(pdvActual):'—'}</b>. `
     + (F.prod.length ? `Filtrado a: <b>${F.prod.join(', ')}</b>. ` : `Mostrando <b>todos</b> los productos. `)
-    + (usaDia
-        ? `Sumando el <b>día ${dia}</b> de: <b>${mesesSel}</b> (la lógica separa qué venta es de cada mes y las suma).`
-        : `Periodo: <b>${periodoLabel()}</b>. Pon un número en el filtro <b>DÍA</b> para sumar ese mismo día en todos los meses seleccionados.`)
+    + `Cada fila es un mes con datos, de más antiguo a más reciente.`
     + `</div>`;
 
-  if(!vendors.length){ tbl.innerHTML='<tr><td style="color:var(--mut);padding:10px">Sin ventas en el periodo/día seleccionado.</td></tr>'; return; }
+  if(!meses.length){ tbl.innerHTML='<tr><td style="color:var(--mut);padding:10px">Sin ventas de este asesor en el periodo/día seleccionado.</td></tr>'; return; }
 
-  let h='<tr><th>#</th><th>Asesor</th><th>Tienda</th>';
+  let h='<tr><th>Mes</th>';
   prods.forEach(p=>{ h+=`<th class="r">${p}</th>`; });
   h+='<th class="r">Total</th><th class="r">Cargo Fijo (S/)</th></tr>';
-  vendors.forEach((x,i)=>{
-    h+=`<tr><td>${i+1}</td><td>${x.v}</td><td>${pdvShort(x.pdv)}</td>`;
+  meses.forEach(x=>{
+    h+=`<tr><td><b>${MESES[x.m-1]} ${x.a}</b></td>`;
     prods.forEach(p=>{ const val=x.prods[p]||0; h+=`<td class="r">${val||''}</td>`; });
     h+=`<td class="r"><b>${x.total}</b></td><td class="r">S/ ${fmt(x.cf)}</td></tr>`;
   });
   // fila de totales por producto
-  h+='<tr style="border-top:2px solid #2a3344"><td></td><td><b>TOTAL</b></td><td></td>';
+  h+='<tr style="border-top:2px solid #2a3344"><td><b>TOTAL</b></td>';
   let gran=0, granCf=0;
-  prods.forEach(p=>{ const s=vendors.reduce((a,b)=>a+(b.prods[p]||0),0); gran+=s; h+=`<td class="r"><b>${s}</b></td>`; });
-  granCf = vendors.reduce((a,b)=>a+b.cf,0);
+  prods.forEach(p=>{ const s=meses.reduce((a,b)=>a+(b.prods[p]||0),0); gran+=s; h+=`<td class="r"><b>${s}</b></td>`; });
+  granCf = meses.reduce((a,b)=>a+b.cf,0);
   h+=`<td class="r"><b>${gran}</b></td><td class="r"><b>S/ ${fmt(granCf)}</b></td></tr>`;
   tbl.innerHTML=h;
 }
