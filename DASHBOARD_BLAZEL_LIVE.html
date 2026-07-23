@@ -201,9 +201,15 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
   <div class="kpis" id="kpisAse"></div>
   <div class="card">
     <h3 id="tAseProd">Avance por producto · por asesor</h3>
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:2px 0 10px">
-      <label style="font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:1px">Vendedor</label>
-      <select id="aseSelectVend" style="background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:13px;min-width:220px"></select>
+    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:2px 0 10px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <label style="font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:1px">Vendedor</label>
+        <select id="aseSelectVend" style="background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:13px;min-width:220px"></select>
+      </div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mut);cursor:pointer">
+        <input type="checkbox" id="aseMostrarTodos" style="cursor:pointer">
+        Mostrar también inactivos (más de 12 meses sin ventas)
+      </label>
     </div>
     <div id="aseProdNota"></div>
     <div class="tscroll" style="max-height:none;overflow:visible"><table id="tblAseProd"></table></div>
@@ -2023,7 +2029,14 @@ function renderAseProd(){
     return;
   }
 
-  // lista de vendedores disponibles: de la tienda filtrada Y con ventas en los últimos 12 meses
+  // lista de vendedores disponibles: de la tienda filtrada, y con ventas en los últimos 12 meses
+  // (salvo que se marque "mostrar también inactivos")
+  const chkTodos = document.getElementById('aseMostrarTodos');
+  const mostrarTodos = chkTodos && chkTodos.checked;
+  if(chkTodos && !chkTodos.dataset.wired){
+    chkTodos.dataset.wired='1';
+    chkTodos.addEventListener('change', renderAseProd);
+  }
   let cutA = DATA.anioActual, cutM = DATA.mesActual - 11;
   while(cutM < 1){ cutM += 12; cutA--; }
   const cutKey = cutA*100+cutM;
@@ -2031,7 +2044,7 @@ function renderAseProd(){
   for(const r of DATA.aseProd){
     const a=r[0], m=r[1], pdv=r[2], vend=r[3];
     if(!vend || !inPdv(pdv)) continue;
-    if((a*100+m) < cutKey) continue; // fuera de los últimos 12 meses
+    if(!mostrarTodos && (a*100+m) < cutKey) continue; // fuera de los últimos 12 meses
     vendSet.add(vend);
   }
   const vendList = [...vendSet].sort();
@@ -2039,7 +2052,7 @@ function renderAseProd(){
   if(!vendList.length){
     sel.innerHTML = '<option value="">(sin asesores)</option>';
     tbl.innerHTML = '';
-    if(nota) nota.innerHTML = '<div style="color:var(--mut);padding:8px">No hay asesores con ventas en los últimos 12 meses para la tienda/filtro seleccionado.</div>';
+    if(nota) nota.innerHTML = '<div style="color:var(--mut);padding:8px">No hay asesores'+(mostrarTodos?'':' con ventas en los últimos 12 meses')+' para la tienda/filtro seleccionado.</div>';
     return;
   }
   if(!aseSelectedVend || !vendList.includes(aseSelectedVend)) aseSelectedVend = vendList[0];
