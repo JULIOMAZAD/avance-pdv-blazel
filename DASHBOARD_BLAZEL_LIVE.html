@@ -199,13 +199,11 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
 
 <section class="sec" id="s-asesores">
   <div class="kpis" id="kpisAse"></div>
-  <div class="grid11">
-    <div class="card"><h3 id="tTop">Top 15 Asesores · Ventas</h3><div id="rankVentas"></div></div>
-    <div class="card"><h3>Top 15 Asesores · Cargo Fijo S/</h3><div id="rankCF"></div></div>
+  <div class="card">
+    <h3 id="tAseProd">Avance por producto · por asesor</h3>
+    <div id="aseProdNota"></div>
+    <div class="tscroll"><table id="tblAseProd"></table></div>
   </div>
-  <div class="card"><h3 id="tAseTbl">Detalle de asesores</h3><div class="tscroll"><table id="tblAse"></table></div></div>
-  <div class="card"><h3 id="tAseProd">Avance por producto · por asesor</h3><div id="aseProdNota"></div><div class="tscroll"><table id="tblAseProd"></table></div></div>
-  <div class="card"><h3 id="tAseHist">Historial por asesor · Mes anterior vs Mes actual</h3><div id="aseHistNota"></div><div class="tscroll"><table id="tblAseHist"></table></div></div>
 </section>
 
 <section class="sec" id="s-dia">
@@ -1953,7 +1951,7 @@ function renderAse(){
   const anios = F.anio.length? F.anio: [DATA.anioActual];
   if(Math.max(...anios) < 2025){
     document.getElementById('kpisAse').innerHTML=kpiHTML('Sin detalle','—','El detalle por asesor está disponible desde 2025');
-    document.getElementById('rankVentas').innerHTML='';document.getElementById('rankCF').innerHTML='';document.getElementById('tblAse').innerHTML='';return;
+    return;
   }
   const list=aseAgg().filter(x=>x.n>0);
   const tot=list.reduce((a,b)=>a+b.n,0), totCF=list.reduce((a,b)=>a+b.cf,0);
@@ -1963,19 +1961,7 @@ function renderAse(){
     kpiHTML('Ventas totales',fmt(tot),`${Math.round(tot/Math.max(activos,1))} por asesor`,'az') +
     kpiHTML('Cargo Fijo equipo','S/ '+fmt(totCF),'','v') +
     kpiHTML('Ritmo equipo',(tot/da).toFixed(0)+'/día','ventas diarias promedio','a');
-  const byN=[...list].sort((a,b)=>b.n-a.n).slice(0,15);
-  const byCF=[...list].sort((a,b)=>b.cf-a.cf).slice(0,15);
-  document.getElementById('tTop').textContent=`Top 15 Asesores · Ventas · ${periodoLabel()}`;
-  document.getElementById('rankVentas').innerHTML=rankHTML(byN,'n',fmt);
-  document.getElementById('rankCF').innerHTML=rankHTML(byCF,'cf',v=>'S/ '+fmt(v));
-  document.getElementById('tAseTbl').textContent=`Detalle de asesores (${activos}) · ${tiendaLabel()}`;
-  let rows='<tr><th>#</th><th>Asesor</th><th>Tienda</th><th class="r">Ventas</th><th class="r">Vtas/día</th><th class="r">HFC</th><th class="r">Cargo Fijo</th><th class="r">Ticket prom.</th></tr>';
-  [...list].sort((a,b)=>b.n-a.n).forEach((x,i)=>{
-    rows+=`<tr><td>${i+1}</td><td>${x.v}</td><td>${pdvShort(x.pdv)}</td><td class="r"><b>${x.n}</b></td><td class="r">${Math.round(x.n/da)}</td><td class="r">${x.hfc}</td><td class="r">S/ ${fmt(x.cf)}</td><td class="r">S/ ${x.n?fmt2(x.cf/x.n):'0'}</td></tr>`;
-  });
-  document.getElementById('tblAse').innerHTML=rows;
   renderAseProd();
-  renderAseHist();
 }
 
 // ===================== PUNTO 2: HFC POR VENDEDOR — MES ANT vs AVANCE ACTUAL =====================
@@ -2020,7 +2006,7 @@ function renderHfcCmpVend(){
   tbl.innerHTML = rowsArr.length? h : '<tr><td style="color:var(--mut);padding:10px">Sin HFC por vendedor en el periodo.</td></tr>';
 }
 
-// ===================== PUNTO 3: AVANCE POR PRODUCTO × ASESOR (día cruza meses y suma) =====================
+// ===================== PUNTO 3: AVANCE POR PRODUCTO × ASESOR (con Cargo Fijo) =====================
 function renderAseProd(){
   const tbl = document.getElementById('tblAseProd');
   const nota = document.getElementById('aseProdNota');
@@ -2040,11 +2026,18 @@ function renderAseProd(){
     else { [a,m,pdv,vend,op,c]=r; }
     if(!inAnio(a)||!inMes(m)||!inPdv(pdv)) continue;
     if(F.prod.length && !F.prod.includes(op)) continue;
-    if(!map[vend]) map[vend]={pdv, prods:{}, total:0};
+    if(!map[vend]) map[vend]={pdv, prods:{}, total:0, cf:0};
     map[vend].prods[op]=(map[vend].prods[op]||0)+c;
     map[vend].total+=c;
     if(map[vend].pdv!==pdv) map[vend].pdv='Varios';
     prodSet.add(op);
+  }
+  // Cargo Fijo por asesor, del mismo periodo/filtro (desde DATA.ases: [a,m,pdv,vend,n,cf,hfc])
+  for(const r of DATA.ases){
+    const [a,m,pdv,vend,,cf] = r;
+    if(!inAnio(a)||!inMes(m)||!inPdv(pdv)) continue;
+    if(!map[vend]) continue; // solo asesores que ya aparecen en el cruce por producto
+    map[vend].cf += cf;
   }
   const prods=[...prodSet].sort();
   const vendors=Object.entries(map).map(([v,d])=>({v,...d})).sort((a,b)=>b.total-a.total);
@@ -2061,76 +2054,20 @@ function renderAseProd(){
 
   let h='<tr><th>#</th><th>Asesor</th><th>Tienda</th>';
   prods.forEach(p=>{ h+=`<th class="r">${p}</th>`; });
-  h+='<th class="r">Total</th></tr>';
+  h+='<th class="r">Total</th><th class="r">Cargo Fijo (S/)</th></tr>';
   vendors.forEach((x,i)=>{
     h+=`<tr><td>${i+1}</td><td>${x.v}</td><td>${pdvShort(x.pdv)}</td>`;
     prods.forEach(p=>{ const val=x.prods[p]||0; h+=`<td class="r">${val||''}</td>`; });
-    h+=`<td class="r"><b>${x.total}</b></td></tr>`;
+    h+=`<td class="r"><b>${x.total}</b></td><td class="r">S/ ${fmt(x.cf)}</td></tr>`;
   });
   // fila de totales por producto
   h+='<tr style="border-top:2px solid #2a3344"><td></td><td><b>TOTAL</b></td><td></td>';
-  let gran=0;
+  let gran=0, granCf=0;
   prods.forEach(p=>{ const s=vendors.reduce((a,b)=>a+(b.prods[p]||0),0); gran+=s; h+=`<td class="r"><b>${s}</b></td>`; });
-  h+=`<td class="r"><b>${gran}</b></td></tr>`;
+  granCf = vendors.reduce((a,b)=>a+b.cf,0);
+  h+=`<td class="r"><b>${gran}</b></td><td class="r"><b>S/ ${fmt(granCf)}</b></td></tr>`;
   tbl.innerHTML=h;
 }
-
-// ===================== PUNTO 4: HISTORIAL POR ASESOR Y PRODUCTO — MES ANT vs MES ACTUAL =====================
-function renderAseHist(){
-  const tbl = document.getElementById('tblAseHist');
-  const nota = document.getElementById('aseHistNota');
-  if(!tbl) return;
-  if(!DATA.aseProd || !DATA.aseProd.length){
-    tbl.innerHTML='';
-    if(nota) nota.innerHTML='<div style="color:var(--mut);padding:8px">El comparativo por producto se construye al cargar tu Excel BASE / datos en vivo.</div>';
-    return;
-  }
-  const [refA, refM] = refAnioMes();
-  const [pa, pm] = prevMes(refA, refM);
-  const esActual = (refA===DATA.anioActual && refM===DATA.mesActual);
-  const da = diasAvanceEfectivo();
-  const dmes = diasMes(refM);
-  // map por asesor+producto -> {pdv, prev, cur}
-  const map={};
-  for(const r of DATA.aseProd){
-    const [a,m,pdv,vend,op,c]=r;
-    if(!inPdv(pdv)) continue;
-    if(F.prod.length && !F.prod.includes(op)) continue;
-    const isPrev=(a===pa&&m===pm), isCur=(a===refA&&m===refM);
-    if(!isPrev&&!isCur) continue;
-    const k=vend+'\u0001'+op;
-    if(!map[k]) map[k]={vend,op,pdv,prev:0,cur:0};
-    if(isPrev) map[k].prev+=c;
-    if(isCur)  map[k].cur+=c;
-    if(map[k].pdv!==pdv) map[k].pdv='Varios';
-  }
-  const rowsArr=Object.values(map).filter(x=>x.prev>0||x.cur>0)
-    .map(x=>({...x, proy: esActual && da>0 ? Math.round(x.cur/da*dmes) : x.cur}))
-    .sort((a,b)=> a.vend===b.vend ? (b.cur-a.cur) : a.vend.localeCompare(b.vend));
-
-  if(nota) nota.innerHTML = `<div style="color:var(--mut);font-size:12px;padding:2px 0 8px">
-    Desglose <b>por producto</b> de cada asesor. Izquierda: <b>${MESES[pm-1]} ${pa}</b> (cierre). Derecha: <b>${MESES[refM-1]} ${refA}</b> (avance${esActual?` · proyección con <b>${da}</b> días`:''}).</div>`;
-
-  let h='<tr><th>#</th><th>Asesor</th><th>Tienda</th><th>Producto</th>'
-      + `<th class="r" style="border-left:2px solid #2a3344">${MESES[pm-1]}</th>`
-      + `<th class="r" style="border-left:2px solid #2a3344">${MESES[refM-1]}</th>`
-      + '<th class="r">Proyección</th><th class="r">Δ vs mes ant.</th></tr>';
-  let lastVend=null, idx=0;
-  rowsArr.forEach((x)=>{
-    let delta='—';
-    if(x.prev>0){ const d=(x.proy-x.prev)/x.prev*100, up=d>=0; delta=`<b class="${up?'up':'dn'}">${up?'▲':'▼'} ${Math.abs(d).toFixed(0)}%</b>`; }
-    const nuevoAsesor = x.vend!==lastVend;
-    if(nuevoAsesor) idx++;
-    const sep = nuevoAsesor ? ' style="border-top:1px solid #2a3344"' : '';
-    h+=`<tr${sep}><td>${nuevoAsesor?idx:''}</td><td>${nuevoAsesor?x.vend:''}</td><td>${nuevoAsesor?pdvShort(x.pdv):''}</td><td>${x.op}</td>`
-     + `<td class="r" style="border-left:2px solid #2a3344">${x.prev||''}</td>`
-     + `<td class="r" style="border-left:2px solid #2a3344"><b>${x.cur||''}</b></td>`
-     + `<td class="r">${fmt(x.proy)}</td><td class="r">${delta}</td></tr>`;
-    lastVend=x.vend;
-  });
-  tbl.innerHTML = rowsArr.length? h : '<tr><td style="color:var(--mut);padding:10px">Sin datos de asesores/producto en el periodo.</td></tr>';
-}
-
 // ===================== VENTAS X DIA =====================
 function renderDia(){
   const refA = F.anio.length===1? F.anio[0] : DATA.anioActual;
