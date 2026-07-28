@@ -97,7 +97,7 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
   </div>
 </div>
 <header>
-  <div class="logo">BLA<b>ZEL</b><small>CREADO POR JULIO MAZA D. · v10 (modalidad afecta todo)</small></div>
+  <div class="logo">BLA<b>ZEL</b><small>CREADO POR JULIO MAZA D. · v11 (curva % cumplimiento en Evolución Cargo Fijo)</small></div>
   <div class="filtros" id="filtrosCont"></div>
   <div id="filtroDiaCont" style="display:none">
     <div>
@@ -992,6 +992,23 @@ function refAnioMes(){
 function cargoSumFor(a,m,pdv){
   let s=0; for(const r of DATA.cargo){ if(r[0]===a && r[1]===m && (pdv?r[2]===pdv:inPdv(r[2]))) s+=r[3]; } return s;
 }
+function cargoMetaFor(a,m){
+  const key = a+'-'+String(m).padStart(2,'0');
+  const C = CUOTAS_HIST && CUOTAS_HIST[key];
+  if(!C) return null;
+  if(!F.pdv.length){
+    return (C.global && C.global.meta_total) ? C.global.meta_total : null;
+  }
+  if(!C.stores) return null;
+  let sum=0, found=false;
+  for(const pdv of F.pdv){
+    const target = pdvShort(pdv).toLowerCase();
+    for(const sName of Object.keys(C.stores)){
+      if(pdvShort(sName).toLowerCase()===target){ sum+=(C.stores[sName].meta_total||0); found=true; break; }
+    }
+  }
+  return found ? sum : null;
+}
 function opsCountFor(a,m,op,pdv){
   let s=0; for(const r of DATA.ops){ if(r[0]===a && r[1]===m && r[3]===op && (pdv?r[2]===pdv:inPdv(r[2]))) s+=r[4]; } return s;
 }
@@ -1320,16 +1337,20 @@ function renderResumen(){
     kpiHTML('MIX FIJA', mix!=null?pct(mix):'—', 'HFC sobre porta+reno','c');
 
   // evolución: 13 meses hacia atrás desde el periodo de referencia
-  const labels=[],vals=[],valsProy=[];
+  const labels=[],vals=[],valsProy=[],valsPct=[];
   let a=refA,m=refM;
   const seq=[]; for(let i=0;i<13;i++){seq.unshift([a,m]); [a,m]=prevMes(a,m);}
   seq.forEach(([ya,ym])=>{labels.push(MESES[ym-1]+' '+String(ya).slice(2)); const v=cargoSumFor(ya,ym); vals.push(v);
-    valsProy.push(ya===DATA.anioActual&&ym===DATA.mesActual? (v/avanceDias*diasMes(ym))-v : 0);});
+    valsProy.push(ya===DATA.anioActual&&ym===DATA.mesActual? (v/avanceDias*diasMes(ym))-v : 0);
+    const meta=cargoMetaFor(ya,ym); valsPct.push(meta? +(v/meta*100).toFixed(1) : null);});
   document.getElementById('tCargoEvo').textContent='Evolución Cargo Fijo · '+tiendaLabel();
   mkChart('chEvo',{type:'bar',data:{labels,datasets:[
     {label:'Cargo Fijo',data:vals,backgroundColor:labels.map((_,i)=>i===labels.length-1?'#e63329':'#4aa3ff88'),borderRadius:5,stack:'s'},
-    {label:'Proyección',data:valsProy,backgroundColor:'#e6332944',borderColor:'#e63329',borderWidth:1,borderDash:[4,3],borderRadius:5,stack:'s'}]},
-    options:{maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': S/ '+fmt(c.raw)}}},scales:{y:{ticks:{callback:v=>'S/ '+fmt(v)}}}}});
+    {label:'Proyección',data:valsProy,backgroundColor:'#e6332944',borderColor:'#e63329',borderWidth:1,borderDash:[4,3],borderRadius:5,stack:'s'},
+    {type:'line',label:'% Cumplimiento',data:valsPct,yAxisID:'y1',borderColor:'#2ecc71',backgroundColor:'#2ecc71',tension:.3,borderWidth:2,pointRadius:3,pointBackgroundColor:'#2ecc71',pointBorderColor:'#161b22',spanGaps:true}]},
+    options:{maintainAspectRatio:false,plugins:{legend:{display:true,position:'top',labels:{boxWidth:12,font:{size:10},color:'#8b97a8'}},tooltip:{callbacks:{label:c=>c.dataset.yAxisID==='y1'?('% Cumplimiento: '+c.raw+'%'):(c.dataset.label+': S/ '+fmt(c.raw))}}},
+    scales:{y:{ticks:{callback:v=>'S/ '+fmt(v)}},
+      y1:{position:'right',min:0,suggestedMax:120,grid:{drawOnChartArea:false},ticks:{callback:v=>v+'%',color:'#2ecc71'}}}}});
 
   // dona operaciones
   const keys=Object.keys(ops).sort((x,y)=>ops[y]-ops[x]).slice(0,7);
