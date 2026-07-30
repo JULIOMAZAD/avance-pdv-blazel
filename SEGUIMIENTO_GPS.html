@@ -82,6 +82,11 @@
   <div id="contenedorTabla">
     <div class="estado-carga">Cargando...</div>
   </div>
+
+  <div class="subtitulo" style="margin-top:32px;font-weight:700;color:var(--tinta);font-size:15px">Acumulado del mes</div>
+  <div id="contenedorResumen">
+    <div class="estado-carga">Cargando...</div>
+  </div>
 </div>
 
 <script>
@@ -148,6 +153,7 @@
       document.getElementById('bajaFecha').value = '';
       document.getElementById('bajaMotivo').value = '';
       renderTabla();
+      renderResumen();
     } catch (err) {
       estado.textContent = 'No se pudo guardar, intenta de nuevo.';
     }
@@ -212,6 +218,27 @@
   let ultimaFechaISO = hoyISO();
   let ultimoCodigoPorNombre = {};
   let ultimasMarcasPorNombre = {};
+  let ultimoResumenPorNombre = {};
+
+  function renderResumen(){
+    let filas = '';
+    ASESORES.forEach(nombre => {
+      const info = INACTIVOS[nombre];
+      if (info && ultimaFechaISO >= info.fecha){
+        filas += '<tr><td>' + nombre + '</td><td colspan="3" class="muted">' + info.motivo + ' desde el ' + info.fecha + '</td></tr>';
+        return;
+      }
+      const c = ultimoResumenPorNombre[nombre] || { asistio:0, falto:0, descanso:0 };
+      filas += '<tr>' +
+        '<td>' + nombre + '</td>' +
+        '<td><span class="pill ok">' + c.asistio + '</span></td>' +
+        '<td><span class="pill falta">' + c.falto + '</span></td>' +
+        '<td><span class="pill descanso">' + c.descanso + '</span></td>' +
+      '</tr>';
+    });
+    document.getElementById('contenedorResumen').innerHTML =
+      '<table><thead><tr><th>Asesor</th><th>Asistencias</th><th>Faltas</th><th>Descansos</th></tr></thead><tbody>' + filas + '</tbody></table>';
+  }
 
   async function cargarTodo(){
     document.getElementById('contenedorTabla').innerHTML = '<div class="estado-carga">Cargando...</div>';
@@ -287,9 +314,31 @@
         }
       }
 
+      // ---- Acumulado del mes: cuenta 1/2/3 en todas las columnas de día ----
+      const resumenPorNombre = {};
+      if (filaHeader !== -1){
+        const header = datosFilas[filaHeader];
+        for (let r = filaHeader+1; r < datosFilas.length; r++){
+          const nombre = (datosFilas[r][1]||'').trim();
+          if (!nombre) continue;
+          const conteo = { asistio:0, falto:0, descanso:0 };
+          for (let c = 2; c < header.length; c++){
+            const partes = (header[c]||'').split('/');
+            if (partes.length < 2) continue;
+            const v = (datosFilas[r][c]||'').trim();
+            if (v === '1') conteo.asistio++;
+            else if (v === '2') conteo.falto++;
+            else if (v === '3') conteo.descanso++;
+          }
+          resumenPorNombre[nombre] = conteo;
+        }
+      }
+
       ultimoCodigoPorNombre = codigoPorNombre;
       ultimasMarcasPorNombre = marcasPorNombre;
+      ultimoResumenPorNombre = resumenPorNombre;
       renderTabla();
+      renderResumen();
       document.getElementById('ultimaActualizacion').textContent = 'Actualizado ' + new Date().toLocaleTimeString('es-PE');
 
     } catch (err) {
