@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seguimiento GPS — JMD Gerencia</title>
+<style>
+  :root{
+    --rojo:#E4002B; --rojo-oscuro:#A5001F; --tinta:#1B1B1F; --gris:#6B6B75;
+    --gris-claro:#F1F1F4; --verde:#1E8E5A; --ambar:#B7791F; --borde:#E3E3E8;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--gris-claro);color:var(--tinta);padding:28px 20px 60px;}
+  .wrap{max-width:1100px;margin:0 auto;}
+  .marca{display:flex;align-items:baseline;gap:2px;}
+  .marca .b{font-weight:800;font-size:20px;}
+  .marca .l{font-weight:800;font-size:20px;color:var(--rojo);}
+  .subtitulo{color:var(--gris);font-size:13px;margin-bottom:20px;}
+  .controles{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px;}
+  .controles label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--gris);}
+  input[type=date]{padding:10px 12px;border:1.5px solid var(--borde);border-radius:10px;font-size:14px;background:#fff;}
+  button.recargar{padding:10px 16px;border:none;border-radius:10px;background:var(--tinta);color:#fff;font-weight:700;font-size:13px;cursor:pointer;}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:22px;}
+  .kpi{background:#fff;border:1px solid var(--borde);border-radius:14px;padding:14px 16px;}
+  .kpi .n{font-size:26px;font-weight:800;}
+  .kpi .t{font-size:12px;color:var(--gris);font-weight:600;text-transform:uppercase;letter-spacing:.04em;}
+  .kpi.ok .n{color:var(--verde);}
+  .kpi.falta .n{color:var(--rojo);}
+  .kpi.descanso .n{color:var(--ambar);}
+  table{width:100%;border-collapse:collapse;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.04);}
+  th,td{padding:11px 14px;text-align:left;font-size:13px;border-bottom:1px solid var(--borde);}
+  th{background:var(--tinta);color:#fff;font-size:11px;text-transform:uppercase;letter-spacing:.04em;}
+  tr:last-child td{border-bottom:none;}
+  .pill{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700;}
+  .pill.ok{background:#E9F7EF;color:var(--verde);}
+  .pill.falta{background:#FDEAEA;color:var(--rojo-oscuro);}
+  .pill.descanso{background:#FDF3E3;color:var(--ambar);}
+  .pill.sinmarcar{background:var(--gris-claro);color:var(--gris);}
+  .muted{color:var(--gris);}
+  .estado-carga{padding:40px;text-align:center;color:var(--gris);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="marca"><span class="b">JMD-GERENCIA</span><span class="l">•SEGUIMIENTO GPS</span></div>
+  <div class="subtitulo">Asistencia de campo por día — entrada, salida, horas y ubicación</div>
+
+  <div class="controles">
+    <div>
+      <label for="fecha">Fecha</label><br>
+      <input type="date" id="fecha">
+    </div>
+    <button class="recargar" onclick="cargarTodo()">🔄 Actualizar</button>
+    <span id="ultimaActualizacion" class="muted" style="font-size:12px"></span>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi ok"><div class="n" id="kpiAsistio">–</div><div class="t">Asistieron</div></div>
+    <div class="kpi falta"><div class="n" id="kpiFalto">–</div><div class="t">Faltaron</div></div>
+    <div class="kpi descanso"><div class="n" id="kpiDescanso">–</div><div class="t">Descanso</div></div>
+    <div class="kpi"><div class="n" id="kpiTotal">–</div><div class="t">Total asesores</div></div>
+  </div>
+
+  <div id="contenedorTabla">
+    <div class="estado-carga">Cargando...</div>
+  </div>
+</div>
+
+<script>
+  // ======================================================================
+  // Links CSV publicados desde Google Sheets (Archivo > Compartir >
+  // Publicar en la web). Si cambias de hoja de Google Sheets cada mes,
+  // actualiza estos dos links.
+  // ======================================================================
+  const CSV_DATOS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQvGCLp7WH54-iCTYZSTI_PpYeRAoey4Ov__FUGWEfTZNB0n-PPwCDVV0G6gUjSkiz8y_haVHkEKVXy/pub?gid=65768257&single=true&output=csv";
+  const CSV_MARCACIONES = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQvGCLp7WH54-iCTYZSTI_PpYeRAoey4Ov__FUGWEfTZNB0n-PPwCDVV0G6gUjSkiz8y_haVHkEKVXy/pub?gid=1159119613&single=true&output=csv";
+
+  // Lista de asesores de campo que sigue este panel (mismo orden/nombres
+  // que en el mapa del Apps Script). Para agregar uno nuevo, añade su
+  // nombre EXACTO aquí.
+  const ASESORES = [
+    "AMPARO SUAREZ ACEVEDO","ANGELA ROJAS BOBBIO","CAMILO RIVERA","JESUS CRUZ ACUÑA",
+    "ALBERTO ROJAS MENDOZA","CECILIA PUNTAS SALCEDO","GRACIE ARACELI MANRIQUE MORQUENCHO",
+    "RUTH SARAI VERGARA SANCHEZ","ANGELY JARITZA ALEGRIA ZAMBRANO","JAVIER CASTELO JESUS",
+    "BRENNA JOSSARY SALAS SHAPIAMA","LUIS FERNANDO ROSADO","RIGOBERTO JUNIOR TERRANOVA GARCIA"
+  ];
+
+  function hoyISO(){
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+  document.getElementById('fecha').value = hoyISO();
+
+  // Parser CSV simple (soporta comillas)
+  function parseCSV(texto){
+    const filas = [];
+    let fila = [], campo = '', enComillas = false;
+    for (let i = 0; i < texto.length; i++){
+      const c = texto[i];
+      if (enComillas){
+        if (c === '"'){
+          if (texto[i+1] === '"'){ campo += '"'; i++; } else { enComillas = false; }
+        } else { campo += c; }
+      } else {
+        if (c === '"'){ enComillas = true; }
+        else if (c === ','){ fila.push(campo); campo = ''; }
+        else if (c === '\n'){ fila.push(campo); filas.push(fila); fila = []; campo=''; }
+        else if (c === '\r'){ /* ignorar */ }
+        else { campo += c; }
+      }
+    }
+    if (campo !== '' || fila.length){ fila.push(campo); filas.push(fila); }
+    return filas;
+  }
+
+  async function obtenerCSV(url){
+    const resp = await fetch(url + '&_=' + Date.now());
+    const texto = await resp.text();
+    return parseCSV(texto);
+  }
+
+  function estadoDesdeCodigo(codigo){
+    if (codigo === '1') return {clase:'ok', texto:'✔ Asistió'};
+    if (codigo === '2') return {clase:'falta', texto:'✕ Faltó'};
+    if (codigo === '3') return {clase:'descanso', texto:'● Descanso'};
+    return {clase:'sinmarcar', texto:'— Sin dato'};
+  }
+
+  function horaFraccionATexto(fraccionStr){
+    const f = parseFloat(fraccionStr);
+    if (isNaN(f)) return '—';
+    const totalSeg = Math.round(f * 86400);
+    const hh = Math.floor(totalSeg/3600).toString().padStart(2,'0');
+    const mm = Math.floor((totalSeg%3600)/60).toString().padStart(2,'0');
+    return hh + ':' + mm;
+  }
+
+  async function cargarTodo(){
+    document.getElementById('contenedorTabla').innerHTML = '<div class="estado-carga">Cargando...</div>';
+    try {
+      const fechaISO = document.getElementById('fecha').value; // yyyy-mm-dd
+      const [anio, mes, dia] = fechaISO.split('-').map(Number);
+      const fechaDDMMYYYY = String(dia).padStart(2,'0') + '/' + String(mes).padStart(2,'0') + '/' + anio;
+
+      const [datosFilas, marcFilas] = await Promise.all([obtenerCSV(CSV_DATOS), obtenerCSV(CSV_MARCACIONES)]);
+
+      // ---- Ubicar columna del día en DATOS ----
+      // Busca la fila de encabezado (contiene "N°" y "NOMBRE COMPLETO")
+      let filaHeader = datosFilas.findIndex(f => f[0] && f[0].trim() === 'N°');
+      let colDia = -1;
+      if (filaHeader !== -1){
+        const header = datosFilas[filaHeader];
+        for (let c = 2; c < header.length; c++){
+          const partes = (header[c]||'').split('/');
+          if (partes.length >= 2 && parseInt(partes[0],10) === dia){ colDia = c; break; }
+        }
+      }
+
+      const codigoPorNombre = {};
+      if (filaHeader !== -1 && colDia !== -1){
+        for (let r = filaHeader+1; r < datosFilas.length; r++){
+          const nombre = (datosFilas[r][1]||'').trim();
+          if (!nombre) continue;
+          codigoPorNombre[nombre] = (datosFilas[r][colDia]||'').trim();
+        }
+      }
+
+      // ---- Marcaciones del día por nombre ----
+      let mHeader = marcFilas.findIndex(f => f[0] && f[0].trim() === 'Fecha');
+      const marcasPorNombre = {};
+      if (mHeader !== -1){
+        for (let r = mHeader+1; r < marcFilas.length; r++){
+          const fila = marcFilas[r];
+          if (!fila[0]) continue;
+          if (fila[0].trim() !== fechaDDMMYYYY) continue;
+          const nombre = (fila[2]||'').trim();
+          if (!marcasPorNombre[nombre]) marcasPorNombre[nombre] = { entrada:null, salida:null, distrito:'—', horasTrab:null, horasFalt:null };
+          const tipo = (fila[3]||'').trim();
+          const hora = fila[1];
+          if (tipo === 'ENTRADA'){
+            if (marcasPorNombre[nombre].entrada === null || parseFloat(hora) < parseFloat(marcasPorNombre[nombre].entrada)) marcasPorNombre[nombre].entrada = hora;
+          }
+          if (tipo === 'SALIDA'){
+            if (marcasPorNombre[nombre].salida === null || parseFloat(hora) > parseFloat(marcasPorNombre[nombre].salida)) marcasPorNombre[nombre].salida = hora;
+            if (fila[8]) marcasPorNombre[nombre].horasTrab = fila[8];
+            if (fila[9]) marcasPorNombre[nombre].horasFalt = fila[9];
+          }
+          if (fila[7]) marcasPorNombre[nombre].distrito = fila[7];
+        }
+      }
+
+      // ---- Render ----
+      let asistio=0, falto=0, descanso=0;
+      let filasHtml = '';
+      ASESORES.forEach(nombre => {
+        const codigo = codigoPorNombre[nombre] || '';
+        const estado = estadoDesdeCodigo(codigo);
+        if (estado.clase === 'ok') asistio++;
+        else if (estado.clase === 'falta') falto++;
+        else if (estado.clase === 'descanso') descanso++;
+
+        const m = marcasPorNombre[nombre] || {};
+        filasHtml += '<tr>' +
+          '<td>' + nombre + '</td>' +
+          '<td><span class="pill ' + estado.clase + '">' + estado.texto + '</span></td>' +
+          '<td>' + (m.entrada ? horaFraccionATexto(m.entrada) : '—') + '</td>' +
+          '<td>' + (m.salida ? horaFraccionATexto(m.salida) : '—') + '</td>' +
+          '<td>' + (m.horasTrab ? m.horasTrab + ' h' : '—') + '</td>' +
+          '<td>' + (m.horasFalt ? m.horasFalt + ' h' : '—') + '</td>' +
+          '<td class="muted">' + (m.distrito || '—') + '</td>' +
+        '</tr>';
+      });
+
+      document.getElementById('kpiAsistio').textContent = asistio;
+      document.getElementById('kpiFalto').textContent = falto;
+      document.getElementById('kpiDescanso').textContent = descanso;
+      document.getElementById('kpiTotal').textContent = ASESORES.length;
+
+      document.getElementById('contenedorTabla').innerHTML =
+        '<table><thead><tr>' +
+        '<th>Asesor</th><th>Estado</th><th>Entrada</th><th>Salida</th><th>Horas trabajadas</th><th>Horas faltantes</th><th>Distrito</th>' +
+        '</tr></thead><tbody>' + filasHtml + '</tbody></table>';
+
+      document.getElementById('ultimaActualizacion').textContent = 'Actualizado ' + new Date().toLocaleTimeString('es-PE');
+
+    } catch (err) {
+      document.getElementById('contenedorTabla').innerHTML = '<div class="estado-carga">No se pudo cargar la información. Revisa que los links CSV sigan publicados. (' + err.message + ')</div>';
+    }
+  }
+
+  cargarTodo();
+</script>
+</body>
+</html>
