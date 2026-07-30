@@ -374,7 +374,7 @@
         filasHtml += '<tr>' +
           '<td>' + nombre + '</td>' +
           '<td><span class="pill renuncio">' + info.motivo + '</span></td>' +
-          '<td colspan="6" class="muted">Desde el ' + info.fecha + '</td>' +
+          '<td colspan="7" class="muted">Desde el ' + info.fecha + '</td>' +
         '</tr>';
         return;
       }
@@ -385,19 +385,19 @@
       else if (estado.clase === 'descanso') descanso++;
 
       const m = marcasPorNombre[nombre] || {};
-      const mapaEntrada = enlaceMapa(m.latEntrada, m.lngEntrada);
-      const mapaSalida = enlaceMapa(m.latSalida, m.lngSalida);
-      const mapas = [mapaEntrada, mapaSalida].filter(Boolean).join(' · ') || '—';
+      const mapaEntrada = enlaceMapa(m.latEntrada, m.lngEntrada) || '—';
+      const mapaSalida = enlaceMapa(m.latSalida, m.lngSalida) || '—';
 
       filasHtml += '<tr>' +
         '<td>' + nombre + '</td>' +
         '<td><span class="pill ' + estado.clase + '">' + estado.texto + '</span></td>' +
         '<td>' + (m.entrada !== undefined && m.entrada !== null ? segundosATexto(m.entrada) : '—') + '</td>' +
+        '<td>' + mapaEntrada + '</td>' +
         '<td>' + (m.salida !== undefined && m.salida !== null ? segundosATexto(m.salida) : '—') + '</td>' +
+        '<td>' + mapaSalida + '</td>' +
         '<td>' + (m.horasTrab ? m.horasTrab + ' h' : '—') + '</td>' +
         '<td>' + (m.horasFalt ? m.horasFalt + ' h' : '—') + '</td>' +
         '<td class="muted">' + (m.distrito || '—') + '</td>' +
-        '<td>' + mapas + '</td>' +
       '</tr>';
     });
 
@@ -408,7 +408,7 @@
 
     document.getElementById('contenedorTabla').innerHTML =
       '<table><thead><tr>' +
-      '<th>Asesor</th><th>Estado</th><th>Entrada</th><th>Salida</th><th>Horas trabajadas</th><th>Horas faltantes</th><th>Distrito</th><th>Ubicación</th>' +
+      '<th>Asesor</th><th>Estado</th><th>Entrada</th><th>Ubicación entrada</th><th>Salida</th><th>Ubicación salida</th><th>Horas trabajadas</th><th>Horas faltantes</th><th>Distrito</th>' +
       '</tr></thead><tbody>' + filasHtml + '</tbody></table>';
   }
 
