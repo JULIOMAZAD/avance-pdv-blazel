@@ -215,6 +215,12 @@
     return hh*3600 + mm*60 + ss;
   }
 
+  function estadoMediodia(seg){
+    if (seg === null || seg === undefined) return {clase:'sinmarcar', texto:'— No marcó'};
+    if (seg >= 43200 && seg <= 50400) return {clase:'ok', texto:'✔ En zona'};
+    return {clase:'descanso', texto:'⚠ Fuera de horario'};
+  }
+
   function segundosATexto(seg){
     if (seg === null || isNaN(seg)) return '—';
     const hh = Math.floor(seg/3600).toString().padStart(2,'0');
@@ -298,7 +304,7 @@
           if (!fila[0]) continue;
           if (!coincideFecha(fila[0], dia, mes, anio)) continue;
           const nombre = (fila[2]||'').trim();
-          if (!marcasPorNombre[nombre]) marcasPorNombre[nombre] = { entrada:null, salida:null, distrito:'—', horasTrab:null, horasFalt:null, latEntrada:null, lngEntrada:null, latSalida:null, lngSalida:null };
+          if (!marcasPorNombre[nombre]) marcasPorNombre[nombre] = { entrada:null, salida:null, mediodia:null, distrito:'—', horasTrab:null, horasFalt:null, latEntrada:null, lngEntrada:null, latSalida:null, lngSalida:null, latMediodia:null, lngMediodia:null };
           const tipo = (fila[3]||'').trim();
           const horaSeg = horaTextoASegundos(fila[1]);
           if (tipo === 'ENTRADA'){
@@ -307,6 +313,11 @@
               marcasPorNombre[nombre].latEntrada = fila[4];
               marcasPorNombre[nombre].lngEntrada = fila[5];
             }
+          }
+          if (tipo === 'MEDIODIA'){
+            marcasPorNombre[nombre].mediodia = horaSeg;
+            marcasPorNombre[nombre].latMediodia = fila[4];
+            marcasPorNombre[nombre].lngMediodia = fila[5];
           }
           if (tipo === 'SALIDA'){
             if (marcasPorNombre[nombre].salida === null || horaSeg > marcasPorNombre[nombre].salida){
@@ -374,7 +385,7 @@
         filasHtml += '<tr>' +
           '<td>' + nombre + '</td>' +
           '<td><span class="pill renuncio">' + info.motivo + '</span></td>' +
-          '<td colspan="7" class="muted">Desde el ' + info.fecha + '</td>' +
+          '<td colspan="9" class="muted">Desde el ' + info.fecha + '</td>' +
         '</tr>';
         return;
       }
@@ -387,12 +398,16 @@
       const m = marcasPorNombre[nombre] || {};
       const mapaEntrada = enlaceMapa(m.latEntrada, m.lngEntrada) || '—';
       const mapaSalida = enlaceMapa(m.latSalida, m.lngSalida) || '—';
+      const mapaMediodia = enlaceMapa(m.latMediodia, m.lngMediodia) || '—';
+      const medio = estadoMediodia(m.mediodia);
 
       filasHtml += '<tr>' +
         '<td>' + nombre + '</td>' +
         '<td><span class="pill ' + estado.clase + '">' + estado.texto + '</span></td>' +
         '<td>' + (m.entrada !== undefined && m.entrada !== null ? segundosATexto(m.entrada) : '—') + '</td>' +
         '<td>' + mapaEntrada + '</td>' +
+        '<td><span class="pill ' + medio.clase + '">' + medio.texto + '</span>' + (m.mediodia !== null ? ' ' + segundosATexto(m.mediodia) : '') + '</td>' +
+        '<td>' + mapaMediodia + '</td>' +
         '<td>' + (m.salida !== undefined && m.salida !== null ? segundosATexto(m.salida) : '—') + '</td>' +
         '<td>' + mapaSalida + '</td>' +
         '<td>' + (m.horasTrab ? m.horasTrab + ' h' : '—') + '</td>' +
@@ -408,7 +423,7 @@
 
     document.getElementById('contenedorTabla').innerHTML =
       '<table><thead><tr>' +
-      '<th>Asesor</th><th>Estado</th><th>Entrada</th><th>Ubicación entrada</th><th>Salida</th><th>Ubicación salida</th><th>Horas trabajadas</th><th>Horas faltantes</th><th>Distrito</th>' +
+      '<th>Asesor</th><th>Estado</th><th>Entrada</th><th>Ubicación entrada</th><th>Medio día</th><th>Ubicación medio día</th><th>Salida</th><th>Ubicación salida</th><th>Horas trabajadas</th><th>Horas faltantes</th><th>Distrito</th>' +
       '</tr></thead><tbody>' + filasHtml + '</tbody></table>';
   }
 

@@ -103,6 +103,7 @@
   button:active{ transform: scale(0.97); }
   button:disabled{ opacity:0.5; cursor:default; transform:none; }
   #btnEntrada{ background: var(--rojo); color:#fff; }
+  #btnMediodia{ background: #B7791F; color:#fff; }
   #btnSalida{ background: var(--tinta); color:#fff; }
   .icono{ font-size:20px; line-height:1; }
   .estado{
@@ -162,10 +163,15 @@
       <button id="btnEntrada" onclick="marcar('ENTRADA')">
         <span class="icono">▶</span> MARCAR ENTRADA
       </button>
+      <button id="btnMediodia" onclick="marcar('MEDIODIA')">
+        <span class="icono">●</span> MARCAR MEDIO DÍA
+      </button>
       <button id="btnSalida" onclick="marcar('SALIDA')">
         <span class="icono">■</span> MARCAR SALIDA
       </button>
     </div>
+
+    <div class="pie" style="margin-top:14px;margin-bottom:0">El marcado de medio día es válido de <b>12:00 p.m. a 2:00 p.m.</b></div>
 
     <div class="estado" id="estado"></div>
   </div>
@@ -194,6 +200,7 @@
 
   function ponerBotones(activo){
     document.getElementById('btnEntrada').disabled = !activo;
+    document.getElementById('btnMediodia').disabled = !activo;
     document.getElementById('btnSalida').disabled = !activo;
   }
 
@@ -230,7 +237,8 @@
         body: JSON.stringify(datos)
       }).then(function(){
         const hora = new Date().toLocaleTimeString('es-PE');
-        mostrarEstado('ok', (tipo === 'ENTRADA' ? 'Entrada' : 'Salida') + ' registrada — ' + hora);
+        const nombreTipo = tipo === 'ENTRADA' ? 'Entrada' : (tipo === 'MEDIODIA' ? 'Marcado de medio día' : 'Salida');
+        mostrarEstado('ok', nombreTipo + ' registrada — ' + hora);
         ponerBotones(true);
       }).catch(function(){
         mostrarEstado('error', 'No se pudo enviar. Revisa tu conexión e intenta de nuevo.');
