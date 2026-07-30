@@ -2448,6 +2448,12 @@ async function fetchCuotasFromAPI(){
 function isValidData(d){
   return d && Array.isArray(d.cargo) && Array.isArray(d.ops) && Array.isArray(d.pdvs);
 }
+function maxPeriodOf(d){
+  let mx=0;
+  (d.cargo||[]).forEach(r=>{const p=r[0]*100+r[1]; if(p>mx)mx=p;});
+  (d.ops||[]).forEach(r=>{const p=r[0]*100+r[1]; if(p>mx)mx=p;});
+  return mx;
+}
 function isValidCuotasHist(d){
   return d && typeof d==='object' && Object.keys(d).length>0 &&
     Object.values(d).every(m=>m && m.global && Array.isArray(m.global.cats));
@@ -2466,7 +2472,7 @@ function init(){
     localStorage.removeItem(STORAGE_KEY_CUOTAS);
     storedCuotas = null;
   }
-  setActiveData(EMBEDDED_DATA);
+  setActiveData((stored && maxPeriodOf(stored) >= maxPeriodOf(EMBEDDED_DATA)) ? stored : EMBEDDED_DATA);
   CUOTAS_HIST = EMBEDDED_CUOTAS_HIST;
   buildFiltroDOM();
   syncFiltroDOM();
@@ -2777,6 +2783,7 @@ async function loadLive(){
     const ND=buildDataFromBase(baseRows);
     let rmax=1; for(let r=1;r<baseRows.length;r++){const d=excelDateToJSDate(baseRows[r][0]); if(d&&!isNaN(d.getTime())&&d.getFullYear()===ND.anioActual&&(d.getMonth()+1)===ND.mesActual&&d.getDate()>rmax)rmax=d.getDate();}
     ND.maxDia=rmax;
+    saveDataToStorage(ND, STORAGE_KEY);
     setActiveData(ND);
     const eqRows=Object.entries(eqAgg).map(([k,c])=>{const p=k.split('|');return [parseInt(p[0]),parseInt(p[1]),p[2],p[3],p[4],p[5],c];});
     if(window.__setEqData) window.__setEqData({rows:eqRows,anios:[...eqAnios].sort((a,b)=>a-b),tiendas:[...eqTiendas].sort()});
