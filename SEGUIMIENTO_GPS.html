@@ -16,10 +16,17 @@
   .marca .b{font-weight:800;font-size:20px;}
   .marca .l{font-weight:800;font-size:20px;color:var(--rojo);}
   .subtitulo{color:var(--gris);font-size:13px;margin-bottom:20px;}
-  .controles{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px;}
-  .controles label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--gris);}
-  input[type=date]{padding:10px 12px;border:1.5px solid var(--borde);border-radius:10px;font-size:14px;background:#fff;}
+  .fila-tarjetas{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:20px;align-items:stretch;}
+  .tarjeta-control{background:#fff;border:1px solid var(--borde);border-radius:14px;padding:16px 18px;flex:1 1 300px;min-width:280px;}
+  .tarjeta-control label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--gris);}
+  .tarjeta-control input[type=date],.tarjeta-control input[type=text],.tarjeta-control select{
+    padding:10px 12px;border:1.5px solid var(--borde);border-radius:10px;font-size:14px;background:#fff;
+    margin:6px 8px 6px 0;
+  }
+  .tarjeta-control select{min-width:220px;}
+  .tarjeta-control input[type=text]{min-width:220px;}
   button.recargar{padding:10px 16px;border:none;border-radius:10px;background:var(--tinta);color:#fff;font-weight:700;font-size:13px;cursor:pointer;}
+  button.recargar.rojo{background:var(--rojo);}
   .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:22px;}
   .kpi{background:#fff;border:1px solid var(--borde);border-radius:14px;padding:14px 16px;}
   .kpi .n{font-size:26px;font-weight:800;}
@@ -46,13 +53,22 @@
   <div class="marca"><span class="b">JMD-GERENCIA</span><span class="l">•SEGUIMIENTO GPS</span></div>
   <div class="subtitulo">Asistencia de campo por día — entrada, salida, horas y ubicación</div>
 
-  <div class="controles">
-    <div>
+  <div class="fila-tarjetas">
+    <div class="tarjeta-control">
       <label for="fecha">Fecha</label><br>
       <input type="date" id="fecha">
+      <button class="recargar" onclick="cargarTodo()">🔄 Actualizar</button>
+      <div id="ultimaActualizacion" class="muted" style="font-size:12px;margin-top:8px"></div>
     </div>
-    <button class="recargar" onclick="cargarTodo()">🔄 Actualizar</button>
-    <span id="ultimaActualizacion" class="muted" style="font-size:12px"></span>
+    <div class="tarjeta-control">
+      <label>Dar de baja a un asesor</label><br>
+      <select id="bajaNombre">
+        <option value="">Selecciona un asesor…</option>
+      </select>
+      <input type="text" id="bajaMotivo" placeholder="Motivo (ej. Renunció, Retirado por bajo rendimiento)">
+      <button class="recargar rojo" onclick="darDeBaja()">🚫 Dar de baja</button>
+      <div id="bajaEstado" class="muted" style="font-size:12px;margin-top:8px"></div>
+    </div>
   </div>
 
   <div class="kpis">
@@ -76,24 +92,51 @@
   const CSV_DATOS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQvGCLp7WH54-iCTYZSTI_PpYeRAoey4Ov__FUGWEfTZNB0n-PPwCDVV0G6gUjSkiz8y_haVHkEKVXy/pub?gid=65768257&single=true&output=csv";
   const CSV_MARCACIONES = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQvGCLp7WH54-iCTYZSTI_PpYeRAoey4Ov__FUGWEfTZNB0n-PPwCDVV0G6gUjSkiz8y_haVHkEKVXy/pub?gid=1159119613&single=true&output=csv";
 
+  // Mismo Apps Script que usa la pantalla de marcado — sirve tanto
+  // para registrar entradas/salidas como para dar de baja asesores.
+  const URL_SCRIPT = "https://script.google.com/macros/s/AKfycbw125n4ceKoQwUBq8zRHKeGzHue_EzZj8yd1zYt_xym0BUbiOgnr5rJFtLuapDJA3kfsA/exec";
+
   // Lista de asesores de campo que sigue este panel (mismo orden/nombres
   // que en el mapa del Apps Script). Para agregar uno nuevo, añade su
   // nombre EXACTO aquí.
   const ASESORES = [
-    "AMPARO SUAREZ ACEVEDO","ANGELA ROJAS BOBBIO","CAMILO RIVERA","JESUS CRUZ ACUÑA",
+    "ANGELA ROJAS BOBBIO","CAMILO RIVERA","JESUS CRUZ ACUÑA",
     "ALBERTO ROJAS MENDOZA","CECILIA PUNTAS SALCEDO","GRACIE ARACELI MANRIQUE MORQUENCHO",
     "RUTH SARAI VERGARA SANCHEZ","ANGELY JARITZA ALEGRÍA ZAMBRANO","JAVIER CASTELO JESÚS",
     "BRENNA JOSSARY SALAS SHAPIAMA","LUIS FERNANDO ROSADO","RIGOBERTO JUNIOR TERRANOVA GARCIA"
   ];
 
-  // Asesores que ya no están activos (renuncia, retiro, cese, etc.):
-  // nombre exacto -> {fecha, motivo}. Pon el motivo que quieras.
-  // Aparecen en la tabla marcados con ese motivo en vez de "Faltó" o
-  // "Sin dato". Debe coincidir con la misma lista del Apps Script.
-  const INACTIVOS = {
-    // 'NOMBRE EXACTO': { fecha: '2026-08-05', motivo: 'Renunció' },
-    // 'OTRO NOMBRE': { fecha: '2026-08-10', motivo: 'Retirado por bajo rendimiento' },
-  };
+  // Se llena solo al cargar, leyendo la hoja INACTIVOS a través del
+  // Apps Script — ya no hace falta editar código para dar de baja a
+  // alguien, se hace desde el formulario de arriba.
+  let INACTIVOS = {};
+
+  document.getElementById('bajaNombre').innerHTML = '<option value="">Selecciona un asesor…</option>' +
+    ASESORES.map(n => '<option value="' + n + '">' + n + '</option>').join('');
+
+  async function darDeBaja(){
+    const nombre = document.getElementById('bajaNombre').value;
+    const motivo = document.getElementById('bajaMotivo').value.trim();
+    const estado = document.getElementById('bajaEstado');
+    if (!nombre || !motivo){
+      estado.textContent = 'Selecciona el asesor y escribe un motivo.';
+      return;
+    }
+    estado.textContent = 'Guardando…';
+    try {
+      await fetch(URL_SCRIPT, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'inactivar', nombre: nombre, motivo: motivo })
+      });
+      estado.textContent = nombre + ' dado de baja. Actualizando…';
+      document.getElementById('bajaMotivo').value = '';
+      setTimeout(cargarTodo, 1500);
+    } catch (err) {
+      estado.textContent = 'No se pudo guardar, intenta de nuevo.';
+    }
+  }
 
   function hoyISO(){
     const d = new Date();
@@ -159,6 +202,15 @@
       const fechaDDMMYYYY = String(dia).padStart(2,'0') + '/' + String(mes).padStart(2,'0') + '/' + anio;
 
       const [datosFilas, marcFilas] = await Promise.all([obtenerCSV(CSV_DATOS), obtenerCSV(CSV_MARCACIONES)]);
+
+      try {
+        const respInact = await fetch(URL_SCRIPT);
+        const dataInact = await respInact.json();
+        if (dataInact && dataInact.inactivos) INACTIVOS = dataInact.inactivos;
+      } catch (errInact) {
+        // Si no se puede leer (CORS, red, etc.), seguimos con la lista vacía
+        // en vez de romper el resto del panel.
+      }
 
       // ---- Ubicar columna del día en DATOS ----
       // Busca la fila de encabezado (contiene "N°" y "NOMBRE COMPLETO")
