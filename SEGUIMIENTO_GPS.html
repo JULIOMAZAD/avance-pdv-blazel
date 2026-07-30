@@ -60,11 +60,12 @@
       <button class="recargar" onclick="cargarTodo()">🔄 Actualizar</button>
       <div id="ultimaActualizacion" class="muted" style="font-size:12px;margin-top:8px"></div>
     </div>
-    <div class="tarjeta-control">
+    <div class="tarjeta-control" id="tarjetaBaja">
       <label>Dar de baja a un asesor</label><br>
       <select id="bajaNombre">
         <option value="">Selecciona un asesor…</option>
       </select>
+      <input type="date" id="bajaFecha" title="Fecha de renuncia/retiro">
       <input type="text" id="bajaMotivo" placeholder="Motivo (ej. Renunció, Retirado por bajo rendimiento)">
       <button class="recargar rojo" onclick="darDeBaja()">🚫 Dar de baja</button>
       <div id="bajaEstado" class="muted" style="font-size:12px;margin-top:8px"></div>
@@ -114,8 +115,17 @@
   document.getElementById('bajaNombre').innerHTML = '<option value="">Selecciona un asesor…</option>' +
     ASESORES.map(n => '<option value="' + n + '">' + n + '</option>').join('');
 
+  // Solo jmaza puede dar de baja asesores. Amparo y Gracie solo ven
+  // el seguimiento, no esta tarjeta.
+  const parametros = new URLSearchParams(window.location.search);
+  const usuarioActual = parametros.get('u') || '';
+  if (usuarioActual !== 'jmaza') {
+    document.getElementById('tarjetaBaja').style.display = 'none';
+  }
+
   async function darDeBaja(){
     const nombre = document.getElementById('bajaNombre').value;
+    const fecha = document.getElementById('bajaFecha').value || hoyISO();
     const motivo = document.getElementById('bajaMotivo').value.trim();
     const estado = document.getElementById('bajaEstado');
     if (!nombre || !motivo){
@@ -128,11 +138,16 @@
         method: 'POST',
         mode: 'no-cors',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'inactivar', nombre: nombre, motivo: motivo })
+        body: JSON.stringify({ action: 'inactivar', nombre: nombre, motivo: motivo, fecha: fecha })
       });
-      estado.textContent = nombre + ' dado de baja. Actualizando…';
+      // Actualización optimista: lo reflejamos ya mismo en el panel,
+      // sin esperar a que vuelva a llegar del servidor.
+      INACTIVOS[nombre] = { fecha: fecha, motivo: motivo };
+      estado.textContent = nombre + ' dado de baja desde el ' + fecha + '.';
+      document.getElementById('bajaNombre').value = '';
+      document.getElementById('bajaFecha').value = '';
       document.getElementById('bajaMotivo').value = '';
-      setTimeout(cargarTodo, 1500);
+      renderTabla();
     } catch (err) {
       estado.textContent = 'No se pudo guardar, intenta de nuevo.';
     }
@@ -194,10 +209,15 @@
     return hh + ':' + mm;
   }
 
+  let ultimaFechaISO = hoyISO();
+  let ultimoCodigoPorNombre = {};
+  let ultimasMarcasPorNombre = {};
+
   async function cargarTodo(){
     document.getElementById('contenedorTabla').innerHTML = '<div class="estado-carga">Cargando...</div>';
     try {
       const fechaISO = document.getElementById('fecha').value; // yyyy-mm-dd
+      ultimaFechaISO = fechaISO;
       const [anio, mes, dia] = fechaISO.split('-').map(Number);
       const fechaDDMMYYYY = String(dia).padStart(2,'0') + '/' + String(mes).padStart(2,'0') + '/' + anio;
 
@@ -208,12 +228,11 @@
         const dataInact = await respInact.json();
         if (dataInact && dataInact.inactivos) INACTIVOS = dataInact.inactivos;
       } catch (errInact) {
-        // Si no se puede leer (CORS, red, etc.), seguimos con la lista vacía
-        // en vez de romper el resto del panel.
+        // Si no se puede leer (CORS, red, etc.), seguimos con la lista que
+        // ya teníamos en memoria en vez de romper el resto del panel.
       }
 
       // ---- Ubicar columna del día en DATOS ----
-      // Busca la fila de encabezado (contiene "N°" y "NOMBRE COMPLETO")
       let filaHeader = datosFilas.findIndex(f => f[0] && f[0].trim() === 'N°');
       let colDia = -1;
       if (filaHeader !== -1){
@@ -242,14 +261,22 @@
           if (!fila[0]) continue;
           if (fila[0].trim() !== fechaDDMMYYYY) continue;
           const nombre = (fila[2]||'').trim();
-          if (!marcasPorNombre[nombre]) marcasPorNombre[nombre] = { entrada:null, salida:null, distrito:'—', horasTrab:null, horasFalt:null };
+          if (!marcasPorNombre[nombre]) marcasPorNombre[nombre] = { entrada:null, salida:null, distrito:'—', horasTrab:null, horasFalt:null, latEntrada:null, lngEntrada:null, latSalida:null, lngSalida:null };
           const tipo = (fila[3]||'').trim();
           const horaSeg = horaTextoASegundos(fila[1]);
           if (tipo === 'ENTRADA'){
-            if (marcasPorNombre[nombre].entrada === null || horaSeg < marcasPorNombre[nombre].entrada) marcasPorNombre[nombre].entrada = horaSeg;
+            if (marcasPorNombre[nombre].entrada === null || horaSeg < marcasPorNombre[nombre].entrada){
+              marcasPorNombre[nombre].entrada = horaSeg;
+              marcasPorNombre[nombre].latEntrada = fila[4];
+              marcasPorNombre[nombre].lngEntrada = fila[5];
+            }
           }
           if (tipo === 'SALIDA'){
-            if (marcasPorNombre[nombre].salida === null || horaSeg > marcasPorNombre[nombre].salida) marcasPorNombre[nombre].salida = horaSeg;
+            if (marcasPorNombre[nombre].salida === null || horaSeg > marcasPorNombre[nombre].salida){
+              marcasPorNombre[nombre].salida = horaSeg;
+              marcasPorNombre[nombre].latSalida = fila[4];
+              marcasPorNombre[nombre].lngSalida = fila[5];
+            }
             if (fila[8]) marcasPorNombre[nombre].horasTrab = fila[8];
             if (fila[9]) marcasPorNombre[nombre].horasFalt = fila[9];
           }
@@ -257,52 +284,73 @@
         }
       }
 
-      // ---- Render ----
-      let asistio=0, falto=0, descanso=0;
-      let filasHtml = '';
-      ASESORES.forEach(nombre => {
-        if (INACTIVOS.hasOwnProperty(nombre)) {
-          const info = INACTIVOS[nombre];
-          filasHtml += '<tr>' +
-            '<td>' + nombre + '</td>' +
-            '<td><span class="pill renuncio">' + info.motivo + '</span></td>' +
-            '<td colspan="5" class="muted">Desde el ' + info.fecha + '</td>' +
-          '</tr>';
-          return;
-        }
-        const codigo = codigoPorNombre[nombre] || '';
-        const estado = estadoDesdeCodigo(codigo);
-        if (estado.clase === 'ok') asistio++;
-        else if (estado.clase === 'falta') falto++;
-        else if (estado.clase === 'descanso') descanso++;
-
-        const m = marcasPorNombre[nombre] || {};
-        filasHtml += '<tr>' +
-          '<td>' + nombre + '</td>' +
-          '<td><span class="pill ' + estado.clase + '">' + estado.texto + '</span></td>' +
-          '<td>' + (m.entrada !== undefined && m.entrada !== null ? segundosATexto(m.entrada) : '—') + '</td>' +
-          '<td>' + (m.salida !== undefined && m.salida !== null ? segundosATexto(m.salida) : '—') + '</td>' +
-          '<td>' + (m.horasTrab ? m.horasTrab + ' h' : '—') + '</td>' +
-          '<td>' + (m.horasFalt ? m.horasFalt + ' h' : '—') + '</td>' +
-          '<td class="muted">' + (m.distrito || '—') + '</td>' +
-        '</tr>';
-      });
-
-      document.getElementById('kpiAsistio').textContent = asistio;
-      document.getElementById('kpiFalto').textContent = falto;
-      document.getElementById('kpiDescanso').textContent = descanso;
-      document.getElementById('kpiTotal').textContent = ASESORES.length;
-
-      document.getElementById('contenedorTabla').innerHTML =
-        '<table><thead><tr>' +
-        '<th>Asesor</th><th>Estado</th><th>Entrada</th><th>Salida</th><th>Horas trabajadas</th><th>Horas faltantes</th><th>Distrito</th>' +
-        '</tr></thead><tbody>' + filasHtml + '</tbody></table>';
-
+      ultimoCodigoPorNombre = codigoPorNombre;
+      ultimasMarcasPorNombre = marcasPorNombre;
+      renderTabla();
       document.getElementById('ultimaActualizacion').textContent = 'Actualizado ' + new Date().toLocaleTimeString('es-PE');
 
     } catch (err) {
       document.getElementById('contenedorTabla').innerHTML = '<div class="estado-carga">No se pudo cargar la información. Revisa que los links CSV sigan publicados. (' + err.message + ')</div>';
     }
+  }
+
+  function enlaceMapa(lat, lng){
+    if (!lat || !lng) return '';
+    return '<a href="https://www.google.com/maps?q=' + lat + ',' + lng + '" target="_blank" style="color:var(--rojo);font-weight:700;text-decoration:none">📍 Ver mapa</a>';
+  }
+
+  function renderTabla(){
+    const fechaISO = ultimaFechaISO;
+    const codigoPorNombre = ultimoCodigoPorNombre;
+    const marcasPorNombre = ultimasMarcasPorNombre;
+
+    let asistio=0, falto=0, descanso=0;
+    let filasHtml = '';
+    ASESORES.forEach(nombre => {
+      // Solo se muestra como inactivo si la fecha consultada es igual
+      // o posterior a su fecha de baja. Si consultas un día ANTERIOR
+      // a su renuncia, se muestra su asistencia real de ese día.
+      const info = INACTIVOS[nombre];
+      if (info && fechaISO >= info.fecha) {
+        filasHtml += '<tr>' +
+          '<td>' + nombre + '</td>' +
+          '<td><span class="pill renuncio">' + info.motivo + '</span></td>' +
+          '<td colspan="6" class="muted">Desde el ' + info.fecha + '</td>' +
+        '</tr>';
+        return;
+      }
+      const codigo = codigoPorNombre[nombre] || '';
+      const estado = estadoDesdeCodigo(codigo);
+      if (estado.clase === 'ok') asistio++;
+      else if (estado.clase === 'falta') falto++;
+      else if (estado.clase === 'descanso') descanso++;
+
+      const m = marcasPorNombre[nombre] || {};
+      const mapaEntrada = enlaceMapa(m.latEntrada, m.lngEntrada);
+      const mapaSalida = enlaceMapa(m.latSalida, m.lngSalida);
+      const mapas = [mapaEntrada, mapaSalida].filter(Boolean).join(' · ') || '—';
+
+      filasHtml += '<tr>' +
+        '<td>' + nombre + '</td>' +
+        '<td><span class="pill ' + estado.clase + '">' + estado.texto + '</span></td>' +
+        '<td>' + (m.entrada !== undefined && m.entrada !== null ? segundosATexto(m.entrada) : '—') + '</td>' +
+        '<td>' + (m.salida !== undefined && m.salida !== null ? segundosATexto(m.salida) : '—') + '</td>' +
+        '<td>' + (m.horasTrab ? m.horasTrab + ' h' : '—') + '</td>' +
+        '<td>' + (m.horasFalt ? m.horasFalt + ' h' : '—') + '</td>' +
+        '<td class="muted">' + (m.distrito || '—') + '</td>' +
+        '<td>' + mapas + '</td>' +
+      '</tr>';
+    });
+
+    document.getElementById('kpiAsistio').textContent = asistio;
+    document.getElementById('kpiFalto').textContent = falto;
+    document.getElementById('kpiDescanso').textContent = descanso;
+    document.getElementById('kpiTotal').textContent = ASESORES.length;
+
+    document.getElementById('contenedorTabla').innerHTML =
+      '<table><thead><tr>' +
+      '<th>Asesor</th><th>Estado</th><th>Entrada</th><th>Salida</th><th>Horas trabajadas</th><th>Horas faltantes</th><th>Distrito</th><th>Ubicación</th>' +
+      '</tr></thead><tbody>' + filasHtml + '</tbody></table>';
   }
 
   cargarTodo();
