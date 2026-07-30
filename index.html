@@ -701,8 +701,9 @@ async function loadGerencia(){
   info.innerHTML=""; km.innerHTML=""; ts.innerHTML="";
   document.getElementById("gerLoadMsg").innerHTML='<div class="loading-sm"><span class="spinner-sm"></span>Sumando '+sel.length+' tienda(s)...</div>';
   try{
+    const comisFragPromise = comisionKpiFragmentGerencia(sel);
     const results=await withLock(()=>Promise.race([
-      fetchInBatches(sel, 3, t=>fetchTienda(SHEET_NAME[t]||"", gerMes)
+      fetchInBatches(sel, 9, t=>fetchTienda(SHEET_NAME[t]||"", gerMes)
         .then(d=>({t,d})).catch(e=>({t,d:null,err:(e&&e.message)||"error"})), isCurrent),
       new Promise((_,rej)=>setTimeout(()=>rej(new Error("La carga tardó demasiado. Intenta de nuevo.")), 90000))
     ]));
@@ -782,7 +783,7 @@ async function loadGerencia(){
     const tEnMeta=storeStats.filter(x=>x.pct>=1).length, best=storeStats[0];
     const jefInd=`<div class="kpi ${tEnMeta/ok.length>=0.5?'green':(tEnMeta>0?'amber':'red')}"><div class="lbl">Tiendas en meta</div><div class="val">${tEnMeta} / ${ok.length}</div><div class="sub">proyectadas</div></div>`+
       (best?`<div class="kpi green"><div class="lbl">Mejor tienda</div><div class="val" style="font-size:16px;margin-top:6px">${TIENDA_LABEL[best.ti]||best.ti}</div><div class="sub">${fmtPct(best.pct)} proyección</div></div>`:"");
-    const comisFrag = await comisionKpiFragmentGerencia(sel);
+    const comisFrag = await comisFragPromise;
     document.getElementById("gerKpis").innerHTML= gaugesRow(struct,totalRow) + '<div class="kpis">' +
       kpiCard("Cuota total (S/)", fmt(totMeta), "Suma del TOTAL de cada tienda") +
       kpiCard("Avance total (S/)", fmt(totAv), fmtPct(avancePct)+" de la cuota") +
@@ -849,7 +850,7 @@ function aggregateResults(ok){
   return {acc, order, factor, totMeta, totAv, totProy};
 }
 async function fetchMonthAgg(sel, mesKey){
-  const results = await fetchInBatches(sel, 3, t=>fetchTienda(SHEET_NAME[t]||"", mesKey).then(d=>({t,d})).catch(e=>({t,d:null})), null, null);
+  const results = await fetchInBatches(sel, 9, t=>fetchTienda(SHEET_NAME[t]||"", mesKey).then(d=>({t,d})).catch(e=>({t,d:null})), null, null);
   const ok = results.filter(r=>r.d);
   if(!ok.length) return null;
   return aggregateResults(ok);
