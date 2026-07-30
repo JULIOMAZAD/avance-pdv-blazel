@@ -222,11 +222,23 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
   <iframe id="vFrame" style="width:100%;height:calc(100vh - 53px);border:none;display:block;background:#0a0b0d"></iframe>
 </div>
 
+<div id="gracieScreen" class="screen">
+  <div class="main-wrap">
+    <div class="top-bar">
+      <div class="top-left"><h2>SUPER CAMPO</h2><div class="pdv">Recarga y seguimiento de asistencia</div></div>
+      <div class="top-actions">
+        <button class="btn-vend" onclick="openEmbed('DASHBOARD_RECARGAS_BLAZEL.html?embed=1&u=gracie','⚡ Recarga','gracieScreen')">⚡ Recarga</button>
+        <button class="btn-vend" onclick="openEmbed('SEGUIMIENTO_GPS.html?u=gracie','📍 Seguimiento GPS','gracieScreen')">📍 Seguimiento GPS</button>
+        <button class="btn-out" onclick="doLogout()">Cerrar sesión</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="embedScreen" class="screen">
   <div style="background:#1a1a2e;padding:10px 16px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:10">
     <button class="btn-out" onclick="salirEmbed()">← Volver</button>
     <span id="embedTitle" style="color:#fff;font-weight:600;font-size:14px">—</span>
-    <button class="btn-vend" id="btnGPSGracie" style="display:none" onclick="openEmbed('SEGUIMIENTO_GPS.html?u=gracie','📍 Seguimiento GPS','loginScreen')">📍 Seguimiento GPS</button>
   </div>
   <iframe id="embedFrame" style="width:100%;height:calc(100vh - 53px);border:none;display:block;background:#0a0b0d"></iframe>
 </div>
@@ -367,8 +379,7 @@ function doLogin(){
   }
   if(t==="GRACIE"){
     gerenteMode=false;
-    openEmbed("DASHBOARD_RECARGAS_BLAZEL.html?embed=1&u=gracie","⚡ Recarga","loginScreen");
-    document.getElementById("btnGPSGracie").style.display="";
+    showScreen("gracieScreen");
     return;
   }
   gerenteMode=false;
@@ -399,7 +410,7 @@ function abrirPersonal(ret){
 }
 function doLogout(){
   curTienda="";gerenteMode=false;comercialMode=false;curLoginType="";gerMode="all";gerSel.clear();
-  ["btnMasivo","btnRecarga","btnRecarDash","btnGPS","btnGPSAmparo","btnGPSGracie"].forEach(function(id){ var b=document.getElementById(id); if(b) b.style.display="none"; });
+  ["btnMasivo","btnRecarga","btnRecarDash","btnGPS","btnGPSAmparo"].forEach(function(id){ var b=document.getElementById(id); if(b) b.style.display="none"; });
   var _gh=document.querySelector("#gerScreen h2"); if(_gh) _gh.textContent="COORD. TIENDAS — Consolidado";
   document.getElementById("passIn").value="";
   document.getElementById("tiendaSel").value="";
@@ -412,7 +423,7 @@ function doLogout(){
 }
 
 function showScreen(id){
-  ["loginScreen","mainScreen","gerScreen","vendedorScreen","recarScreen","embedScreen"].forEach(s=>{
+  ["loginScreen","mainScreen","gerScreen","vendedorScreen","recarScreen","gracieScreen","embedScreen"].forEach(s=>{
     document.getElementById(s).classList.toggle("active", s===id);
   });
 }

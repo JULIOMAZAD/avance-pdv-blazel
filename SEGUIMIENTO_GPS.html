@@ -224,12 +224,15 @@
       const [datosFilas, marcFilas] = await Promise.all([obtenerCSV(CSV_DATOS), obtenerCSV(CSV_MARCACIONES)]);
 
       try {
-        const respInact = await fetch(URL_SCRIPT);
+        const controlador = new AbortController();
+        const limite = setTimeout(() => controlador.abort(), 4000);
+        const respInact = await fetch(URL_SCRIPT, { signal: controlador.signal });
+        clearTimeout(limite);
         const dataInact = await respInact.json();
         if (dataInact && dataInact.inactivos) INACTIVOS = dataInact.inactivos;
       } catch (errInact) {
-        // Si no se puede leer (CORS, red, etc.), seguimos con la lista que
-        // ya teníamos en memoria en vez de romper el resto del panel.
+        // Si no se puede leer a tiempo (CORS, red, demora, etc.), seguimos
+        // con la lista que ya teníamos en memoria en vez de trabar el panel.
       }
 
       // ---- Ubicar columna del día en DATOS ----
