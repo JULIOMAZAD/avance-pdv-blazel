@@ -200,6 +200,13 @@
     return {clase:'sinmarcar', texto:'— Sin dato'};
   }
 
+  function coincideFecha(texto, dia, mes, anio){
+    if (!texto) return false;
+    const partes = texto.trim().split(/[\/\-]/).map(Number);
+    if (partes.length < 3 || partes.some(isNaN)) return false;
+    return partes[0] === dia && partes[1] === mes && partes[2] === anio;
+  }
+
   function horaTextoASegundos(texto){
     if (!texto) return null;
     const partes = texto.trim().split(':').map(Number);
@@ -289,7 +296,7 @@
         for (let r = mHeader+1; r < marcFilas.length; r++){
           const fila = marcFilas[r];
           if (!fila[0]) continue;
-          if (fila[0].trim() !== fechaDDMMYYYY) continue;
+          if (!coincideFecha(fila[0], dia, mes, anio)) continue;
           const nombre = (fila[2]||'').trim();
           if (!marcasPorNombre[nombre]) marcasPorNombre[nombre] = { entrada:null, salida:null, distrito:'—', horasTrab:null, horasFalt:null, latEntrada:null, lngEntrada:null, latSalida:null, lngSalida:null };
           const tipo = (fila[3]||'').trim();
