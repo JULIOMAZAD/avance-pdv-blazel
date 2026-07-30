@@ -182,7 +182,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
         <button class="btn-vend" id="btnMasivo" style="display:none" onclick="abrirMasivo()">📡 Masivo</button>
         <button class="btn-vend" id="btnRecarga" style="display:none" onclick="abrirRecargaDash()">⚡ Recarga</button>
         <button class="btn-vend" onclick="abrirPersonal('gerScreen')">🗂️ Control Personal</button>
-        <button class="btn-vend" id="btnGPS" style="display:none" onclick="window.open('SEGUIMIENTO_GPS.html','_blank')">📍 Seguimiento GPS</button>
+        <button class="btn-vend" id="btnGPS" style="display:none" onclick="openEmbed('SEGUIMIENTO_GPS.html','📍 Seguimiento GPS','gerScreen')">📍 Seguimiento GPS</button>
         <button class="btn-out" onclick="doLogout()">Cerrar sesión</button>
       </div>
     </div>
@@ -204,7 +204,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
   <div class="main-wrap">
     <div class="top-bar">
       <div class="top-left"><h2>COORD. CAMPO — Avance de Campo</h2><div class="pdv">Avance por responsable y asesor</div></div>
-      <div class="top-actions"><button class="btn-vend" id="btnRecarDash" style="display:none" onclick="abrirRecargaAmparo()">⚡ Recarga</button><button class="btn-vend" onclick="abrirPersonal('recarScreen')">🗂️ Control Personal</button><button class="btn-vend" id="btnGPSAmparo" style="display:none" onclick="window.open('SEGUIMIENTO_GPS.html','_blank')">📍 Seguimiento GPS</button><button class="btn-out" onclick="doLogout()">Cerrar sesión</button></div>
+      <div class="top-actions"><button class="btn-vend" id="btnRecarDash" style="display:none" onclick="abrirRecargaAmparo()">⚡ Recarga</button><button class="btn-vend" onclick="abrirPersonal('recarScreen')">🗂️ Control Personal</button><button class="btn-vend" id="btnGPSAmparo" style="display:none" onclick="openEmbed('SEGUIMIENTO_GPS.html','📍 Seguimiento GPS','recarScreen')">📍 Seguimiento GPS</button><button class="btn-out" onclick="doLogout()">Cerrar sesión</button></div>
     </div>
     <div class="mes-tabs" id="recarMesTabs"></div>
     <div id="recarInfo" class="info-row"></div>
@@ -226,7 +226,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
   <div style="background:#1a1a2e;padding:10px 16px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:10">
     <button class="btn-out" onclick="salirEmbed()">← Volver</button>
     <span id="embedTitle" style="color:#fff;font-weight:600;font-size:14px">—</span>
-    <button class="btn-vend" id="btnGPSGracie" style="display:none;margin-left:auto" onclick="window.open('SEGUIMIENTO_GPS.html','_blank')">📍 Seguimiento GPS</button>
+    <button class="btn-vend" id="btnGPSGracie" style="display:none;margin-left:auto" onclick="openEmbed('SEGUIMIENTO_GPS.html','📍 Seguimiento GPS','loginScreen')">📍 Seguimiento GPS</button>
   </div>
   <iframe id="embedFrame" style="width:100%;height:calc(100vh - 53px);border:none;display:block;background:#0a0b0d"></iframe>
 </div>

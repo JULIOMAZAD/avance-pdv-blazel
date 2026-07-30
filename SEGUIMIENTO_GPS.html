@@ -36,6 +36,7 @@
   .pill.falta{background:#FDEAEA;color:var(--rojo-oscuro);}
   .pill.descanso{background:#FDF3E3;color:var(--ambar);}
   .pill.sinmarcar{background:var(--gris-claro);color:var(--gris);}
+  .pill.renuncio{background:#EDEDF2;color:var(--gris);text-decoration:line-through;}
   .muted{color:var(--gris);}
   .estado-carga{padding:40px;text-align:center;color:var(--gris);}
 </style>
@@ -81,9 +82,18 @@
   const ASESORES = [
     "AMPARO SUAREZ ACEVEDO","ANGELA ROJAS BOBBIO","CAMILO RIVERA","JESUS CRUZ ACUÑA",
     "ALBERTO ROJAS MENDOZA","CECILIA PUNTAS SALCEDO","GRACIE ARACELI MANRIQUE MORQUENCHO",
-    "RUTH SARAI VERGARA SANCHEZ","ANGELY JARITZA ALEGRIA ZAMBRANO","JAVIER CASTELO JESUS",
+    "RUTH SARAI VERGARA SANCHEZ","ANGELY JARITZA ALEGRÍA ZAMBRANO","JAVIER CASTELO JESÚS",
     "BRENNA JOSSARY SALAS SHAPIAMA","LUIS FERNANDO ROSADO","RIGOBERTO JUNIOR TERRANOVA GARCIA"
   ];
+
+  // Asesores que ya no están activos (renuncia, retiro, cese, etc.):
+  // nombre exacto -> {fecha, motivo}. Pon el motivo que quieras.
+  // Aparecen en la tabla marcados con ese motivo en vez de "Faltó" o
+  // "Sin dato". Debe coincidir con la misma lista del Apps Script.
+  const INACTIVOS = {
+    // 'NOMBRE EXACTO': { fecha: '2026-08-05', motivo: 'Renunció' },
+    // 'OTRO NOMBRE': { fecha: '2026-08-10', motivo: 'Retirado por bajo rendimiento' },
+  };
 
   function hoyISO(){
     const d = new Date();
@@ -199,6 +209,15 @@
       let asistio=0, falto=0, descanso=0;
       let filasHtml = '';
       ASESORES.forEach(nombre => {
+        if (INACTIVOS.hasOwnProperty(nombre)) {
+          const info = INACTIVOS[nombre];
+          filasHtml += '<tr>' +
+            '<td>' + nombre + '</td>' +
+            '<td><span class="pill renuncio">' + info.motivo + '</span></td>' +
+            '<td colspan="5" class="muted">Desde el ' + info.fecha + '</td>' +
+          '</tr>';
+          return;
+        }
         const codigo = codigoPorNombre[nombre] || '';
         const estado = estadoDesdeCodigo(codigo);
         if (estado.clase === 'ok') asistio++;
