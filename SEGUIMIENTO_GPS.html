@@ -126,12 +126,18 @@
     return {clase:'sinmarcar', texto:'— Sin dato'};
   }
 
-  function horaFraccionATexto(fraccionStr){
-    const f = parseFloat(fraccionStr);
-    if (isNaN(f)) return '—';
-    const totalSeg = Math.round(f * 86400);
-    const hh = Math.floor(totalSeg/3600).toString().padStart(2,'0');
-    const mm = Math.floor((totalSeg%3600)/60).toString().padStart(2,'0');
+  function horaTextoASegundos(texto){
+    if (!texto) return null;
+    const partes = texto.trim().split(':').map(Number);
+    if (partes.length < 2 || partes.some(isNaN)) return null;
+    const [hh, mm, ss] = [partes[0]||0, partes[1]||0, partes[2]||0];
+    return hh*3600 + mm*60 + ss;
+  }
+
+  function segundosATexto(seg){
+    if (seg === null || isNaN(seg)) return '—';
+    const hh = Math.floor(seg/3600).toString().padStart(2,'0');
+    const mm = Math.floor((seg%3600)/60).toString().padStart(2,'0');
     return hh + ':' + mm;
   }
 
@@ -176,12 +182,12 @@
           const nombre = (fila[2]||'').trim();
           if (!marcasPorNombre[nombre]) marcasPorNombre[nombre] = { entrada:null, salida:null, distrito:'—', horasTrab:null, horasFalt:null };
           const tipo = (fila[3]||'').trim();
-          const hora = fila[1];
+          const horaSeg = horaTextoASegundos(fila[1]);
           if (tipo === 'ENTRADA'){
-            if (marcasPorNombre[nombre].entrada === null || parseFloat(hora) < parseFloat(marcasPorNombre[nombre].entrada)) marcasPorNombre[nombre].entrada = hora;
+            if (marcasPorNombre[nombre].entrada === null || horaSeg < marcasPorNombre[nombre].entrada) marcasPorNombre[nombre].entrada = horaSeg;
           }
           if (tipo === 'SALIDA'){
-            if (marcasPorNombre[nombre].salida === null || parseFloat(hora) > parseFloat(marcasPorNombre[nombre].salida)) marcasPorNombre[nombre].salida = hora;
+            if (marcasPorNombre[nombre].salida === null || horaSeg > marcasPorNombre[nombre].salida) marcasPorNombre[nombre].salida = horaSeg;
             if (fila[8]) marcasPorNombre[nombre].horasTrab = fila[8];
             if (fila[9]) marcasPorNombre[nombre].horasFalt = fila[9];
           }
@@ -203,8 +209,8 @@
         filasHtml += '<tr>' +
           '<td>' + nombre + '</td>' +
           '<td><span class="pill ' + estado.clase + '">' + estado.texto + '</span></td>' +
-          '<td>' + (m.entrada ? horaFraccionATexto(m.entrada) : '—') + '</td>' +
-          '<td>' + (m.salida ? horaFraccionATexto(m.salida) : '—') + '</td>' +
+          '<td>' + (m.entrada !== undefined && m.entrada !== null ? segundosATexto(m.entrada) : '—') + '</td>' +
+          '<td>' + (m.salida !== undefined && m.salida !== null ? segundosATexto(m.salida) : '—') + '</td>' +
           '<td>' + (m.horasTrab ? m.horasTrab + ' h' : '—') + '</td>' +
           '<td>' + (m.horasFalt ? m.horasFalt + ' h' : '—') + '</td>' +
           '<td class="muted">' + (m.distrito || '—') + '</td>' +
