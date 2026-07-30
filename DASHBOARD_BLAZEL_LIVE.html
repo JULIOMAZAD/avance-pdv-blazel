@@ -860,6 +860,17 @@ function setActiveData(data){
     F.moda = Array.isArray(vista.moda) ? vista.moda : [];
     F.dia  = (typeof vista.dia==='number') ? vista.dia : 0;
     window._tabPendiente = vista.tab || null;
+    // Si la vista guardada apunta a un año/mes sin datos (p.ej. quedó en un mes
+    // que aún no tiene información cargada), caemos al último periodo con datos
+    // reales en vez de mostrar todo en cero.
+    if(F.anio.length===1 && F.mes.length===1){
+      const a=F.anio[0], m=F.mes[0];
+      const hayDatos = (DATA.cargo||[]).some(r=>r[0]===a && r[1]===m) || (DATA.ops||[]).some(r=>r[0]===a && r[1]===m);
+      if(!hayDatos){
+        F.anio = [DATA.anioActual];
+        F.mes = [DATA.mesActual];
+      }
+    }
   } else {
     // valores por defecto del filtro: año y mes actuales, todas las tiendas, todos los productos
     F.anio = [DATA.anioActual];
