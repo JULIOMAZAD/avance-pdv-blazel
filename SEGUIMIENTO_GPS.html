@@ -70,6 +70,12 @@
       <button class="recargar rojo" onclick="darDeBaja()">🚫 Dar de baja</button>
       <div id="bajaEstado" class="muted" style="font-size:12px;margin-top:8px"></div>
     </div>
+    <div class="tarjeta-control" id="tarjetaControlHora">
+      <label>Hora de control (medio día) para esta fecha</label><br>
+      <input type="time" id="horaControlInput">
+      <button class="recargar" onclick="guardarHoraControl()">⏱ Guardar hora</button>
+      <div id="horaControlEstado" class="muted" style="font-size:12px;margin-top:8px"></div>
+    </div>
   </div>
 
   <div class="kpis">
@@ -120,12 +126,40 @@
   document.getElementById('bajaNombre').innerHTML = '<option value="">Selecciona un asesor…</option>' +
     ASESORES.map(n => '<option value="' + n + '">' + n + '</option>').join('');
 
-  // Solo jmaza puede dar de baja asesores. Amparo y Gracie solo ven
-  // el seguimiento, no esta tarjeta.
+  // Solo jmaza puede dar de baja asesores o fijar la hora de control.
+  // Amparo y Gracie solo ven el seguimiento, no estas tarjetas.
   const parametros = new URLSearchParams(window.location.search);
   const usuarioActual = parametros.get('u') || '';
   if (usuarioActual !== 'jmaza') {
     document.getElementById('tarjetaBaja').style.display = 'none';
+    document.getElementById('tarjetaControlHora').style.display = 'none';
+  }
+
+  let horaControlSegundos = null; // hora de control del día consultado, en segundos-del-día
+
+  async function guardarHoraControl(){
+    const fecha = document.getElementById('fecha').value;
+    const hora = document.getElementById('horaControlInput').value; // "HH:mm"
+    const estado = document.getElementById('horaControlEstado');
+    if (!fecha || !hora){
+      estado.textContent = 'Elige la fecha (arriba) y la hora.';
+      return;
+    }
+    estado.textContent = 'Guardando…';
+    try {
+      await fetch(URL_SCRIPT, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'set_hora_control', fecha: fecha, hora: hora })
+      });
+      const [hh, mm] = hora.split(':').map(Number);
+      horaControlSegundos = hh*3600 + mm*60;
+      estado.textContent = 'Hora de control guardada: ' + hora + '.';
+      renderTabla();
+    } catch (err) {
+      estado.textContent = 'No se pudo guardar, intenta de nuevo.';
+    }
   }
 
   async function darDeBaja(){
@@ -217,7 +251,9 @@
 
   function estadoMediodia(seg){
     if (seg === null || seg === undefined) return {clase:'sinmarcar', texto:'— No marcó'};
-    if (seg >= 43200 && seg <= 50400) return {clase:'ok', texto:'✔ En zona'};
+    if (horaControlSegundos === null) return {clase:'sinmarcar', texto:'Marcó (sin hora de control asignada)'};
+    const TOLERANCIA = 30 * 60; // 30 minutos
+    if (Math.abs(seg - horaControlSegundos) <= TOLERANCIA) return {clase:'ok', texto:'✔ En zona'};
     return {clase:'descanso', texto:'⚠ Fuera de horario'};
   }
 
@@ -266,10 +302,18 @@
       try {
         const controlador = new AbortController();
         const limite = setTimeout(() => controlador.abort(), 4000);
-        const respInact = await fetch(URL_SCRIPT, { signal: controlador.signal });
+        const respInact = await fetch(URL_SCRIPT + '?fecha=' + fechaISO, { signal: controlador.signal });
         clearTimeout(limite);
         const dataInact = await respInact.json();
         if (dataInact && dataInact.inactivos) INACTIVOS = dataInact.inactivos;
+        if (dataInact && dataInact.horaControl) {
+          const [hh, mm] = dataInact.horaControl.split(':').map(Number);
+          horaControlSegundos = hh*3600 + mm*60;
+          const inputHora = document.getElementById('horaControlInput');
+          if (inputHora) inputHora.value = dataInact.horaControl;
+        } else {
+          horaControlSegundos = null;
+        }
       } catch (errInact) {
         // Si no se puede leer a tiempo (CORS, red, demora, etc.), seguimos
         // con la lista que ya teníamos en memoria en vez de trabar el panel.
@@ -369,6 +413,37 @@
     return '<a href="https://www.google.com/maps?q=' + lat + ',' + lng + '" target="_blank" style="color:var(--rojo);font-weight:700;text-decoration:none">📍 Ver mapa</a>';
   }
 
+  // Distancia en metros entre dos coordenadas (fórmula de Haversine)
+  function distanciaMetros(lat1, lng1, lat2, lng2){
+    if (!lat1 || !lng1 || !lat2 || !lng2) return null;
+    const R = 6371000;
+    const rad = Math.PI / 180;
+    const dLat = (lat2 - lat1) * rad;
+    const dLng = (lng2 - lng1) * rad;
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*rad)*Math.cos(lat2*rad)*Math.sin(dLng/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+
+  const UMBRAL_SOSPECHA_METROS = 300;
+
+  function alertaUbicacion(m){
+    const puntos = [
+      [m.latEntrada, m.lngEntrada],
+      [m.latMediodia, m.lngMediodia],
+      [m.latSalida, m.lngSalida]
+    ].filter(p => p[0] && p[1]);
+    if (puntos.length < 2) return '';
+    for (let i = 0; i < puntos.length; i++){
+      for (let j = i+1; j < puntos.length; j++){
+        const d = distanciaMetros(puntos[i][0], puntos[i][1], puntos[j][0], puntos[j][1]);
+        if (d !== null && d < UMBRAL_SOSPECHA_METROS) {
+          return '<span class="pill falta" title="Las marcas quedaron a menos de ' + UMBRAL_SOSPECHA_METROS + ' m entre sí">⚠ Mismo punto</span>';
+        }
+      }
+    }
+    return '';
+  }
+
   function renderTabla(){
     const fechaISO = ultimaFechaISO;
     const codigoPorNombre = ultimoCodigoPorNombre;
@@ -385,7 +460,7 @@
         filasHtml += '<tr>' +
           '<td>' + nombre + '</td>' +
           '<td><span class="pill renuncio">' + info.motivo + '</span></td>' +
-          '<td colspan="9" class="muted">Desde el ' + info.fecha + '</td>' +
+          '<td colspan="10" class="muted">Desde el ' + info.fecha + '</td>' +
         '</tr>';
         return;
       }
@@ -400,6 +475,7 @@
       const mapaSalida = enlaceMapa(m.latSalida, m.lngSalida) || '—';
       const mapaMediodia = enlaceMapa(m.latMediodia, m.lngMediodia) || '—';
       const medio = estadoMediodia(m.mediodia);
+      const alerta = alertaUbicacion(m) || '<span class="muted">—</span>';
 
       filasHtml += '<tr>' +
         '<td>' + nombre + '</td>' +
@@ -413,6 +489,7 @@
         '<td>' + (m.horasTrab ? m.horasTrab + ' h' : '—') + '</td>' +
         '<td>' + (m.horasFalt ? m.horasFalt + ' h' : '—') + '</td>' +
         '<td class="muted">' + (m.distrito || '—') + '</td>' +
+        '<td>' + alerta + '</td>' +
       '</tr>';
     });
 
@@ -423,7 +500,7 @@
 
     document.getElementById('contenedorTabla').innerHTML =
       '<table><thead><tr>' +
-      '<th>Asesor</th><th>Estado</th><th>Entrada</th><th>Ubicación entrada</th><th>Medio día</th><th>Ubicación medio día</th><th>Salida</th><th>Ubicación salida</th><th>Horas trabajadas</th><th>Horas faltantes</th><th>Distrito</th>' +
+      '<th>Asesor</th><th>Estado</th><th>Entrada</th><th>Ubicación entrada</th><th>Medio día</th><th>Ubicación medio día</th><th>Salida</th><th>Ubicación salida</th><th>Horas trabajadas</th><th>Horas faltantes</th><th>Distrito</th><th>Alerta</th>' +
       '</tr></thead><tbody>' + filasHtml + '</tbody></table>';
   }
 
