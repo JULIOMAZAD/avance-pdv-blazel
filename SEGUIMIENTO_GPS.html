@@ -10,24 +10,48 @@
     --gris-claro:#F1F1F4; --verde:#1E8E5A; --ambar:#B7791F; --borde:#E3E3E8;
   }
   *{box-sizing:border-box;}
-  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--gris-claro);color:var(--tinta);padding:28px 20px 60px;}
-  .wrap{max-width:1100px;margin:0 auto;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--gris-claro);color:var(--tinta);padding:32px 24px 60px;}
+  .wrap{max-width:1180px;margin:0 auto;}
   .marca{display:flex;align-items:baseline;gap:2px;}
   .marca .b{font-weight:800;font-size:20px;}
   .marca .l{font-weight:800;font-size:20px;color:var(--rojo);}
-  .subtitulo{color:var(--gris);font-size:13px;margin-bottom:20px;}
-  .fila-tarjetas{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:20px;align-items:stretch;}
-  .tarjeta-control{background:#fff;border:1px solid var(--borde);border-radius:14px;padding:16px 18px;flex:1 1 300px;min-width:280px;}
-  .tarjeta-control label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--gris);}
-  .tarjeta-control input[type=date],.tarjeta-control input[type=text],.tarjeta-control select{
-    padding:10px 12px;border:1.5px solid var(--borde);border-radius:10px;font-size:14px;background:#fff;
-    margin:6px 8px 6px 0;
+  .subtitulo{color:var(--gris);font-size:13px;margin-bottom:24px;}
+
+  .fila-tarjetas{display:grid;grid-template-columns:repeat(3, 1fr);gap:16px;margin-bottom:24px;align-items:stretch;}
+  @media (max-width: 900px){ .fila-tarjetas{grid-template-columns:1fr;} }
+
+  .tarjeta-control{
+    background:#fff;border:1px solid var(--borde);border-radius:14px;
+    padding:18px 20px;display:flex;flex-direction:column;
   }
-  .tarjeta-control select{min-width:220px;}
-  .tarjeta-control input[type=text]{min-width:220px;}
-  button.recargar{padding:10px 16px;border:none;border-radius:10px;background:var(--tinta);color:#fff;font-weight:700;font-size:13px;cursor:pointer;}
+  .tarjeta-control > label:first-child{
+    font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
+    color:var(--gris);margin-bottom:14px;
+  }
+  .campo{display:flex;flex-direction:column;gap:5px;margin-bottom:12px;}
+  .campo-fila{display:flex;gap:10px;align-items:flex-end;margin-bottom:12px;}
+  .campo-fila .campo{margin-bottom:0;flex:1;}
+  .campo .microlabel{font-size:11px;font-weight:600;color:var(--gris);}
+  .tarjeta-control input[type=date],
+  .tarjeta-control input[type=time],
+  .tarjeta-control input[type=text],
+  .tarjeta-control select{
+    padding:10px 12px;border:1.5px solid var(--borde);border-radius:10px;
+    font-size:14px;background:#fff;width:100%;
+  }
+  .tarjeta-control input:focus,.tarjeta-control select:focus{
+    outline:none;border-color:var(--tinta);
+  }
+  .tarjeta-control .acciones{margin-top:auto;padding-top:4px;}
+  button.recargar{
+    padding:10px 18px;border:none;border-radius:10px;background:var(--tinta);
+    color:#fff;font-weight:700;font-size:13px;cursor:pointer;width:100%;
+  }
+  button.recargar:hover{opacity:.9;}
   button.recargar.rojo{background:var(--rojo);}
-  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:22px;}
+  .nota-estado{font-size:12px;color:var(--gris);margin-top:10px;min-height:16px;}
+
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:24px;}
   .kpi{background:#fff;border:1px solid var(--borde);border-radius:14px;padding:14px 16px;}
   .kpi .n{font-size:26px;font-weight:800;}
   .kpi .t{font-size:12px;color:var(--gris);font-weight:600;text-transform:uppercase;letter-spacing:.04em;}
@@ -55,27 +79,54 @@
 
   <div class="fila-tarjetas">
     <div class="tarjeta-control">
-      <label for="fecha">Fecha</label><br>
-      <input type="date" id="fecha">
-      <button class="recargar" onclick="cargarTodo()">🔄 Actualizar</button>
-      <div id="ultimaActualizacion" class="muted" style="font-size:12px;margin-top:8px"></div>
+      <label>Fecha</label>
+      <div class="campo">
+        <input type="date" id="fecha">
+      </div>
+      <div class="acciones">
+        <button class="recargar" onclick="cargarTodo()">🔄 Actualizar</button>
+        <div class="nota-estado" id="ultimaActualizacion"></div>
+      </div>
     </div>
+
     <div class="tarjeta-control" id="tarjetaBaja">
-      <label>Dar de baja a un asesor</label><br>
-      <select id="bajaNombre">
-        <option value="">Selecciona un asesor…</option>
-      </select>
-      <input type="date" id="bajaFecha" title="Fecha de renuncia/retiro">
-      <input type="text" id="bajaMotivo" placeholder="Motivo (ej. Renunció, Retirado por bajo rendimiento)">
-      <button class="recargar rojo" onclick="darDeBaja()">🚫 Dar de baja</button>
-      <div id="bajaEstado" class="muted" style="font-size:12px;margin-top:8px"></div>
+      <label>Dar de baja a un asesor</label>
+      <div class="campo">
+        <span class="microlabel">Asesor</span>
+        <select id="bajaNombre">
+          <option value="">Selecciona un asesor…</option>
+        </select>
+      </div>
+      <div class="campo">
+        <span class="microlabel">Fecha de renuncia/retiro</span>
+        <input type="date" id="bajaFecha">
+      </div>
+      <div class="campo">
+        <span class="microlabel">Motivo</span>
+        <input type="text" id="bajaMotivo" placeholder="Ej. Renunció, Retirado por bajo rendimiento">
+      </div>
+      <div class="acciones">
+        <button class="recargar rojo" onclick="darDeBaja()">🚫 Dar de baja</button>
+        <div class="nota-estado" id="bajaEstado"></div>
+      </div>
     </div>
+
     <div class="tarjeta-control" id="tarjetaControlHora">
-      <label>Rango de control (medio día) para esta fecha</label><br>
-      <input type="time" id="horaControlDesde" title="Desde"> a
-      <input type="time" id="horaControlHasta" title="Hasta">
-      <button class="recargar" onclick="guardarHoraControl()">⏱ Guardar rango</button>
-      <div id="horaControlEstado" class="muted" style="font-size:12px;margin-top:8px"></div>
+      <label>Rango de control (medio día) para esta fecha</label>
+      <div class="campo-fila">
+        <div class="campo">
+          <span class="microlabel">Desde</span>
+          <input type="time" id="horaControlDesde">
+        </div>
+        <div class="campo">
+          <span class="microlabel">Hasta</span>
+          <input type="time" id="horaControlHasta">
+        </div>
+      </div>
+      <div class="acciones">
+        <button class="recargar" onclick="guardarHoraControl()">⏱ Guardar rango</button>
+        <div class="nota-estado" id="horaControlEstado"></div>
+      </div>
     </div>
   </div>
 
