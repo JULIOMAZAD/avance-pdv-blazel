@@ -71,9 +71,10 @@
       <div id="bajaEstado" class="muted" style="font-size:12px;margin-top:8px"></div>
     </div>
     <div class="tarjeta-control" id="tarjetaControlHora">
-      <label>Hora de control (medio día) para esta fecha</label><br>
-      <input type="time" id="horaControlInput">
-      <button class="recargar" onclick="guardarHoraControl()">⏱ Guardar hora</button>
+      <label>Rango de control (medio día) para esta fecha</label><br>
+      <input type="time" id="horaControlDesde" title="Desde"> a
+      <input type="time" id="horaControlHasta" title="Hasta">
+      <button class="recargar" onclick="guardarHoraControl()">⏱ Guardar rango</button>
       <div id="horaControlEstado" class="muted" style="font-size:12px;margin-top:8px"></div>
     </div>
   </div>
@@ -135,14 +136,20 @@
     document.getElementById('tarjetaControlHora').style.display = 'none';
   }
 
-  let horaControlSegundos = null; // hora de control del día consultado, en segundos-del-día
+  let horaControlDesdeSeg = null;
+  let horaControlHastaSeg = null;
 
   async function guardarHoraControl(){
     const fecha = document.getElementById('fecha').value;
-    const hora = document.getElementById('horaControlInput').value; // "HH:mm"
+    const desde = document.getElementById('horaControlDesde').value; // "HH:mm"
+    const hasta = document.getElementById('horaControlHasta').value;
     const estado = document.getElementById('horaControlEstado');
-    if (!fecha || !hora){
-      estado.textContent = 'Elige la fecha (arriba) y la hora.';
+    if (!fecha || !desde || !hasta){
+      estado.textContent = 'Elige la fecha (arriba) y las dos horas.';
+      return;
+    }
+    if (hasta <= desde){
+      estado.textContent = 'La hora "hasta" debe ser después de "desde".';
       return;
     }
     estado.textContent = 'Guardando…';
@@ -151,11 +158,13 @@
         method: 'POST',
         mode: 'no-cors',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'set_hora_control', fecha: fecha, hora: hora })
+        body: JSON.stringify({ action: 'set_hora_control', fecha: fecha, horaDesde: desde, horaHasta: hasta })
       });
-      const [hh, mm] = hora.split(':').map(Number);
-      horaControlSegundos = hh*3600 + mm*60;
-      estado.textContent = 'Hora de control guardada: ' + hora + '.';
+      const [h1, m1] = desde.split(':').map(Number);
+      const [h2, m2] = hasta.split(':').map(Number);
+      horaControlDesdeSeg = h1*3600 + m1*60;
+      horaControlHastaSeg = h2*3600 + m2*60;
+      estado.textContent = 'Rango guardado: ' + desde + ' a ' + hasta + '.';
       renderTabla();
     } catch (err) {
       estado.textContent = 'No se pudo guardar, intenta de nuevo.';
@@ -251,9 +260,8 @@
 
   function estadoMediodia(seg){
     if (seg === null || seg === undefined) return {clase:'sinmarcar', texto:'— No marcó'};
-    if (horaControlSegundos === null) return {clase:'sinmarcar', texto:'Marcó (sin hora de control asignada)'};
-    const TOLERANCIA = 30 * 60; // 30 minutos
-    if (Math.abs(seg - horaControlSegundos) <= TOLERANCIA) return {clase:'ok', texto:'✔ En zona'};
+    if (horaControlDesdeSeg === null || horaControlHastaSeg === null) return {clase:'sinmarcar', texto:'Marcó (sin rango asignado)'};
+    if (seg >= horaControlDesdeSeg && seg <= horaControlHastaSeg) return {clase:'ok', texto:'✔ En zona'};
     return {clase:'descanso', texto:'⚠ Fuera de horario'};
   }
 
@@ -306,13 +314,18 @@
         clearTimeout(limite);
         const dataInact = await respInact.json();
         if (dataInact && dataInact.inactivos) INACTIVOS = dataInact.inactivos;
-        if (dataInact && dataInact.horaControl) {
-          const [hh, mm] = dataInact.horaControl.split(':').map(Number);
-          horaControlSegundos = hh*3600 + mm*60;
-          const inputHora = document.getElementById('horaControlInput');
-          if (inputHora) inputHora.value = dataInact.horaControl;
+        if (dataInact && dataInact.horaDesde && dataInact.horaHasta) {
+          const [h1, m1] = dataInact.horaDesde.split(':').map(Number);
+          const [h2, m2] = dataInact.horaHasta.split(':').map(Number);
+          horaControlDesdeSeg = h1*3600 + m1*60;
+          horaControlHastaSeg = h2*3600 + m2*60;
+          const inputDesde = document.getElementById('horaControlDesde');
+          const inputHasta = document.getElementById('horaControlHasta');
+          if (inputDesde) inputDesde.value = dataInact.horaDesde;
+          if (inputHasta) inputHasta.value = dataInact.horaHasta;
         } else {
-          horaControlSegundos = null;
+          horaControlDesdeSeg = null;
+          horaControlHastaSeg = null;
         }
       } catch (errInact) {
         // Si no se puede leer a tiempo (CORS, red, demora, etc.), seguimos
