@@ -32,6 +32,14 @@
   .campo-fila{display:flex;gap:10px;align-items:flex-end;margin-bottom:12px;}
   .campo-fila .campo{margin-bottom:0;flex:1;}
   .campo .microlabel{font-size:11px;font-weight:600;color:var(--gris);}
+  .selector-hora{display:flex;align-items:center;gap:4px;}
+  .selector-hora select{
+    padding:10px 8px;border:1.5px solid var(--borde);border-radius:10px;
+    font-size:14px;background:#fff;text-align:center;width:100%;
+    font-variant-numeric:tabular-nums;cursor:pointer;
+  }
+  .selector-hora select:focus{outline:none;border-color:var(--tinta);}
+  .selector-hora span{color:var(--gris);font-weight:700;}
   .tarjeta-control input[type=date],
   .tarjeta-control input[type=time],
   .tarjeta-control input[type=text],
@@ -116,11 +124,19 @@
       <div class="campo-fila">
         <div class="campo">
           <span class="microlabel">Desde</span>
-          <input type="time" id="horaControlDesde">
+          <div class="selector-hora">
+            <select id="horaControlDesdeH"></select>
+            <span>:</span>
+            <select id="horaControlDesdeM"></select>
+          </div>
         </div>
         <div class="campo">
           <span class="microlabel">Hasta</span>
-          <input type="time" id="horaControlHasta">
+          <div class="selector-hora">
+            <select id="horaControlHastaH"></select>
+            <span>:</span>
+            <select id="horaControlHastaM"></select>
+          </div>
         </div>
       </div>
       <div class="acciones">
@@ -190,13 +206,40 @@
   let horaControlDesdeSeg = null;
   let horaControlHastaSeg = null;
 
+  // Llena los 4 menús de hora/minuto (00-23 y 00/15/30/45).
+  function llenarSelectoresHora(){
+    const horas = [];
+    for (let h = 0; h < 24; h++) horas.push(String(h).padStart(2,'0'));
+    const minutos = ['00','15','30','45'];
+    ['horaControlDesdeH','horaControlHastaH'].forEach(id => {
+      document.getElementById(id).innerHTML = horas.map(h => '<option value="'+h+'">'+h+'</option>').join('');
+    });
+    ['horaControlDesdeM','horaControlHastaM'].forEach(id => {
+      document.getElementById(id).innerHTML = minutos.map(m => '<option value="'+m+'">'+m+'</option>').join('');
+    });
+  }
+  llenarSelectoresHora();
+
+  function leerHoraSelect(idH, idM){
+    return document.getElementById(idH).value + ':' + document.getElementById(idM).value;
+  }
+  function ponerHoraSelect(idH, idM, hhmm){
+    const [h, m] = hhmm.split(':');
+    document.getElementById(idH).value = h;
+    // Redondea el minuto guardado al más cercano de la lista (00/15/30/45)
+    const minutosDisponibles = [0,15,30,45];
+    const minutoNum = Number(m);
+    const masCercano = minutosDisponibles.reduce((a,b) => Math.abs(b-minutoNum) < Math.abs(a-minutoNum) ? b : a);
+    document.getElementById(idM).value = String(masCercano).padStart(2,'0');
+  }
+
   async function guardarHoraControl(){
     const fecha = document.getElementById('fecha').value;
-    const desde = document.getElementById('horaControlDesde').value; // "HH:mm"
-    const hasta = document.getElementById('horaControlHasta').value;
+    const desde = leerHoraSelect('horaControlDesdeH','horaControlDesdeM');
+    const hasta = leerHoraSelect('horaControlHastaH','horaControlHastaM');
     const estado = document.getElementById('horaControlEstado');
-    if (!fecha || !desde || !hasta){
-      estado.textContent = 'Elige la fecha (arriba) y las dos horas.';
+    if (!fecha){
+      estado.textContent = 'Elige la fecha (arriba) primero.';
       return;
     }
     if (hasta <= desde){
@@ -370,10 +413,8 @@
           const [h2, m2] = dataInact.horaHasta.split(':').map(Number);
           horaControlDesdeSeg = h1*3600 + m1*60;
           horaControlHastaSeg = h2*3600 + m2*60;
-          const inputDesde = document.getElementById('horaControlDesde');
-          const inputHasta = document.getElementById('horaControlHasta');
-          if (inputDesde) inputDesde.value = dataInact.horaDesde;
-          if (inputHasta) inputHasta.value = dataInact.horaHasta;
+          ponerHoraSelect('horaControlDesdeH','horaControlDesdeM', dataInact.horaDesde);
+          ponerHoraSelect('horaControlHastaH','horaControlHastaM', dataInact.horaHasta);
         } else {
           horaControlDesdeSeg = null;
           horaControlHastaSeg = null;
