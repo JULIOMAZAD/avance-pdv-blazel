@@ -394,6 +394,9 @@
           <button class="tab" id="empFilterCesados" onclick="setEmployeeStatusFilter('Cesado')">Cesados</button>
         </div>
         <input id="employeeFilter" placeholder="Filtrar por documento, nombre, área o puesto" oninput="renderEmployees()" />
+        <div class="row" style="margin-top:8px;">
+          <div class="col-4"><label>Filtrar por tienda</label><select id="employeeTiendaFilter" onchange="renderEmployees()"><option value="">Todas las tiendas</option></select></div>
+        </div>
         <div class="table-wrap">
           <table>
             <thead>
@@ -2215,10 +2218,23 @@
       renderEmployees();
     }
 
+    function renderEmployeeTiendaOptions() {
+      const sel = document.getElementById('employeeTiendaFilter');
+      if (!sel) return;
+      const actual = sel.value;
+      const tiendas = Array.from(new Set(state.empleados.map(function(r) { return norm(r.tienda); }).filter(Boolean))).sort(function(a, b) { return a.localeCompare(b, 'es'); });
+      sel.innerHTML = '<option value="">Todas las tiendas</option>' +
+        tiendas.map(function(t) { return '<option value="' + esc(t) + '">' + esc(t) + '</option>'; }).join('');
+      if (tiendas.indexOf(actual) !== -1) sel.value = actual;
+    }
+
     function renderEmployees() {
+      renderEmployeeTiendaOptions();
       const q = norm(document.getElementById('employeeFilter').value).toLowerCase();
+      const tiendaSel = document.getElementById('employeeTiendaFilter') ? document.getElementById('employeeTiendaFilter').value : '';
       const rows = state.empleados.filter(function(r) {
         if (employeeStatusFilter !== 'todos' && r.status !== employeeStatusFilter) return false;
+        if (tiendaSel && norm(r.tienda) !== tiendaSel) return false;
         return [r.docType, r.doc, r.name, r.phone, r.email, r.company, r.tienda, r.role, r.time, r.status, r.endReason, r.notes].join(' ').toLowerCase().includes(q);
       });
       const body = document.getElementById('employeeTable');
