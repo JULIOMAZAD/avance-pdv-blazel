@@ -395,7 +395,7 @@
         </div>
         <input id="employeeFilter" placeholder="Filtrar por documento, nombre, área o puesto" oninput="renderEmployees()" />
         <div class="row" style="margin-top:8px;">
-          <div class="col-4"><label>Filtrar por tienda</label><select id="employeeTiendaFilter" onchange="renderEmployees()"><option value="">Todas las tiendas</option></select></div>
+          <div class="col-4"><label>Filtrar por tienda</label><select id="employeeTiendaFilter" onchange="onTiendaFilterChange()"><option value="">Todas las tiendas</option></select></div>
         </div>
         <div class="table-wrap">
           <table>
@@ -2218,14 +2218,36 @@
       renderEmployees();
     }
 
+    function tiendaKey(v) {
+      return norm(v).toUpperCase();
+    }
+
     function renderEmployeeTiendaOptions() {
       const sel = document.getElementById('employeeTiendaFilter');
       if (!sel) return;
       const actual = sel.value;
-      const tiendas = Array.from(new Set(state.empleados.map(function(r) { return norm(r.tienda); }).filter(Boolean))).sort(function(a, b) { return a.localeCompare(b, 'es'); });
+      const porKey = {};
+      state.empleados.forEach(function(r) {
+        const t = norm(r.tienda);
+        if (!t) return;
+        const key = tiendaKey(t);
+        if (!porKey[key]) porKey[key] = t;
+      });
+      const keys = Object.keys(porKey).sort(function(a, b) { return porKey[a].localeCompare(porKey[b], 'es'); });
       sel.innerHTML = '<option value="">Todas las tiendas</option>' +
-        tiendas.map(function(t) { return '<option value="' + esc(t) + '">' + esc(t) + '</option>'; }).join('');
-      if (tiendas.indexOf(actual) !== -1) sel.value = actual;
+        keys.map(function(k) { return '<option value="' + esc(k) + '">' + esc(porKey[k]) + '</option>'; }).join('');
+      if (keys.indexOf(actual) !== -1) sel.value = actual;
+    }
+
+    function onTiendaFilterChange() {
+      const sel = document.getElementById('employeeTiendaFilter');
+      if (sel && sel.value) {
+        employeeStatusFilter = 'Activo';
+        document.getElementById('empFilterAll').classList.toggle('active', false);
+        document.getElementById('empFilterActivos').classList.toggle('active', true);
+        document.getElementById('empFilterCesados').classList.toggle('active', false);
+      }
+      renderEmployees();
     }
 
     function renderEmployees() {
@@ -2234,7 +2256,7 @@
       const tiendaSel = document.getElementById('employeeTiendaFilter') ? document.getElementById('employeeTiendaFilter').value : '';
       const rows = state.empleados.filter(function(r) {
         if (employeeStatusFilter !== 'todos' && r.status !== employeeStatusFilter) return false;
-        if (tiendaSel && norm(r.tienda) !== tiendaSel) return false;
+        if (tiendaSel && tiendaKey(r.tienda) !== tiendaSel) return false;
         return [r.docType, r.doc, r.name, r.phone, r.email, r.company, r.tienda, r.role, r.time, r.status, r.endReason, r.notes].join(' ').toLowerCase().includes(q);
       });
       const body = document.getElementById('employeeTable');
