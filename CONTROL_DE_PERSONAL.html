@@ -319,8 +319,7 @@
       <button class="danger" onclick="showTab('verreingresos')">VER REINGRESOS</button>
       <button class="tab" data-tab="vacaciones">VACACIONES</button>
       <button class="danger" onclick="showTab('vervacaciones')">VER VACACIONES</button>
-      <button class="tab" data-tab="contratos">CONTRATOS</button>
-      <button class="danger" onclick="showTab('vercontratos')">VER CONTRATOS</button>
+      <button class="tab" data-tab="cumpleanos">CUMPLEAÑOS</button>
       <button class="danger" onclick="showTab('vercesados')">VER CESADOS</button>
     </div>
 
@@ -664,66 +663,13 @@
       </div>
     </section>
 
-    <section id="tab-contratos" class="tab-panel hidden">
-      <div class="card">
-        <h2>Registrar / renovar contrato</h2>
-        <span class="muted small">Busca al trabajador activo, confirma quién es y registra su nuevo periodo de contrato.</span>
-        <div class="search-box" style="margin-top:12px;">
-          <input id="contratoSearchDoc" placeholder="Escribe DNI, Carnet de Extranjería o Nombre" />
-          <button class="primary" onclick="searchForContrato()">Buscar</button>
-          <button class="light" onclick="clearContratoPanel()">Limpiar</button>
-        </div>
-        <div id="contratoSearchResult" style="margin-top:12px;"></div>
-        <div id="contratoFormBox" class="hidden" style="margin-top:16px; border-top:1px solid var(--line); padding-top:16px;">
-          <div id="contratoEmployeeLabel" style="font-weight:700; margin-bottom:6px;"></div>
-          <div id="contratoActual" class="info-box small" style="margin-bottom:12px;"></div>
-          <div class="row">
-            <div class="col-3"><label>Fecha de inicio</label><input id="contratoInicio" type="date" onchange="calcContratoDuracion()" /></div>
-            <div class="col-3"><label>Fecha de vencimiento</label><input id="contratoFin" type="date" onchange="calcContratoDuracion()" /><div class="small muted" style="margin-top:4px;">Vacío = indefinido</div></div>
-            <div class="col-3"><label>Duración (calculada)</label><input id="contratoDuracionCalc" readonly /></div>
-            <div class="col-3"><label>N° de contrato / referencia</label><input id="contratoRef" placeholder="Opcional" /></div>
-          </div>
-          <div class="toolbar" style="margin-top:12px;">
-            <button class="success" onclick="confirmContrato()">Registrar contrato</button>
-            <button class="light" onclick="clearContratoPanel()">Cancelar</button>
-          </div>
-          <div style="margin-top:18px;">
-            <h3 style="font-size:14px;">Historial de contratos de esta persona</h3>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr><th>Inicio</th><th>Vencimiento</th><th>Referencia</th></tr>
-                </thead>
-                <tbody id="contratoPersonHistoryTable"></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section id="tab-vercontratos" class="tab-panel hidden">
+    <section id="tab-cumpleanos" class="tab-panel hidden">
       <div class="card">
         <div class="form-title">
-          <h2>Contratos — Vista general</h2>
-          <span class="muted small">Todos los trabajadores activos. La alerta empieza 10 días antes del vencimiento.</span>
+          <h2>🎂 Cumpleaños por mes</h2>
+          <span class="muted small">Solo trabajadores activos. Haz clic en un mes para ver los nombres y fechas.</span>
         </div>
-        <input id="contratoListFilter" placeholder="Filtrar por documento, nombre, tienda o área" oninput="renderContratosListado()" />
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Documento</th>
-                <th>Nombre</th>
-                <th>Área</th>
-                <th>Tienda</th>
-                <th>Estado</th>
-                <th>Vencimiento</th>
-              </tr>
-            </thead>
-            <tbody id="contratoListadoTable"></tbody>
-          </table>
-        </div>
+        <div id="cumpleanosMensual"></div>
       </div>
     </section>
   </div>
@@ -1991,163 +1937,33 @@
     }
 
     const DIAS_VACACIONES_ANUALES = 15; // ajusta aquí si tu política cambia
-    const DIAS_ALERTA_CONTRATO = 10; // desde cuántos días antes del vencimiento avisa
+    const MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
-    let contratoSelectedId = null;
-
-    function searchForContrato() {
-      const raw = norm(document.getElementById('contratoSearchDoc').value);
-      const doc = cleanDoc(raw);
-      const nameQuery = raw.toLowerCase();
-      const box = document.getElementById('contratoSearchResult');
-      clearContratoForm();
-      if (!raw) {
-        box.innerHTML = '<span class="muted">Escribe un documento o Nombre válido.</span>';
-        return;
-      }
-      const matches = state.empleados.filter(function(x) {
-        if (x.status !== 'Activo') return false;
-        const matchDoc = doc && cleanDoc(x.doc) === doc;
-        const matchName = nameQuery.length >= 3 && (x.name || '').toLowerCase().includes(nameQuery);
-        return matchDoc || matchName;
+    function renderCumpleanosMensual() {
+      const box = document.getElementById('cumpleanosMensual');
+      if (!box) return;
+      const porMes = MESES_ES.map(function() { return []; });
+      state.empleados.forEach(function(r) {
+        if (r.status !== 'Activo' || !r.birthDate) return;
+        const b = new Date(r.birthDate + 'T00:00:00');
+        if (isNaN(b.getTime())) return;
+        porMes[b.getMonth()].push({ r: r, dia: b.getDate() });
       });
-      if (!matches.length) {
-        box.innerHTML = '<span class="muted">No se encontró ningún trabajador activo con ese documento o Nombre.</span>';
-        return;
-      }
-      box.innerHTML = matches.map(function(m) {
-        return '<div class="result-box" style="margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">' +
-          '<span><b>' + esc(m.name) + '</b> · ' + esc(m.docType) + ' ' + esc(m.doc) + (m.tienda ? (' · ' + esc(m.tienda)) : '') + '</span>' +
-          '<button class="primary" onclick="selectForContrato(\'' + m.id + '\')">Seleccionar</button>' +
-          '</div>';
+      porMes.forEach(function(list) { list.sort(function(a, b) { return a.dia - b.dia; }); });
+      const mesActual = new Date().getMonth();
+      box.innerHTML = MESES_ES.map(function(nombreMes, idx) {
+        const list = porMes[idx];
+        const abierto = idx === mesActual;
+        const filas = list.map(function(item) {
+          return '<tr><td>' + String(item.dia).padStart(2, '0') + '</td><td>' + esc(item.r.name) + '</td><td>' + esc(item.r.tienda || '-') + '</td><td>' + esc(item.r.docType) + ' ' + esc(item.r.doc) + '</td></tr>';
+        }).join('') || '<tr><td colspan="4">Sin cumpleaños registrados este mes.</td></tr>';
+        return '<details' + (abierto ? ' open' : '') + ' style="margin-bottom:10px; border:1px solid var(--line); border-radius:8px; padding:10px 14px;">' +
+          '<summary style="cursor:pointer; font-weight:700;">' + nombreMes + (idx === mesActual ? ' (mes actual)' : '') + ' — ' + list.length + (list.length === 1 ? ' cumpleaños' : ' cumpleaños') + '</summary>' +
+          '<div class="table-wrap" style="margin-top:10px;"><table><thead><tr><th>Día</th><th>Nombre</th><th>Tienda</th><th>Documento</th></tr></thead><tbody>' + filas + '</tbody></table></div>' +
+          '</details>';
       }).join('');
     }
 
-    function calcContratoDuracion() {
-      const inicio = document.getElementById('contratoInicio').value;
-      const fin = document.getElementById('contratoFin').value;
-      const out = document.getElementById('contratoDuracionCalc');
-      if (!inicio) { out.value = ''; return; }
-      if (!fin) { out.value = 'Indefinido'; return; }
-      const d1 = new Date(inicio + 'T00:00:00');
-      const finExclusivo = new Date(fin + 'T00:00:00');
-      finExclusivo.setDate(finExclusivo.getDate() + 1); // el contrato cubre todo el día de vencimiento
-      if (finExclusivo <= d1) { out.value = 'Fecha de vencimiento inválida'; return; }
-      let meses = (finExclusivo.getFullYear() - d1.getFullYear()) * 12 + (finExclusivo.getMonth() - d1.getMonth());
-      if (finExclusivo.getDate() < d1.getDate()) meses -= 1;
-      const checkpoint = new Date(d1);
-      checkpoint.setMonth(checkpoint.getMonth() + meses);
-      const diasRestantes = Math.round((finExclusivo - checkpoint) / 86400000);
-      if (meses <= 0) {
-        out.value = diasRestantes + ' día(s)';
-        return;
-      }
-      const anos = Math.floor(meses / 12);
-      const mesesRestantes = meses % 12;
-      let texto = '';
-      if (anos > 0) texto += anos + (anos === 1 ? ' año' : ' años');
-      if (mesesRestantes > 0) texto += (texto ? ' ' : '') + mesesRestantes + (mesesRestantes === 1 ? ' mes' : ' meses');
-      if (diasRestantes > 0) texto += (texto ? ' y ' : '') + diasRestantes + ' día(s)';
-      out.value = texto || '0 meses';
-    }
-
-    function selectForContrato(id) {
-      const r = state.empleados.find(function(x) { return x.id === id; });
-      if (!r) return;
-      contratoSelectedId = id;
-      document.getElementById('contratoEmployeeLabel').textContent = r.name + ' · ' + r.docType + ' ' + r.doc + (r.tienda ? (' · ' + r.tienda) : '');
-      const c = r.contrato;
-      document.getElementById('contratoActual').textContent = c
-        ? ('Contrato actual: del ' + fmtDate(c.inicio) + ' al ' + (c.fin ? fmtDate(c.fin) : 'indefinido') + (c.ref ? (' · Ref: ' + c.ref) : ''))
-        : 'No tiene contrato registrado todavía.';
-      document.getElementById('contratoInicio').value = todayISO();
-      document.getElementById('contratoFin').value = '';
-      document.getElementById('contratoDuracionCalc').value = '';
-      document.getElementById('contratoRef').value = '';
-      document.getElementById('contratoFormBox').classList.remove('hidden');
-      renderContratoPersonHistory(r);
-    }
-
-    function confirmContrato() {
-      if (!contratoSelectedId) return;
-      const inicio = norm(document.getElementById('contratoInicio').value);
-      const fin = norm(document.getElementById('contratoFin').value);
-      const ref = norm(document.getElementById('contratoRef').value);
-      if (!inicio) { alert('Ingresa la fecha de inicio del contrato.'); return; }
-      if (fin && fin <= inicio) { alert('La fecha de vencimiento debe ser posterior a la de inicio.'); return; }
-      const idx = state.empleados.findIndex(function(x) { return x.id === contratoSelectedId; });
-      if (idx < 0) return;
-      const r = state.empleados[idx];
-      r.contratoHistorial = Array.isArray(r.contratoHistorial) ? r.contratoHistorial : [];
-      if (r.contrato) r.contratoHistorial.push(r.contrato);
-      r.contrato = { inicio: inicio, fin: fin, ref: ref };
-      saveData(false, 'auto');
-      alert('Contrato registrado correctamente.');
-      clearContratoPanel();
-    }
-
-    function renderContratoPersonHistory(r) {
-      const body = document.getElementById('contratoPersonHistoryTable');
-      const list = Array.isArray(r.contratoHistorial) ? r.contratoHistorial.slice().reverse() : [];
-      body.innerHTML = list.map(function(c) {
-        return '<tr><td>' + esc(fmtDate(c.inicio)) + '</td><td>' + esc(c.fin ? fmtDate(c.fin) : 'Indefinido') + '</td><td>' + esc(c.ref || '-') + '</td></tr>';
-      }).join('') || '<tr><td colspan="3">Sin contratos anteriores.</td></tr>';
-    }
-
-    function clearContratoForm() {
-      contratoSelectedId = null;
-      document.getElementById('contratoFormBox').classList.add('hidden');
-      document.getElementById('contratoEmployeeLabel').textContent = '';
-      document.getElementById('contratoActual').textContent = '';
-      document.getElementById('contratoInicio').value = '';
-      document.getElementById('contratoFin').value = '';
-      document.getElementById('contratoDuracionCalc').value = '';
-      document.getElementById('contratoRef').value = '';
-    }
-
-    function clearContratoPanel() {
-      document.getElementById('contratoSearchDoc').value = '';
-      document.getElementById('contratoSearchResult').innerHTML = '';
-      clearContratoForm();
-    }
-
-    function contratoEstado(r) {
-      const c = r.contrato;
-      const hoy = todayISO();
-      if (!c || !c.inicio) return { orden: 3, claseFila: '', estado: 'Sin contrato registrado', vencimiento: '-' };
-      if (!c.fin) return { orden: 2, claseFila: 'vac-row-completada', estado: 'Indefinido', vencimiento: '-' };
-      const diasParaVencer = Math.round((new Date(c.fin + 'T00:00:00') - new Date(hoy + 'T00:00:00')) / 86400000);
-      if (diasParaVencer < 0) {
-        return { orden: 0, claseFila: 'vac-row-vencido', estado: '⚠️ Vencido hace ' + Math.abs(diasParaVencer) + ' día(s)', vencimiento: fmtDate(c.fin) };
-      }
-      if (diasParaVencer <= DIAS_ALERTA_CONTRATO) {
-        return { orden: 1, claseFila: 'vac-row-pendiente', estado: '🔔 Vence en ' + diasParaVencer + ' día(s)', vencimiento: fmtDate(c.fin) };
-      }
-      return { orden: 2, claseFila: 'vac-row-curso', estado: 'Vigente (faltan ' + diasParaVencer + ' días)', vencimiento: fmtDate(c.fin) };
-    }
-
-    function renderContratosListado() {
-      const body = document.getElementById('contratoListadoTable');
-      if (!body) return;
-      const q = norm(document.getElementById('contratoListFilter').value).toLowerCase();
-      const rows = state.empleados.filter(function(r) {
-        if (r.status !== 'Activo') return false;
-        return [r.doc, r.name, r.tienda, r.company].join(' ').toLowerCase().includes(q);
-      });
-      const rowsConEstado = rows.map(function(r) { return { r: r, e: contratoEstado(r) }; });
-      rowsConEstado.sort(function(a, b) { return a.e.orden - b.e.orden; });
-      body.innerHTML = rowsConEstado.map(function(item) {
-        const r = item.r, e = item.e;
-        return '<tr class="' + e.claseFila + '">' +
-          '<td>' + esc(r.docType) + ' ' + esc(r.doc) + '</td>' +
-          '<td>' + esc(r.name) + '</td>' +
-          '<td>' + esc(r.company || '-') + '</td>' +
-          '<td>' + esc(r.tienda || '-') + '</td>' +
-          '<td style="font-weight:700;">' + esc(e.estado) + '</td>' +
-          '<td>' + esc(e.vencimiento) + '</td>' +
-          '</tr>';
-      }).join('') || '<tr><td colspan="6">Sin trabajadores activos.</td></tr>';
-    }
 
     function calcularSituacionCiclo(r, hoy) {
       if (norm(r.docType).toUpperCase() !== 'DNI') return null;
@@ -2479,16 +2295,13 @@
       }
       let html = '';
       emps.forEach(function(e) {
-        const summary = e.status === 'Activo'
-          ? 'Actualmente trabaja en <b>' + esc(e.company || 'sin área') + '</b>' + (e.tienda ? (' (' + esc(e.tienda) + ')') : '') + ' como <b>' + esc(e.role || 'sin puesto') + '</b> desde el <b>' + esc(fmtDate(e.startDate)) + '</b>.'
-          : 'Trabajó en <b>' + esc(e.company || 'sin área') + '</b>' + (e.tienda ? (' (' + esc(e.tienda) + ')') : '') + ' como <b>' + esc(e.role || 'sin puesto') + '</b> desde el <b>' + esc(fmtDate(e.startDate)) + '</b> hasta el <b>' + esc(fmtDate(e.endDate)) + '</b>. Motivo de cese: <b>' + esc(e.endReason || 'no registrado') + '</b>.';
         html += '<div class="person-card">' +
           '<div class="person-card-head">' + badgeStatus('emp', e.status) + '<span class="person-card-name">' + esc(e.name) + '</span><span class="person-card-doc">' + esc(e.docType) + ' ' + esc(e.doc) + '</span></div>' +
-          '<div class="person-card-summary">' + summary + '</div>' +
-          (e.status === 'Activo' ? '<div class="vac-banner">🏖️ ' + esc(vacacionStatusText(e)) + '</div>' : '') +
-          (e.status === 'Activo' && e.contrato && e.contrato.fin && (Math.round((new Date(e.contrato.fin + 'T00:00:00') - new Date(todayISO() + 'T00:00:00')) / 86400000)) <= DIAS_ALERTA_CONTRATO
-            ? '<div class="vac-banner">📄 ' + esc(contratoEstado(e).estado) + ' (contrato vence el ' + esc(fmtDate(e.contrato.fin)) + ')</div>' : '') +
-          (e.notes ? '<div class="small muted" style="margin-top:8px;">Observaciones: ' + esc(e.notes) + '</div>' : '') +
+          '<div class="table-wrap" style="margin-top:8px;"><table><tbody>' +
+          '<tr><td class="muted">Cargo</td><td><b>' + esc(e.role || '-') + '</b></td></tr>' +
+          '<tr><td class="muted">Tienda</td><td><b>' + esc(e.tienda || '-') + '</b></td></tr>' +
+          '<tr><td class="muted">Cumpleaños</td><td><b>' + esc(fmtDate(e.birthDate)) + '</b></td></tr>' +
+          '</tbody></table></div>' +
           (e.status === 'Cesado' ? '<div style="margin-top:10px;">Esta persona ya no trabaja aquí. <button class="success" onclick="irAReingresar(\'' + e.id + '\')">¿Reingresar?</button></div>' : '') +
           '</div>';
       });
@@ -2563,7 +2376,7 @@
       renderCesadosHistory();
       renderReingresosHistory();
       renderVacacionesListado();
-      renderContratosListado();
+      renderCumpleanosMensual();
       renderKpis();
       renderBirthdays();
       renderBackups();
