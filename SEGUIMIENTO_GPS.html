@@ -375,9 +375,16 @@
     let filas = '';
     ASESORES.forEach(nombre => {
       const info = INACTIVOS[nombre];
-      if (info && ultimaFechaISO >= info.fecha){
-        filas += '<tr><td>' + nombre + '</td><td colspan="3" class="muted">' + info.motivo + ' desde el ' + info.fecha + '</td></tr>';
-        return;
+      if (info) {
+        const mesConsultado = ultimaFechaISO.slice(0, 7);
+        const mesBaja = info.fecha.slice(0, 7);
+        if (ultimaFechaISO > info.fecha && mesConsultado !== mesBaja) {
+          return; // mes posterior al de la baja: ya no aparece
+        }
+        if (ultimaFechaISO >= info.fecha) {
+          filas += '<tr><td>' + nombre + '</td><td colspan="3" class="muted">' + info.motivo + ' desde el ' + info.fecha + '</td></tr>';
+          return;
+        }
       }
       const c = ultimoResumenPorNombre[nombre] || { asistio:0, falto:0, descanso:0 };
       filas += '<tr>' +
@@ -554,21 +561,32 @@
     const codigoPorNombre = ultimoCodigoPorNombre;
     const marcasPorNombre = ultimasMarcasPorNombre;
 
-    let asistio=0, falto=0, descanso=0;
+    let asistio=0, falto=0, descanso=0, totalVisibles=0;
     let filasHtml = '';
     ASESORES.forEach(nombre => {
-      // Solo se muestra como inactivo si la fecha consultada es igual
-      // o posterior a su fecha de baja. Si consultas un día ANTERIOR
-      // a su renuncia, se muestra su asistencia real de ese día.
+      // Regla de baja: si consultas un día ANTES de la fecha de baja,
+      // se muestra su asistencia real de ese día. Durante el MISMO MES
+      // en que se dio de baja (desde ese día en adelante), aparece con
+      // el motivo. A partir del mes SIGUIENTE, desaparece del panel por
+      // completo, como si ya no fuera parte del equipo.
       const info = INACTIVOS[nombre];
-      if (info && fechaISO >= info.fecha) {
-        filasHtml += '<tr>' +
-          '<td>' + nombre + '</td>' +
-          '<td><span class="pill renuncio">' + info.motivo + '</span></td>' +
-          '<td colspan="10" class="muted">Desde el ' + info.fecha + '</td>' +
-        '</tr>';
-        return;
+      if (info) {
+        const mesConsultado = fechaISO.slice(0, 7);
+        const mesBaja = info.fecha.slice(0, 7);
+        if (fechaISO > info.fecha && mesConsultado !== mesBaja) {
+          return; // mes posterior al de la baja: ya no aparece
+        }
+        if (fechaISO >= info.fecha) {
+          totalVisibles++;
+          filasHtml += '<tr>' +
+            '<td>' + nombre + '</td>' +
+            '<td><span class="pill renuncio">' + info.motivo + '</span></td>' +
+            '<td colspan="10" class="muted">Desde el ' + info.fecha + '</td>' +
+          '</tr>';
+          return;
+        }
       }
+      totalVisibles++;
       const codigo = codigoPorNombre[nombre] || '';
       const estado = estadoDesdeCodigo(codigo);
       if (estado.clase === 'ok') asistio++;
@@ -601,7 +619,7 @@
     document.getElementById('kpiAsistio').textContent = asistio;
     document.getElementById('kpiFalto').textContent = falto;
     document.getElementById('kpiDescanso').textContent = descanso;
-    document.getElementById('kpiTotal').textContent = ASESORES.length;
+    document.getElementById('kpiTotal').textContent = totalVisibles;
 
     document.getElementById('contenedorTabla').innerHTML =
       '<table><thead><tr>' +
