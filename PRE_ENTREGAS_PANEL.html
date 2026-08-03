@@ -169,7 +169,7 @@
   </table>
   <div class="acta-seccion-roja">ANEXO — DETALLE DE SERIES / ICCID</div>
   <table class="acta-table" style="border:1px solid #000;">
-    <thead><tr><th style="border:1px solid #000;">#</th><th style="border:1px solid #000;">Serie / ICCID</th></tr></thead>
+    <thead><tr><th style="border:1px solid #000;">Serie / ICCID</th></tr></thead>
     <tbody id="pSeriesBody"></tbody>
   </table>
   <div class="acta-seccion-roja">FIRMAS</div>
@@ -282,32 +282,56 @@
     const abierto = filaAbierta === p.id;
     let scanHtml = '';
     if(abierto){
-      scanHtml = '<div class="panel-scan abierto">' +
-        '<div style="background:#FFF7F5;border:1.5px solid var(--rojo);border-radius:10px;padding:10px;margin-bottom:10px;">' +
-          '<div style="font-size:12px;font-weight:700;margin-bottom:2px;">Primera serie del lote</div>' +
-          '<input type="text" id="rangoInicio_' + p.id + '" placeholder="Ej. 895110113011183729" autocomplete="off" style="margin-bottom:8px;" oninput="mostrarVistaPrevia(\'' + p.id + '\')">' +
-          '<div style="font-size:12px;font-weight:700;margin-bottom:2px;">Última serie del lote <span style="font-weight:400;color:var(--gris);">(déjalo vacío si es una sola)</span></div>' +
-          '<input type="text" id="rangoFin_' + p.id + '" placeholder="Ej. 895110113011183738 → si pones esta, se agregan las 10 del medio también" autocomplete="off" style="margin-bottom:8px;" oninput="mostrarVistaPrevia(\'' + p.id + '\')">' +
-          '<div id="vistaPrevia_' + p.id + '" style="display:none;background:#fff;border:1px dashed var(--rojo);border-radius:8px;padding:8px;margin-bottom:8px;font-size:12px;font-family:monospace;max-height:100px;overflow-y:auto;"></div>' +
-          '<button class="btn-rojo" style="width:100%;" onclick="generarRango(\'' + p.id + '\')">➕ Agregar</button>' +
-          '<div class="nota-scan" id="notaRango_' + p.id + '"></div>' +
-        '</div>' +
-        '<div style="margin-bottom:10px;"><button class="btn-secundario" id="btnCamara_' + p.id + '" onclick="alternarCamara(\'' + p.id + '\')">📷 Usar cámara del celular (agrega una por una)</button></div>' +
-        '<div id="camaraBox_' + p.id + '" style="display:none;margin-bottom:10px;">' +
-          '<div id="lector_' + p.id + '" style="width:100%;max-width:320px;border-radius:10px;overflow:hidden;"></div>' +
-        '</div>' +
-        '<details style="margin-bottom:10px;">' +
-          '<summary style="cursor:pointer;font-size:12px;color:var(--gris);">¿Prefieres pegar una lista larga de una vez? Aquí</summary>' +
-          '<textarea id="pegarLista_' + p.id + '" placeholder="895110113011183729, 895110113011183730, ..." style="width:100%;min-height:70px;padding:8px;border:1.5px solid var(--borde);border-radius:8px;font-family:monospace;font-size:12px;margin:8px 0 6px;"></textarea>' +
-          '<button class="btn-secundario" onclick="agregarListaPegada(\'' + p.id + '\')">➕ Agregar toda la lista</button>' +
-          '<div class="nota-scan" id="notaLista_' + p.id + '"></div>' +
-        '</details>' +
-        '<div class="contador-scan">' + ((p.seriesAsignadas || '').trim() ? 'Ya tiene ' + (p.seriesAsignadas.split(",").filter(function(s){return s.trim();}).length) + ' asignada(s) antes. ' : '') + 'Nuevas en este lote: <b id="contadorScan_' + p.id + '">' + seriesEnCurso.length + '</b> · Pedido total: ' + p.cantidad + '</div>' +
-        '<div class="lista-series" id="listaSeries_' + p.id + '"></div>' +
-        '<button class="btn-rojo" onclick="guardarAsignacion(\'' + p.id + '\')">💾 Guardar asignación</button> ' +
-        '<button class="btn-secundario" onclick="cerrarScan()">Cancelar</button>' +
-        '<div class="nota-scan" id="notaScan_' + p.id + '"></div>' +
-      '</div>';
+      const yaAsignadas = (p.seriesAsignadas || '').split(',').filter(function(s){ return s.trim(); }).length;
+      const faltan = Math.max((Number(p.cantidad) || 0) - yaAsignadas, 1);
+      const esUnaSola = faltan === 1;
+
+      if(esUnaSola){
+        scanHtml = '<div class="panel-scan abierto">' +
+          '<div style="background:#FFF7F5;border:1.5px solid var(--rojo);border-radius:10px;padding:10px;margin-bottom:10px;">' +
+            '<div style="font-size:12px;font-weight:700;margin-bottom:2px;">Escanea o escribe la serie de este chip (es el último que falta)</div>' +
+            '<input type="text" id="rangoInicio_' + p.id + '" placeholder="Ej. 895110113011183729" autocomplete="off" style="margin-bottom:8px;">' +
+            '<button class="btn-rojo" style="width:100%;" onclick="agregarSerieUnica(\'' + p.id + '\')">➕ Agregar</button>' +
+            '<div class="nota-scan" id="notaRango_' + p.id + '"></div>' +
+          '</div>' +
+          '<div style="margin-bottom:10px;"><button class="btn-secundario" id="btnCamara_' + p.id + '" onclick="alternarCamara(\'' + p.id + '\')">📷 Usar cámara del celular</button></div>' +
+          '<div id="camaraBox_' + p.id + '" style="display:none;margin-bottom:10px;">' +
+            '<div id="lector_' + p.id + '" style="width:100%;max-width:320px;border-radius:10px;overflow:hidden;"></div>' +
+          '</div>' +
+          '<div class="contador-scan">Nuevas en este lote: <b id="contadorScan_' + p.id + '">' + seriesEnCurso.length + '</b> · Pedido total: ' + p.cantidad + '</div>' +
+          '<div class="lista-series" id="listaSeries_' + p.id + '"></div>' +
+          '<button class="btn-rojo" id="btnGuardar_' + p.id + '" onclick="guardarAsignacion(\'' + p.id + '\')">💾 Guardar asignación</button> ' +
+          '<button class="btn-secundario" onclick="cerrarScan()">Cancelar</button>' +
+          '<div class="nota-scan" id="notaScan_' + p.id + '"></div>' +
+        '</div>';
+      } else {
+        scanHtml = '<div class="panel-scan abierto">' +
+          '<div style="background:#FFF7F5;border:1.5px solid var(--rojo);border-radius:10px;padding:10px;margin-bottom:10px;">' +
+            '<div style="font-size:12px;font-weight:700;margin-bottom:2px;">1️⃣ Escanea/escribe la PRIMERA serie del lote (Enter o Tab pasa al siguiente campo)</div>' +
+            '<input type="text" id="rangoInicio_' + p.id + '" placeholder="Ej. 895110113011183729" autocomplete="off" style="margin-bottom:8px;" oninput="mostrarVistaPrevia(\'' + p.id + '\')">' +
+            '<div style="font-size:12px;font-weight:700;margin-bottom:2px;">2️⃣ Escanea/escribe la ÚLTIMA serie del lote <span style="font-weight:400;color:var(--gris);">(si solo tienes esa 1, déjalo vacío y presiona Enter igual)</span></div>' +
+            '<input type="text" id="rangoFin_' + p.id + '" placeholder="Ej. 895110113011183738 → se agregan también las del medio" autocomplete="off" style="margin-bottom:8px;" oninput="mostrarVistaPrevia(\'' + p.id + '\')">' +
+            '<div id="vistaPrevia_' + p.id + '" style="display:none;background:#fff;border:1px dashed var(--rojo);border-radius:8px;padding:8px;margin-bottom:8px;font-size:12px;font-family:monospace;max-height:100px;overflow-y:auto;"></div>' +
+            '<button class="btn-rojo" style="width:100%;" onclick="generarRango(\'' + p.id + '\')">➕ Agregar</button>' +
+            '<div class="nota-scan" id="notaRango_' + p.id + '"></div>' +
+          '</div>' +
+          '<div style="margin-bottom:10px;"><button class="btn-secundario" id="btnCamara_' + p.id + '" onclick="alternarCamara(\'' + p.id + '\')">📷 Usar cámara del celular (agrega una por una)</button></div>' +
+          '<div id="camaraBox_' + p.id + '" style="display:none;margin-bottom:10px;">' +
+            '<div id="lector_' + p.id + '" style="width:100%;max-width:320px;border-radius:10px;overflow:hidden;"></div>' +
+          '</div>' +
+          '<details style="margin-bottom:10px;">' +
+            '<summary style="cursor:pointer;font-size:12px;color:var(--gris);">¿Prefieres pegar una lista larga de una vez? Aquí</summary>' +
+            '<textarea id="pegarLista_' + p.id + '" placeholder="895110113011183729, 895110113011183730, ..." style="width:100%;min-height:70px;padding:8px;border:1.5px solid var(--borde);border-radius:8px;font-family:monospace;font-size:12px;margin:8px 0 6px;"></textarea>' +
+            '<button class="btn-secundario" onclick="agregarListaPegada(\'' + p.id + '\')">➕ Agregar toda la lista</button>' +
+            '<div class="nota-scan" id="notaLista_' + p.id + '"></div>' +
+          '</details>' +
+          '<div class="contador-scan">' + (yaAsignadas ? 'Ya tiene ' + yaAsignadas + ' asignada(s) antes. ' : '') + 'Nuevas en este lote: <b id="contadorScan_' + p.id + '">' + seriesEnCurso.length + '</b> · Pedido total: ' + p.cantidad + '</div>' +
+          '<div class="lista-series" id="listaSeries_' + p.id + '"></div>' +
+          '<button class="btn-rojo" id="btnGuardar_' + p.id + '" onclick="guardarAsignacion(\'' + p.id + '\')">💾 Guardar asignación</button> ' +
+          '<button class="btn-secundario" onclick="cerrarScan()">Cancelar</button>' +
+          '<div class="nota-scan" id="notaScan_' + p.id + '"></div>' +
+        '</div>';
+      }
     }
 
     let acciones = '';
@@ -390,15 +414,34 @@
       const inputFin = document.getElementById('rangoFin_' + filaAbierta);
       if(inputInicio){
         inputInicio.focus();
-        [inputInicio, inputFin].forEach(function(el){
-          if(!el) return;
-          el.addEventListener('keydown', function(e){
+
+        if(inputFin){
+          // Modo con 2 campos: Enter/Tab en la primera solo mueve el foco
+          // a la última (no agrega todavía); Enter/Tab en la última sí
+          // calcula y agrega (rango completo, o solo 1 si la dejó vacía).
+          inputInicio.addEventListener('keydown', function(e){
+            if(e.key === 'Enter' || e.key === 'Tab'){
+              e.preventDefault();
+              inputFin.focus();
+            }
+          });
+          inputFin.addEventListener('keydown', function(e){
             if(e.key === 'Enter' || e.key === 'Tab'){
               e.preventDefault();
               generarRango(filaAbierta);
             }
           });
-        });
+        } else {
+          // Modo de un solo chip: Enter/Tab agrega directo y avisa que
+          // ya puede guardar.
+          inputInicio.addEventListener('keydown', function(e){
+            if(e.key === 'Enter' || e.key === 'Tab'){
+              e.preventDefault();
+              agregarSerieUnica(filaAbierta);
+            }
+          });
+        }
+
         renderListaSeries(filaAbierta);
       }
     }
@@ -474,6 +517,21 @@
     previa.style.display = 'block';
     previa.style.color = 'var(--tinta)';
     previa.textContent = 'Esto va a agregar ' + r.series.length + ' series: ' + r.series.join(', ');
+  }
+
+  function agregarSerieUnica(id){
+    const inicioEl = document.getElementById('rangoInicio_' + id);
+    const nota = document.getElementById('notaRango_' + id);
+    const valor = inicioEl.value.trim();
+    if(!valor){
+      if(nota) nota.textContent = 'Escanea o escribe la serie primero.';
+      return;
+    }
+    agregarSerie(valor);
+    inicioEl.value = '';
+    if(nota) nota.textContent = '✓ Listo. Dale a "💾 Guardar asignación" para terminar.';
+    const btnGuardar = document.getElementById('btnGuardar_' + id);
+    if(btnGuardar) btnGuardar.focus();
   }
 
   function generarRango(id){
@@ -674,8 +732,8 @@
     document.getElementById('pDireccionCliente').textContent = direccion + (distrito ? ' - ' + distrito : '');
     document.getElementById('pPuntoLlegada').textContent = (direccion || '(sin dirección registrada)') + (distrito ? ' - ' + distrito : '');
     document.getElementById('pCant').textContent = series.length;
-    document.getElementById('pSeriesBody').innerHTML = series.map(function(s, i){
-      return '<tr><td style="border:1px solid #000;">' + (i+1) + '</td><td style="border:1px solid #000;">' + s + '</td></tr>';
+    document.getElementById('pSeriesBody').innerHTML = series.map(function(s){
+      return '<tr><td style="border:1px solid #000;">' + s + '</td></tr>';
     }).join('');
     return p;
   }
