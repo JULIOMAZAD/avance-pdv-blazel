@@ -166,10 +166,11 @@
     <tr><td>Nombre</td><td id="pCliente"></td></tr>
     <tr><td>DNI</td><td id="pDni"></td></tr>
     <tr><td>Dirección</td><td id="pDireccionCliente"></td></tr>
+    <tr><td>Biométrico(s) que usa</td><td id="pBiometricos"></td></tr>
   </table>
   <div class="acta-seccion-roja">ANEXO — DETALLE DE SERIES / ICCID</div>
-  <table class="acta-table" style="border:1px solid #000;">
-    <thead><tr><th style="border:1px solid #000;">Serie / ICCID</th></tr></thead>
+  <table class="acta-table" style="border:none;">
+    <thead><tr><th style="border:none;border-bottom:1.5px solid #000;">Serie / ICCID</th></tr></thead>
     <tbody id="pSeriesBody"></tbody>
   </table>
   <div class="acta-seccion-roja">FIRMAS</div>
@@ -710,11 +711,11 @@
     if(!p) return null;
     const series = (p.seriesAsignadas || '').split(',').map(s => s.trim()).filter(Boolean);
 
-    let direccion = '', distrito = '';
+    let direccion = '', distrito = '', biometricos = '';
     try{
       const r = await fetch(URL_SCRIPT + '?modo=cliente&dni=' + encodeURIComponent(p.dni) + '&_=' + Date.now());
       const d = await r.json();
-      if(d && d.cliente){ direccion = d.cliente.direccion || ''; distrito = d.cliente.distrito || ''; }
+      if(d && d.cliente){ direccion = d.cliente.direccion || ''; distrito = d.cliente.distrito || ''; biometricos = d.cliente.biometricos || ''; }
     }catch(e){ /* si falla, se imprime igual con los datos que ya tenemos */ }
 
     const ahoraTxt = new Date().toLocaleString('es-PE');
@@ -725,10 +726,11 @@
     document.getElementById('pCliente').textContent = p.nombreCliente;
     document.getElementById('pDni').textContent = p.dni;
     document.getElementById('pDireccionCliente').textContent = direccion + (distrito ? ' - ' + distrito : '');
+    document.getElementById('pBiometricos').textContent = biometricos || 'No registra';
     document.getElementById('pPuntoLlegada').textContent = (direccion || '(sin dirección registrada)') + (distrito ? ' - ' + distrito : '');
     document.getElementById('pCant').textContent = series.length;
     document.getElementById('pSeriesBody').innerHTML = series.map(function(s){
-      return '<tr><td style="border:1px solid #000;">' + s + '</td></tr>';
+      return '<tr><td style="border:none;border-bottom:1px solid #ddd;">' + s + '</td></tr>';
     }).join('');
     return p;
   }
