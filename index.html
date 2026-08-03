@@ -183,6 +183,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
         <button class="btn-vend" id="btnRecarga" style="display:none" onclick="abrirRecargaDash()">⚡ Recarga</button>
         <button class="btn-vend" onclick="abrirPersonal('gerScreen')">🗂️ Control Personal</button>
         <button class="btn-vend" id="btnGPS" style="display:none" onclick="openEmbed('SEGUIMIENTO_GPS.html?u=jmaza','📍 Seguimiento GPS','gerScreen')">📍 Seguimiento GPS</button>
+        <button class="btn-vend" id="btnPreEntregas" style="display:none" onclick="openEmbed('PRE_ENTREGAS_PANEL.html?u=jmaza','📦 Pre-entregas','gerScreen')">📦 Pre-entregas</button>
         <button class="btn-out" onclick="doLogout()">Cerrar sesión</button>
       </div>
     </div>
@@ -204,7 +205,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
   <div class="main-wrap">
     <div class="top-bar">
       <div class="top-left"><h2>COORD. CAMPO — Avance de Campo</h2><div class="pdv">Avance por responsable y asesor</div></div>
-      <div class="top-actions"><button class="btn-vend" id="btnRecarDash" style="display:none" onclick="abrirRecargaAmparo()">⚡ Recarga</button><button class="btn-vend" onclick="abrirPersonal('recarScreen')">🗂️ Control Personal</button><button class="btn-vend" id="btnGPSAmparo" style="display:none" onclick="openEmbed('SEGUIMIENTO_GPS.html?u=amparo','📍 Seguimiento GPS','recarScreen')">📍 Seguimiento GPS</button><button class="btn-out" onclick="doLogout()">Cerrar sesión</button></div>
+      <div class="top-actions"><button class="btn-vend" id="btnRecarDash" style="display:none" onclick="abrirRecargaAmparo()">⚡ Recarga</button><button class="btn-vend" onclick="abrirPersonal('recarScreen')">🗂️ Control Personal</button><button class="btn-vend" id="btnGPSAmparo" style="display:none" onclick="openEmbed('SEGUIMIENTO_GPS.html?u=amparo','📍 Seguimiento GPS','recarScreen')">📍 Seguimiento GPS</button><button class="btn-vend" onclick="openEmbed('PRE_ENTREGAS_PANEL.html?u=amparo','📦 Pre-entregas','recarScreen')">📦 Pre-entregas</button><button class="btn-out" onclick="doLogout()">Cerrar sesión</button></div>
     </div>
     <div class="mes-tabs" id="recarMesTabs"></div>
     <div id="recarInfo" class="info-row"></div>
@@ -229,6 +230,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
       <div class="top-actions">
         <button class="btn-vend" onclick="openEmbed('DASHBOARD_RECARGAS_BLAZEL.html?embed=1&u=gracie','⚡ Recarga','gracieScreen')">⚡ Recarga</button>
         <button class="btn-vend" onclick="openEmbed('SEGUIMIENTO_GPS.html?u=gracie','📍 Seguimiento GPS','gracieScreen')">📍 Seguimiento GPS</button>
+        <button class="btn-vend" onclick="openEmbed('PRE_ENTREGAS_PANEL.html?u=gracie','📦 Pre-entregas','gracieScreen')">📦 Pre-entregas</button>
         <button class="btn-out" onclick="doLogout()">Cerrar sesión</button>
       </div>
     </div>
@@ -351,6 +353,7 @@ function doLogin(){
     document.getElementById("btnMasivo").style.display="";
     document.getElementById("btnRecarga").style.display="";
     document.getElementById("btnGPS").style.display="";
+    document.getElementById("btnPreEntregas").style.display="";
     var _gh=document.querySelector("#gerScreen h2"); if(_gh) _gh.textContent="COMERCIAL — Consolidado";
     showScreen("gerScreen");
     renderGerMesTabs();
@@ -410,7 +413,7 @@ function abrirPersonal(ret){
 }
 function doLogout(){
   curTienda="";gerenteMode=false;comercialMode=false;curLoginType="";gerMode="all";gerSel.clear();
-  ["btnMasivo","btnRecarga","btnRecarDash","btnGPS","btnGPSAmparo"].forEach(function(id){ var b=document.getElementById(id); if(b) b.style.display="none"; });
+  ["btnMasivo","btnRecarga","btnRecarDash","btnGPS","btnGPSAmparo","btnPreEntregas"].forEach(function(id){ var b=document.getElementById(id); if(b) b.style.display="none"; });
   var _gh=document.querySelector("#gerScreen h2"); if(_gh) _gh.textContent="COORD. TIENDAS — Consolidado";
   document.getElementById("passIn").value="";
   document.getElementById("tiendaSel").value="";
