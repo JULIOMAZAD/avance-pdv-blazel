@@ -284,28 +284,22 @@
     if(abierto){
       scanHtml = '<div class="panel-scan abierto">' +
         '<div style="background:#FFF7F5;border:1.5px solid var(--rojo);border-radius:10px;padding:10px;margin-bottom:10px;">' +
-          '<div style="font-size:12px;font-weight:700;margin-bottom:6px;">📦 Series consecutivas (por defecto) — escanea/escribe solo la PRIMERA y la ÚLTIMA del lote</div>' +
-          '<div style="display:flex;gap:8px;margin-bottom:6px;">' +
-            '<input type="text" id="rangoInicio_' + p.id + '" placeholder="Serie inicial" autocomplete="off" style="flex:1;margin-bottom:0;">' +
-            '<input type="text" id="rangoFin_' + p.id + '" placeholder="Serie final" autocomplete="off" style="flex:1;margin-bottom:0;">' +
-          '</div>' +
-          '<button class="btn-rojo" onclick="generarRango(\'' + p.id + '\')">🧮 Generar todas las del rango</button>' +
+          '<div style="font-size:12px;font-weight:700;margin-bottom:2px;">Primera serie del lote</div>' +
+          '<input type="text" id="rangoInicio_' + p.id + '" placeholder="Ej. 895110113011183729" autocomplete="off" style="margin-bottom:8px;">' +
+          '<div style="font-size:12px;font-weight:700;margin-bottom:2px;">Última serie del lote <span style="font-weight:400;color:var(--gris);">(déjalo vacío si es una sola)</span></div>' +
+          '<input type="text" id="rangoFin_' + p.id + '" placeholder="Ej. 895110113011183738 → si pones esta, se agregan las 10 del medio también" autocomplete="off" style="margin-bottom:8px;">' +
+          '<button class="btn-rojo" style="width:100%;" onclick="generarRango(\'' + p.id + '\')">➕ Agregar</button>' +
           '<div class="nota-scan" id="notaRango_' + p.id + '"></div>' +
         '</div>' +
-        '<div style="background:#F1F1F4;border-radius:10px;padding:10px;margin-bottom:10px;">' +
-          '<div style="font-size:12px;font-weight:700;margin-bottom:6px;">📋 O pega tu lista completa de series (separadas por coma o una por línea)</div>' +
-          '<textarea id="pegarLista_' + p.id + '" placeholder="895110113011183729, 895110113011183730, ..." style="width:100%;min-height:70px;padding:8px;border:1.5px solid var(--borde);border-radius:8px;font-family:monospace;font-size:12px;margin-bottom:6px;"></textarea>' +
-          '<button class="btn-secundario" onclick="agregarListaPegada(\'' + p.id + '\')">➕ Agregar toda la lista</button>' +
-        '</div>' +
-        '<div style="font-size:12px;color:var(--gris);margin-bottom:6px;">¿Una sola serie suelta? Aquí:</div>' +
-        '<div style="display:flex;gap:8px;margin-bottom:10px;">' +
-          '<input type="text" id="scanInput_' + p.id + '" placeholder="Escanea o escribe la serie" autocomplete="off" style="flex:1;margin-bottom:0;">' +
-          '<button class="btn-rojo" style="padding:0 18px;" onclick="agregarDesdeInput(\'' + p.id + '\')">➕ Agregar</button>' +
-        '</div>' +
-        '<div style="margin-bottom:10px;"><button class="btn-secundario" id="btnCamara_' + p.id + '" onclick="alternarCamara(\'' + p.id + '\')">📷 Usar cámara del celular</button></div>' +
+        '<div style="margin-bottom:10px;"><button class="btn-secundario" id="btnCamara_' + p.id + '" onclick="alternarCamara(\'' + p.id + '\')">📷 Usar cámara del celular (agrega una por una)</button></div>' +
         '<div id="camaraBox_' + p.id + '" style="display:none;margin-bottom:10px;">' +
           '<div id="lector_' + p.id + '" style="width:100%;max-width:320px;border-radius:10px;overflow:hidden;"></div>' +
         '</div>' +
+        '<details style="margin-bottom:10px;">' +
+          '<summary style="cursor:pointer;font-size:12px;color:var(--gris);">¿Prefieres pegar una lista larga de una vez? Aquí</summary>' +
+          '<textarea id="pegarLista_' + p.id + '" placeholder="895110113011183729, 895110113011183730, ..." style="width:100%;min-height:70px;padding:8px;border:1.5px solid var(--borde);border-radius:8px;font-family:monospace;font-size:12px;margin:8px 0 6px;"></textarea>' +
+          '<button class="btn-secundario" onclick="agregarListaPegada(\'' + p.id + '\')">➕ Agregar toda la lista</button>' +
+        '</details>' +
         '<div class="contador-scan">' + ((p.seriesAsignadas || '').trim() ? 'Ya tiene ' + (p.seriesAsignadas.split(",").filter(function(s){return s.trim();}).length) + ' asignada(s) antes. ' : '') + 'Nuevas en este lote: <b id="contadorScan_' + p.id + '">' + seriesEnCurso.length + '</b> · Pedido total: ' + p.cantidad + '</div>' +
         '<div class="lista-series" id="listaSeries_' + p.id + '"></div>' +
         '<button class="btn-rojo" onclick="guardarAsignacion(\'' + p.id + '\')">💾 Guardar asignación</button> ' +
@@ -390,14 +384,18 @@
     }).join('');
 
     if(filaAbierta){
-      const input = document.getElementById('scanInput_' + filaAbierta);
-      if(input){
-        input.focus();
-        input.addEventListener('keydown', function(e){
-          if(e.key === 'Enter' || e.key === 'Tab'){
-            e.preventDefault();
-            agregarDesdeInput(filaAbierta);
-          }
+      const inputInicio = document.getElementById('rangoInicio_' + filaAbierta);
+      const inputFin = document.getElementById('rangoFin_' + filaAbierta);
+      if(inputInicio){
+        inputInicio.focus();
+        [inputInicio, inputFin].forEach(function(el){
+          if(!el) return;
+          el.addEventListener('keydown', function(e){
+            if(e.key === 'Enter' || e.key === 'Tab'){
+              e.preventDefault();
+              generarRango(filaAbierta);
+            }
+          });
         });
         renderListaSeries(filaAbierta);
       }
@@ -429,12 +427,22 @@
     const inicio = inicioEl.value.trim();
     const fin = finEl.value.trim();
 
-    if(!inicio || !fin){
-      nota.textContent = 'Escribe la serie inicial y la final.';
+    if(!inicio){
+      nota.textContent = 'Escribe al menos la primera serie.';
       return;
     }
+
+    // Si no hay "última serie", se agrega solo la de "primera" como serie suelta.
+    if(!fin){
+      agregarSerie(inicio);
+      nota.textContent = '';
+      inicioEl.value = '';
+      inicioEl.focus();
+      return;
+    }
+
     if(inicio.length !== fin.length || !/^\d+$/.test(inicio) || !/^\d+$/.test(fin)){
-      nota.textContent = 'Las dos series deben ser solo números y tener la misma cantidad de dígitos.';
+      nota.textContent = 'Si vas a usar rango, las dos series deben ser solo números y tener la misma cantidad de dígitos.';
       return;
     }
 
@@ -467,17 +475,10 @@
       if(seriesEnCurso.length > yaEstaba) agregadas++;
     });
 
-    nota.textContent = '✓ Se generaron y agregaron ' + agregadas + ' series (de ' + inicio + ' a ' + fin + ').';
+    nota.textContent = '✓ Se agregaron ' + agregadas + ' series (de ' + inicio + ' a ' + fin + ', son ' + cantidad + ' en total).';
     inicioEl.value = '';
     finEl.value = '';
-  }
-
-  function agregarDesdeInput(id){
-    const input = document.getElementById('scanInput_' + id);
-    if(!input) return;
-    agregarSerie(input.value.trim());
-    input.value = '';
-    input.focus();
+    inicioEl.focus();
   }
 
   function abrirScan(id){
