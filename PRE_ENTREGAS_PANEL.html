@@ -103,6 +103,11 @@
     <div id="resultadoBuscarSerie"></div>
   </div>
 
+  <div class="buscador-reclamo">
+    <label>🔓 Nombres abiertos hoy en algún celular</label>
+    <div id="listaSesiones" style="font-size:13px;color:var(--gris);">Cargando…</div>
+  </div>
+
   <div class="kpis">
     <div class="kpi pend"><div class="n" id="kpiPendientes">–</div><div class="t">Pendientes</div></div>
     <div class="kpi asig"><div class="n" id="kpiAsignados">–</div><div class="t">Listos para recoger</div></div>
@@ -594,6 +599,34 @@
     if(e.key === 'Enter'){ e.preventDefault(); buscarPorSerieUI(); }
   });
 
+  async function cargarSesionesHoy(){
+    const cont = document.getElementById('listaSesiones');
+    try{
+      const resp = await fetch(URL_SCRIPT + '?modo=sesiones_hoy&_=' + Date.now());
+      const data = await resp.json();
+      const lista = (data && data.sesiones) || [];
+      if(!lista.length){
+        cont.innerHTML = 'Nadie ha abierto su día todavía.';
+        return;
+      }
+      cont.innerHTML = lista.map(function(s){
+        return '<span style="display:inline-flex;align-items:center;gap:6px;background:var(--gris-claro);border-radius:999px;padding:4px 6px 4px 12px;margin:3px 6px 3px 0;">' +
+          s.nombre + ' <span style="color:var(--gris);font-size:11px;">(' + s.hora + ')</span>' +
+          ' <button style="background:var(--rojo);color:#fff;border-radius:999px;padding:3px 9px;font-size:11px;" onclick="liberarSesion(\'' + s.nombre + '\')">🔓 Liberar</button>' +
+        '</span>';
+      }).join('');
+    }catch(err){
+      cont.innerHTML = 'No se pudo cargar.';
+    }
+  }
+
+  async function liberarSesion(nombre){
+    if(!confirm('¿Liberar la sesión de ' + nombre + '? Podrá volver a abrir su día en cualquier celular ingresando su PIN.')) return;
+    await fetch(URL_SCRIPT + '?modo=liberar_sesion&nombre=' + encodeURIComponent(nombre) + '&_=' + Date.now());
+    cargarSesionesHoy();
+  }
+
+  cargarSesionesHoy();
   cargarTodo();
 </script>
 </body>

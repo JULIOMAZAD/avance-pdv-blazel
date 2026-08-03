@@ -200,31 +200,42 @@
   <div class="subtitulo">Registro de campo</div>
   <div class="reloj" id="reloj">--:--:--</div>
 
-  <div class="tarjeta" style="max-width:400px;padding-bottom:16px;margin-bottom:14px;">
-    <label for="nombre">Tu nombre</label>
-    <!--
-      PARA AGREGAR UN ASESOR NUEVO (cuando lleguen a 20):
-      Copia una línea como esta:  <option>NOMBRE DEL ASESOR</option>
-      y pégala debajo de las demás, con el nombre EXACTAMENTE igual
-      a como aparece en tu hoja DATOS. Luego avísame para que también
-      lo agregue en el Apps Script (paso necesario para que su marca
-      se escriba en la fila correcta).
-    -->
-    <select id="nombre" style="margin-bottom:0">
-      <option value="">Selecciona tu nombre…</option>
-      <option>ANGELA ROJAS BOBBIO</option>
-      <option>CAMILO RIVERA</option>
-      <option>JESUS CRUZ ACUÑA</option>
-      <option>ALBERTO ROJAS MENDOZA</option>
-      <option>CECILIA PUNTAS SALCEDO</option>
-      <option>GRACIE ARACELI MANRIQUE MORQUENCHO</option>
-      <option>RUTH SARAI VERGARA SANCHEZ</option>
-      <option>ANGELY JARITZA ALEGRÍA ZAMBRANO</option>
-      <option>JAVIER CASTELO JESÚS</option>
-      <option>BRENNA JOSSARY SALAS SHAPIAMA</option>
-      <option>LUIS FERNANDO ROSADO</option>
-      <option>RIGOBERTO JUNIOR TERRANOVA GARCIA</option>
-    </select>
+  <div class="tarjeta" id="cardIdentidad" style="max-width:400px;padding-bottom:16px;margin-bottom:14px;">
+    <div id="zonaSeleccion">
+      <label for="nombre">Tu nombre (se elige una sola vez en este celular)</label>
+      <!--
+        PARA AGREGAR UN ASESOR NUEVO (cuando lleguen a 20):
+        Copia una línea como esta:  <option>NOMBRE DEL ASESOR</option>
+        y pégala debajo de las demás, con el nombre EXACTAMENTE igual
+        a como aparece en tu hoja DATOS. Luego avísame para que también
+        lo agregue en el Apps Script (paso necesario para que su marca
+        se escriba en la fila correcta, y para darle su PIN).
+      -->
+      <select id="nombre">
+        <option value="">Selecciona tu nombre…</option>
+        <option>ANGELA ROJAS BOBBIO</option>
+        <option>CAMILO RIVERA</option>
+        <option>JESUS CRUZ ACUÑA</option>
+        <option>ALBERTO ROJAS MENDOZA</option>
+        <option>CECILIA PUNTAS SALCEDO</option>
+        <option>GRACIE ARACELI MANRIQUE MORQUENCHO</option>
+        <option>RUTH SARAI VERGARA SANCHEZ</option>
+        <option>JAVIER CASTELO JESÚS</option>
+        <option>BRENNA JOSSARY SALAS SHAPIAMA</option>
+        <option>LUIS FERNANDO ROSADO</option>
+        <option>RIGOBERTO JUNIOR TERRANOVA GARCIA</option>
+        <option>AMPARO SUAREZ ACEVEDO</option>
+      </select>
+      <label for="pinInput" style="margin-top:12px">PIN (los últimos 4 dígitos de tu DNI)</label>
+      <input type="text" id="pinInput" inputmode="numeric" maxlength="4" placeholder="••••" style="margin-bottom:12px;letter-spacing:4px;font-weight:700;">
+      <button id="btnAbrirSesion" onclick="abrirSesion()" style="background:var(--tinta);color:#fff;width:100%;">🔓 ABRIR MI DÍA</button>
+      <div class="estado" id="estadoSesion"></div>
+    </div>
+    <div id="zonaBloqueada" style="display:none">
+      <label>Tu nombre en este celular</label>
+      <div style="font-weight:800;font-size:16px;margin-bottom:6px" id="nombreBloqueadoTexto"></div>
+      <div style="font-size:12px;color:var(--gris)" id="estadoSesionBloqueada"></div>
+    </div>
   </div>
 
   <div class="tabs">
@@ -292,6 +303,116 @@
   // (termina en /exec)
   // ======================================================================
   const URL_SCRIPT = "https://script.google.com/macros/s/AKfycbw125n4ceKoQwUBq8zRHKeGzHue_EzZj8yd1zYt_xym0BUbiOgnr5rJFtLuapDJA3kfsA/exec";
+
+  // ======================================================================
+  // SEGURO DE IDENTIDAD: PIN + nombre bloqueado por celular + sesión diaria
+  // ======================================================================
+  let sesionAbierta = false;
+
+  function obtenerDeviceToken(){
+    let t = localStorage.getItem('bz_deviceToken');
+    if(!t){
+      t = 'dev-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10);
+      localStorage.setItem('bz_deviceToken', t);
+    }
+    return t;
+  }
+  const deviceToken = obtenerDeviceToken();
+
+  function ponerTodosLosBotones(activo){
+    ['btnEntrada','btnMediodia','btnSalida','btnBuscarCliente','btnGuardarPre'].forEach(function(id){
+      const el = document.getElementById(id);
+      if(el) el.disabled = !activo;
+    });
+  }
+  ponerTodosLosBotones(false); // bloqueado hasta verificar sesión
+
+  function mostrarEstadoSesion(tipo, mensaje){
+    const el = document.getElementById('estadoSesion');
+    el.className = 'estado ' + tipo;
+    el.textContent = mensaje;
+  }
+
+  function mostrarBloqueado(nombre, mensaje){
+    document.getElementById('zonaSeleccion').style.display = 'none';
+    document.getElementById('zonaBloqueada').style.display = 'block';
+    document.getElementById('nombreBloqueadoTexto').textContent = '🔒 ' + nombre;
+    document.getElementById('estadoSesionBloqueada').textContent = mensaje;
+    document.getElementById('nombre').value = nombre;
+    document.getElementById('nombre').dispatchEvent(new Event('change'));
+  }
+
+  function abrirSesion(){
+    const nombre = document.getElementById('nombre').value;
+    const pin = document.getElementById('pinInput').value.trim();
+    if(!nombre){ mostrarEstadoSesion('error', 'Selecciona tu nombre.'); return; }
+    if(!pin || pin.length < 4){ mostrarEstadoSesion('error', 'Ingresa tu PIN (4 dígitos).'); return; }
+
+    document.getElementById('btnAbrirSesion').disabled = true;
+    mostrarEstadoSesion('cargando', 'Verificando…');
+
+    fetch(URL_SCRIPT + '?modo=abrir_sesion&nombre=' + encodeURIComponent(nombre) + '&pin=' + encodeURIComponent(pin) + '&deviceToken=' + encodeURIComponent(deviceToken) + '&_=' + Date.now())
+      .then(function(r){ return r.json(); })
+      .then(function(data){
+        document.getElementById('btnAbrirSesion').disabled = false;
+        if(!data.ok){
+          mostrarEstadoSesion('error', data.error || 'No se pudo abrir.');
+          return;
+        }
+        localStorage.setItem('bz_nombreBloqueado', nombre);
+        mostrarBloqueado(nombre, '✔ Sesión abierta hasta las 11:00 pm.');
+        ponerTodosLosBotones(true);
+        sesionAbierta = true;
+      }).catch(function(){
+        document.getElementById('btnAbrirSesion').disabled = false;
+        mostrarEstadoSesion('error', 'No se pudo conectar. Intenta de nuevo.');
+      });
+  }
+
+  function verificarSesionAlEntrar(){
+    const nombreGuardado = localStorage.getItem('bz_nombreBloqueado');
+    if(!nombreGuardado) return; // primera vez en este celular: se queda en la vista de selección
+
+    document.getElementById('zonaSeleccion').style.display = 'none';
+    document.getElementById('zonaBloqueada').style.display = 'block';
+    document.getElementById('nombreBloqueadoTexto').textContent = '🔒 ' + nombreGuardado;
+    document.getElementById('estadoSesionBloqueada').textContent = 'Verificando…';
+
+    fetch(URL_SCRIPT + '?modo=verificar_sesion&nombre=' + encodeURIComponent(nombreGuardado) + '&deviceToken=' + encodeURIComponent(deviceToken) + '&_=' + Date.now())
+      .then(function(r){ return r.json(); })
+      .then(function(data){
+        document.getElementById('nombre').value = nombreGuardado;
+        document.getElementById('nombre').dispatchEvent(new Event('change'));
+
+        if(data.fueraHorario){
+          document.getElementById('estadoSesionBloqueada').textContent = '⏰ Fuera de horario. El aplicativo abre de 7:00 am a 11:00 pm.';
+          ponerTodosLosBotones(false);
+          return;
+        }
+        if(data.enUso){
+          document.getElementById('estadoSesionBloqueada').textContent = '⚠ Tu nombre ya está abierto en otro celular hoy. Avisa a tu jefe si no fuiste tú.';
+          ponerTodosLosBotones(false);
+          return;
+        }
+        if(data.abierto){
+          document.getElementById('estadoSesionBloqueada').textContent = '✔ Sesión abierta hasta las 11:00 pm.';
+          ponerTodosLosBotones(true);
+          sesionAbierta = true;
+          return;
+        }
+        // No hay sesión abierta hoy todavía en ningún celular: pide el PIN una vez más (nuevo día)
+        document.getElementById('zonaSeleccion').style.display = 'block';
+        document.getElementById('zonaBloqueada').style.display = 'none';
+        document.getElementById('nombre').value = nombreGuardado;
+        document.getElementById('nombre').disabled = true; // ya no se puede cambiar el nombre, solo confirmar PIN
+        mostrarEstadoSesion('', '');
+      })
+      .catch(function(){
+        document.getElementById('estadoSesionBloqueada').textContent = 'No se pudo verificar. Revisa tu conexión y recarga la página.';
+        ponerTodosLosBotones(false);
+      });
+  }
+  verificarSesionAlEntrar();
 
   function cambiarVista(v){
     document.getElementById('vistaAsistencia').classList.toggle('activa', v==='asistencia');
@@ -368,6 +489,10 @@
     const nombre = document.getElementById('nombre').value;
     if(!nombre){
       mostrarEstado('error', 'Primero selecciona tu nombre.');
+      return;
+    }
+    if(!sesionAbierta){
+      mostrarEstado('error', 'Tu sesión no está abierta. Recarga la página.');
       return;
     }
     if(URL_SCRIPT.indexOf('PEGAR_AQUI') !== -1){
@@ -519,6 +644,10 @@
     const vendedor = document.getElementById('nombre').value;
     if(!vendedor){
       mostrarEstadoPre('error', 'Primero selecciona tu nombre arriba.');
+      return;
+    }
+    if(!sesionAbierta){
+      mostrarEstadoPre('error', 'Tu sesión no está abierta. Recarga la página.');
       return;
     }
     if(!clienteActual){
