@@ -124,6 +124,8 @@
   </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 <script>
   // Mismo Apps Script que la app de marcado / pre-entrega.
@@ -136,6 +138,61 @@
   let filtroActual = 'PENDIENTE';
   let filaAbierta = null;
   let seriesEnCurso = [];
+  let greAbiertoPara = null;
+
+  function abrirGre(vend){
+    greAbiertoPara = (greAbiertoPara === vend) ? null : vend;
+    render();
+  }
+
+  function renderPanelGre(vend, pendientesGre){
+    const todasLasSeries = [];
+    pendientesGre.forEach(function(p){
+      (p.seriesAsignadas || '').split(',').map(function(s){ return s.trim(); }).filter(Boolean).forEach(function(s){ todasLasSeries.push(s); });
+    });
+    const ids = pendientesGre.map(function(p){ return p.id; });
+    const mensaje = 'Solicitud de GRE — ' + vend + '\n' +
+      'Fecha: ' + new Date().toLocaleDateString('es-PE') + '\n' +
+      'Motivo: Otros — Obsequio / promoción, entrega a clientes\n' +
+      'Cantidad total: ' + todasLasSeries.length + ' chips\n' +
+      'Clientes atendidos: ' + pendientesGre.length + '\n\n' +
+      'Series (todas):\n' + todasLasSeries.map(function(s){ return '- ' + s; }).join('\n');
+
+    return '<div class="panel-scan abierto" style="margin-bottom:14px;">' +
+      '<textarea id="greTexto_' + vend + '" readonly style="width:100%;min-height:160px;padding:10px;border:1.5px solid var(--borde);border-radius:10px;font-family:monospace;font-size:12px;margin-bottom:10px;">' + mensaje + '</textarea>' +
+      '<button class="btn-secundario" onclick="copiarGre(\'' + vend + '\')">📋 Copiar mensaje</button> ' +
+      '<input type="text" id="greNumero_' + vend + '" placeholder="N° de GRE que te dio almacén" style="width:220px;padding:9px;border:1.5px solid var(--borde);border-radius:10px;margin-left:8px;">' +
+      '<button class="btn-rojo" onclick="guardarGreRecibida(\'' + vend + '\', ' + JSON.stringify(ids) + ')">✔ Marcar GRE recibida</button>' +
+      '<div class="nota-scan" id="greNota_' + vend + '"></div>' +
+    '</div>';
+  }
+
+  function copiarGre(vend){
+    const ta = document.getElementById('greTexto_' + vend);
+    ta.select();
+    try{ navigator.clipboard.writeText(ta.value); }catch(e){ document.execCommand('copy'); }
+    const nota = document.getElementById('greNota_' + vend);
+    if(nota) nota.textContent = '✓ Mensaje copiado.';
+  }
+
+  async function guardarGreRecibida(vend, ids){
+    const greNumero = document.getElementById('greNumero_' + vend).value.trim();
+    if(!greNumero){
+      document.getElementById('greNota_' + vend).textContent = 'Ingresa el N° de GRE primero.';
+      return;
+    }
+    await fetch(URL_SCRIPT, {
+      method: 'POST', mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'marcar_gre_recibida', preEntregaIds: ids, greNumero: greNumero })
+    });
+    ids.forEach(function(id){
+      const p = TODAS.find(function(x){ return x.id === id; });
+      if(p) p.greNumero = greNumero;
+    });
+    greAbiertoPara = null;
+    render();
+  }
 
   function cambiarFiltro(f){
     filtroActual = f;
@@ -182,6 +239,7 @@
       acciones = '<button class="btn-rojo" onclick="abrirScan(\'' + p.id + '\')">🔫 Escanear series</button>';
     } else if(p.estado === 'ASIGNADO'){
       acciones = '<button class="btn-secundario" onclick="imprimirActa(\'' + p.id + '\')">🖨️ Imprimir acta</button>' +
+        '<button class="btn-secundario" onclick="compartirActa(\'' + p.id + '\')">📲 Descargar / Enviar por WhatsApp</button>' +
         '<button class="btn-rojo" onclick="marcarEntregado(\'' + p.id + '\')">✔ Marcar entregado</button>';
     }
 
@@ -229,8 +287,14 @@
     cont.innerHTML = ordenVendedores.map(function(vend){
       const items = grupos[vend];
       const pendCount = items.filter(function(x){ return x.estado === 'PENDIENTE'; }).length;
+      const pendientesGre = TODAS.filter(function(x){ return x.vendedor === vend && x.estado === 'ASIGNADO' && !x.greNumero; });
+      const btnGre = pendientesGre.length
+        ? '<button class="btn-secundario" style="margin-left:10px;" onclick="abrirGre(\'' + vend + '\')">📋 Pedir GRE (' + pendientesGre.length + ' cliente(s))</button>'
+        : '';
+      const panelGre = greAbiertoPara === vend ? renderPanelGre(vend, pendientesGre) : '';
       return '<div class="grupo-vendedor">' +
-        '<div class="titulo-vendedor">👤 ' + vend + (pendCount ? ' <span class="badge-pend">' + pendCount + ' pendiente(s)</span>' : '') + '</div>' +
+        '<div class="titulo-vendedor">👤 ' + vend + (pendCount ? ' <span class="badge-pend">' + pendCount + ' pendiente(s)</span>' : '') + btnGre + '</div>' +
+        panelGre +
         items.map(renderItem).join('') +
       '</div>';
     }).join('');
@@ -375,9 +439,9 @@
     render();
   }
 
-  function imprimirActa(id){
+  function llenarActa(id){
     const p = TODAS.find(x => x.id === id);
-    if(!p) return;
+    if(!p) return null;
     const series = (p.seriesAsignadas || '').split(',').map(s => s.trim()).filter(Boolean);
 
     document.getElementById('pFecha').textContent = 'Fecha: ' + p.fecha;
@@ -389,8 +453,40 @@
     document.getElementById('pSeriesBody').innerHTML = series.map(function(s, i){
       return '<tr><td>' + (i+1) + '</td><td>' + s + '</td></tr>';
     }).join('');
+    return p;
+  }
 
+  function imprimirActa(id){
+    if(!llenarActa(id)) return;
     window.print();
+  }
+
+  async function compartirActa(id){
+    const p = llenarActa(id);
+    if(!p) return;
+    const area = document.getElementById('printArea');
+    area.style.display = 'block';
+
+    const canvas = await html2canvas(area, { scale: 2, backgroundColor: '#ffffff' });
+    area.style.display = 'none';
+
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ unit: 'pt', format: 'a4' });
+    const pageW = pdf.internal.pageSize.getWidth();
+    const imgH = (canvas.height * pageW) / canvas.width;
+    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pageW, imgH);
+
+    const nombreArchivo = 'Acta_' + (p.correlativo || p.id) + '_' + p.nombreCliente.replace(/[^a-zA-Z0-9]/g,'_') + '.pdf';
+    const blob = pdf.output('blob');
+    const archivo = new File([blob], nombreArchivo, { type: 'application/pdf' });
+
+    if(navigator.canShare && navigator.canShare({ files: [archivo] })){
+      try{
+        await navigator.share({ files: [archivo], title: 'Acta de entrega', text: 'Acta de entrega — ' + p.nombreCliente });
+        return;
+      }catch(e){ /* si cancela el share, cae a la descarga normal */ }
+    }
+    pdf.save(nombreArchivo);
   }
 
   cargarTodo();
