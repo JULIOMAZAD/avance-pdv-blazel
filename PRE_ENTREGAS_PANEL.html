@@ -299,6 +299,7 @@
           '<summary style="cursor:pointer;font-size:12px;color:var(--gris);">¿Prefieres pegar una lista larga de una vez? Aquí</summary>' +
           '<textarea id="pegarLista_' + p.id + '" placeholder="895110113011183729, 895110113011183730, ..." style="width:100%;min-height:70px;padding:8px;border:1.5px solid var(--borde);border-radius:8px;font-family:monospace;font-size:12px;margin:8px 0 6px;"></textarea>' +
           '<button class="btn-secundario" onclick="agregarListaPegada(\'' + p.id + '\')">➕ Agregar toda la lista</button>' +
+          '<div class="nota-scan" id="notaLista_' + p.id + '"></div>' +
         '</details>' +
         '<div class="contador-scan">' + ((p.seriesAsignadas || '').trim() ? 'Ya tiene ' + (p.seriesAsignadas.split(",").filter(function(s){return s.trim();}).length) + ' asignada(s) antes. ' : '') + 'Nuevas en este lote: <b id="contadorScan_' + p.id + '">' + seriesEnCurso.length + '</b> · Pedido total: ' + p.cantidad + '</div>' +
         '<div class="lista-series" id="listaSeries_' + p.id + '"></div>' +
@@ -404,8 +405,12 @@
 
   function agregarListaPegada(id){
     const ta = document.getElementById('pegarLista_' + id);
+    const notaLista = document.getElementById('notaLista_' + id);
     const texto = ta.value.trim();
-    if(!texto) return;
+    if(!texto){
+      if(notaLista) notaLista.textContent = 'Pega primero la lista de series en el cuadro de arriba.';
+      return;
+    }
 
     const partes = texto.split(/[,\n\r\t;]+/).map(function(s){ return s.trim(); }).filter(Boolean);
     let agregadas = 0;
@@ -415,6 +420,7 @@
       if(seriesEnCurso.length > yaEstaba) agregadas++;
     });
 
+    if(notaLista) notaLista.textContent = '✓ Se agregaron ' + agregadas + ' de ' + partes.length + ' series de la lista.';
     const nota = document.getElementById('notaScan_' + id);
     if(nota) nota.textContent = '✓ Se agregaron ' + agregadas + ' de ' + partes.length + ' series de la lista.';
     ta.value = '';
