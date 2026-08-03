@@ -94,6 +94,12 @@
       <input type="text" id="inputBuscarSerie" placeholder="Escanea o escribe la serie del chip" autocomplete="off">
       <button class="btn-rojo" onclick="buscarPorSerieUI()">Buscar</button>
     </div>
+    <div style="margin-top:8px;">
+      <button class="btn-secundario" id="btnCamaraBuscar" onclick="alternarCamaraBuscar()">📷 Usar cámara del celular</button>
+    </div>
+    <div id="camaraBoxBuscar" style="display:none;margin-top:10px;">
+      <div id="lectorBuscar" style="width:100%;max-width:320px;border-radius:10px;overflow:hidden;"></div>
+    </div>
     <div id="resultadoBuscarSerie"></div>
   </div>
 
@@ -520,6 +526,42 @@
       }catch(e){ /* si cancela el share, cae a la descarga normal */ }
     }
     pdf.save(nombreArchivo);
+  }
+
+  let lectorCamaraBuscar = null;
+  let camaraBuscarActiva = false;
+
+  function alternarCamaraBuscar(){
+    const box = document.getElementById('camaraBoxBuscar');
+    const btn = document.getElementById('btnCamaraBuscar');
+    if(camaraBuscarActiva){
+      if(lectorCamaraBuscar){
+        lectorCamaraBuscar.stop().then(function(){ lectorCamaraBuscar.clear(); lectorCamaraBuscar = null; }).catch(function(){ lectorCamaraBuscar = null; });
+      }
+      camaraBuscarActiva = false;
+      box.style.display = 'none';
+      btn.textContent = '📷 Usar cámara del celular';
+      return;
+    }
+    box.style.display = 'block';
+    btn.textContent = '✕ Apagar cámara';
+    camaraBuscarActiva = true;
+    lectorCamaraBuscar = new Html5Qrcode('lectorBuscar');
+    lectorCamaraBuscar.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: { width: 250, height: 120 } },
+      function(textoDecodificado){
+        document.getElementById('inputBuscarSerie').value = textoDecodificado.trim();
+        alternarCamaraBuscar(); // apaga la cámara al detectar
+        buscarPorSerieUI();
+      },
+      function(){ /* sin detección, ignorar */ }
+    ).catch(function(err){
+      document.getElementById('resultadoBuscarSerie').innerHTML = '<div class="resultado-serie no">No se pudo abrir la cámara: ' + err + '</div>';
+      box.style.display = 'none';
+      btn.textContent = '📷 Usar cámara del celular';
+      camaraBuscarActiva = false;
+    });
   }
 
   async function buscarPorSerieUI(){
