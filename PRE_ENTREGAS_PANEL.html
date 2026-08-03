@@ -657,15 +657,34 @@
     if(!p) return;
     const area = document.getElementById('printArea');
     area.style.display = 'block';
+    area.style.width = '760px';   // ancho fijo, para que no capture todo el ancho de la pantalla
 
-    const canvas = await html2canvas(area, { scale: 2, backgroundColor: '#ffffff' });
+    // Se fuerza el ancho/alto exactos del elemento (evita que html2canvas
+    // capture espacio de más, que era la causa del PDF gigante y en blanco).
+    const anchoReal = area.scrollWidth;
+    const altoReal = area.scrollHeight;
+
+    const canvas = await html2canvas(area, {
+      scale: 1.5,
+      backgroundColor: '#ffffff',
+      width: anchoReal,
+      height: altoReal,
+      windowWidth: anchoReal,
+      windowHeight: altoReal
+    });
     area.style.display = 'none';
+    area.style.width = '';
 
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF({ unit: 'pt', format: 'a4' });
     const pageW = pdf.internal.pageSize.getWidth();
-    const imgH = (canvas.height * pageW) / canvas.width;
-    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pageW, imgH);
+    const pageH = pdf.internal.pageSize.getHeight();
+    const margen = 28;
+    const anchoUtil = pageW - margen * 2;
+    const imgH = (canvas.height * anchoUtil) / canvas.width;
+
+    const imgData = canvas.toDataURL('image/jpeg', 0.82); // JPEG comprimido: PDF mucho más liviano
+    pdf.addImage(imgData, 'JPEG', margen, margen, anchoUtil, Math.min(imgH, pageH - margen * 2));
 
     const nombreArchivo = 'Guia_' + (p.correlativo || p.id) + '_' + p.nombreCliente.replace(/[^a-zA-Z0-9]/g,'_') + '.pdf';
     const blob = pdf.output('blob');
