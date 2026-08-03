@@ -45,6 +45,7 @@
   .grupo-vendedor{margin-bottom:22px;}
   .titulo-vendedor{font-size:15px;font-weight:800;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--tinta);}
   .badge-pend{background:var(--ambar);color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;}
+  .badge-total{background:var(--gris-claro);color:var(--tinta);font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;}
 
   .panel-scan{margin-top:14px;padding-top:14px;border-top:1px dashed var(--borde);display:none;}
   .panel-scan.abierto{display:block;}
@@ -88,10 +89,10 @@
   </div>
 
   <div class="tabs">
-    <div class="tab activo" id="tabPend" onclick="cambiarFiltro('PENDIENTE')">🟠 Pendientes</div>
+    <div class="tab" id="tabPend" onclick="cambiarFiltro('PENDIENTE')">🟠 Pendientes</div>
     <div class="tab" id="tabAsig" onclick="cambiarFiltro('ASIGNADO')">🟢 Listos para recoger</div>
     <div class="tab" id="tabEnt" onclick="cambiarFiltro('ENTREGADO')">⚪ Entregados</div>
-    <div class="tab" id="tabTodo" onclick="cambiarFiltro('TODOS')">Todos</div>
+    <div class="tab activo" id="tabTodo" onclick="cambiarFiltro('TODOS')">Todos</div>
   </div>
 
   <div style="margin-bottom:14px;">
@@ -135,7 +136,7 @@
   const usuarioActual = parametros.get('u') || '';
 
   let TODAS = [];
-  let filtroActual = 'PENDIENTE';
+  let filtroActual = 'TODOS';
   let filaAbierta = null;
   let seriesEnCurso = [];
   let greAbiertoPara = null;
@@ -289,14 +290,21 @@
 
     cont.innerHTML = ordenVendedores.map(function(vend){
       const items = grupos[vend];
-      const pendCount = items.filter(function(x){ return x.estado === 'PENDIENTE'; }).length;
+      const itemsVendedorTodos = TODAS.filter(function(x){ return x.vendedor === vend; });
+      const pendCount = itemsVendedorTodos.filter(function(x){ return x.estado === 'PENDIENTE'; }).length;
+      const totalClientes = itemsVendedorTodos.length;
+      const totalChips = itemsVendedorTodos.reduce(function(sum, x){ return sum + (Number(x.cantidad) || 0); }, 0);
       const pendientesGre = TODAS.filter(function(x){ return x.vendedor === vend && x.estado === 'ASIGNADO' && !x.greNumero; });
       const btnGre = pendientesGre.length
         ? '<button class="btn-secundario" style="margin-left:10px;" onclick="abrirGre(\'' + vend + '\')">📋 Pedir GRE (' + pendientesGre.length + ' cliente(s))</button>'
         : '';
       const panelGre = greAbiertoPara === vend ? renderPanelGre(vend, pendientesGre) : '';
       return '<div class="grupo-vendedor">' +
-        '<div class="titulo-vendedor">👤 ' + vend + (pendCount ? ' <span class="badge-pend">' + pendCount + ' pendiente(s)</span>' : '') + btnGre + '</div>' +
+        '<div class="titulo-vendedor">👤 ' + vend +
+          ' <span class="badge-total">' + totalClientes + ' cliente(s)</span>' +
+          ' <span class="badge-total">' + totalChips + ' chip(s)</span>' +
+          (pendCount ? ' <span class="badge-pend">' + pendCount + ' pendiente(s)</span>' : '') +
+          btnGre + '</div>' +
         panelGre +
         items.map(renderItem).join('') +
       '</div>';
