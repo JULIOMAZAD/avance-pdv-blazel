@@ -186,6 +186,12 @@
   .pill-estado{ font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px; }
   .pill-estado.PENDIENTE{ background:#FDF3E3; color:#B7791F; }
   .pill-estado.ASIGNADO{ background:#E9F7EF; color:var(--verde); }
+  .mis-pedidos{ margin-top:16px; width:100%; max-width:400px; }
+  .mis-pedidos h4{ font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--gris); margin:0 0 8px; }
+  .pedido-item{ background:#fff; border:1px solid var(--borde); border-radius:12px; padding:12px 14px; margin-bottom:8px; font-size:13px; }
+  .pedido-item .top{ display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .pedido-item .nom{ font-weight:700; }
+  .pedido-item button{ background:var(--verde); color:#fff; width:100%; margin-top:8px; padding:10px; font-size:13px; }
 </style>
 </head>
 <body>
@@ -261,7 +267,7 @@
         <div class="dato" id="clienteBioLabel"></div>
         <div class="chips-bio" id="clienteBioChips"></div>
         <div id="clienteUbicacionInfo" class="dato" style="margin-top:8px;"></div>
-        <button class="btn-link" id="btnActualizarUbicacion" onclick="actualizarUbicacion()" style="display:none">📍 ¿Cambió de dirección? Actualizar ubicación</button>
+        <button class="btn-link" id="btnActualizarUbicacion" onclick="actualizarUbicacion()" style="display:none">Actualizar datos del cliente</button>
       </div>
 
       <label for="cantidadChips" id="labelCantidad" style="display:none">Cantidad de chips que pide</label>
@@ -272,7 +278,12 @@
       <div class="estado" id="estadoPre"></div>
     </div>
 
-    <div class="pie">Busca al cliente por su DNI. La ubicación solo se pide la primera vez que se registra ese cliente.</div>
+    <div class="mis-pedidos">
+      <h4>Mis pedidos en curso</h4>
+      <div id="listaMisPedidos"><span style="color:var(--gris);font-size:13px">Selecciona tu nombre arriba para verlos.</span></div>
+    </div>
+
+    <div class="pie">Busca al cliente por su DNI y registra la cantidad que pide.</div>
   </div>
 
 <script>
@@ -287,6 +298,51 @@
     document.getElementById('vistaPre').classList.toggle('activa', v==='pre');
     document.getElementById('tabAsistencia').classList.toggle('activo', v==='asistencia');
     document.getElementById('tabPre').classList.toggle('activo', v==='pre');
+    if(v === 'pre') cargarMisPedidos();
+  }
+
+  document.getElementById('nombre').addEventListener('change', cargarMisPedidos);
+
+  function cargarMisPedidos(){
+    const nombre = document.getElementById('nombre').value;
+    const cont = document.getElementById('listaMisPedidos');
+    if(!nombre){
+      cont.innerHTML = '<span style="color:var(--gris);font-size:13px">Selecciona tu nombre arriba para verlos.</span>';
+      return;
+    }
+    cont.innerHTML = '<span style="color:var(--gris);font-size:13px">Cargando…</span>';
+    fetch(URL_SCRIPT + '?modo=preentregas_vendedor&nombre=' + encodeURIComponent(nombre) + '&_=' + Date.now())
+      .then(function(r){ return r.json(); })
+      .then(function(data){
+        const lista = (data && data.preentregas) || [];
+        if(!lista.length){
+          cont.innerHTML = '<span style="color:var(--gris);font-size:13px">No tienes pedidos pendientes.</span>';
+          return;
+        }
+        cont.innerHTML = lista.slice().reverse().map(function(p){
+          const boton = p.estado === 'ASIGNADO'
+            ? '<button onclick="confirmarEntrega(\'' + p.id + '\')">✔ Ya entregué</button>'
+            : '<div style="color:var(--gris);font-size:12px;margin-top:6px">Esperando que oficina asigne los chips…</div>';
+          return '<div class="pedido-item">' +
+            '<div class="top"><span class="nom">' + p.nombreCliente + '</span>' +
+            '<span class="pill-estado ' + p.estado + '">' + p.estado + '</span></div>' +
+            '<div style="color:var(--gris)">' + p.cantidad + ' chip(s) · ' + p.fecha + '</div>' +
+            boton +
+          '</div>';
+        }).join('');
+      })
+      .catch(function(){
+        cont.innerHTML = '<span style="color:var(--gris);font-size:13px">No se pudo cargar. Revisa tu conexión.</span>';
+      });
+  }
+
+  function confirmarEntrega(id){
+    if(!confirm('¿Confirmas que ya le entregaste los chips a este cliente?')) return;
+    fetch(URL_SCRIPT, {
+      method: 'POST', mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'marcar_entregado', preEntregaId: id })
+    }).then(function(){ cargarMisPedidos(); });
   }
 
   function actualizarReloj(){
@@ -427,11 +483,10 @@
 
     const infoUbic = document.getElementById('clienteUbicacionInfo');
     const btnActualizar = document.getElementById('btnActualizarUbicacion');
+    infoUbic.textContent = '';
     if(c.lat && c.lng){
-      infoUbic.textContent = '📍 Ubicación ya registrada' + (c.geoFecha ? ' (' + c.geoFecha + ')' : '');
       btnActualizar.style.display = 'block';
     } else {
-      infoUbic.textContent = '📍 Se registrará tu ubicación actual al guardar (primera vez).';
       btnActualizar.style.display = 'none';
     }
 
@@ -440,7 +495,7 @@
 
   function actualizarUbicacion(){
     if(!clienteActual) return;
-    mostrarEstadoPre('cargando', 'Obteniendo tu ubicación actual…');
+    mostrarEstadoPre('cargando', 'Actualizando…');
     obtenerUbicacion().then(function(pos){
       fetch(URL_SCRIPT, {
         method: 'POST', mode: 'no-cors',
@@ -450,12 +505,12 @@
         clienteActual.lat = pos.lat; clienteActual.lng = pos.lng;
         clienteActual.geoFecha = new Date().toLocaleDateString('es-PE');
         renderTarjetaCliente();
-        mostrarEstadoPre('ok', 'Ubicación actualizada. Se guardó un historial de la dirección anterior.');
+        mostrarEstadoPre('ok', 'Datos actualizados.');
       }).catch(function(){
         mostrarEstadoPre('error', 'No se pudo actualizar. Intenta de nuevo.');
       });
     }).catch(function(){
-      mostrarEstadoPre('error', 'No se pudo obtener tu ubicación. Activa el GPS.');
+      mostrarEstadoPre('error', 'No se pudo actualizar. Intenta de nuevo.');
     });
   }
 
@@ -493,6 +548,7 @@
         document.getElementById('btnGuardarPre').style.display = 'none';
         document.getElementById('btnGuardarPre').disabled = false;
         clienteActual = null;
+        cargarMisPedidos();
       }).catch(function(){
         mostrarEstadoPre('error', 'No se pudo guardar. Revisa tu conexión e intenta de nuevo.');
         document.getElementById('btnGuardarPre').disabled = false;
@@ -504,7 +560,7 @@
       obtenerUbicacion().then(function(pos){
         enviar(pos.lat, pos.lng);
       }).catch(function(){
-        mostrarEstadoPre('error', 'No se pudo obtener tu ubicación (necesaria la primera vez con este cliente). Activa el GPS.');
+        mostrarEstadoPre('error', 'No se pudo guardar. Activa el GPS del celular e intenta de nuevo.');
         document.getElementById('btnGuardarPre').disabled = false;
       });
     } else {

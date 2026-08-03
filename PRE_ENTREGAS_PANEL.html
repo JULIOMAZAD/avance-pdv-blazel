@@ -42,6 +42,9 @@
   .btn-secundario{background:var(--gris-claro);color:var(--tinta);}
   .btn-rojo{background:var(--rojo);color:#fff;}
   .estado-carga{padding:40px;text-align:center;color:var(--gris);}
+  .grupo-vendedor{margin-bottom:22px;}
+  .titulo-vendedor{font-size:15px;font-weight:800;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--tinta);}
+  .badge-pend{background:var(--ambar);color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;}
 
   .panel-scan{margin-top:14px;padding-top:14px;border-top:1px dashed var(--borde);display:none;}
   .panel-scan.abierto{display:block;}
@@ -104,6 +107,7 @@
     <div>
       <div class="acta-title">Acta de Entrega de Chips</div>
       <div class="acta-meta" id="pFecha"></div>
+      <div class="acta-meta" id="pCorrelativo" style="font-weight:800;"></div>
     </div>
     <div class="acta-meta" id="pVendedor"></div>
   </div>
@@ -120,6 +124,7 @@
   </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 <script>
   // Mismo Apps Script que la app de marcado / pre-entrega.
   const URL_SCRIPT = "https://script.google.com/macros/s/AKfycbw125n4ceKoQwUBq8zRHKeGzHue_EzZj8yd1zYt_xym0BUbiOgnr5rJFtLuapDJA3kfsA/exec";
@@ -154,6 +159,47 @@
     }
   }
 
+  function renderItem(p){
+    const abierto = filaAbierta === p.id;
+    let scanHtml = '';
+    if(abierto){
+      scanHtml = '<div class="panel-scan abierto">' +
+        '<input type="text" id="scanInput_' + p.id + '" placeholder="Escanea o escribe la serie y presiona Enter" autocomplete="off">' +
+        '<div style="margin-bottom:10px;"><button class="btn-secundario" id="btnCamara_' + p.id + '" onclick="alternarCamara(\'' + p.id + '\')">📷 Usar cámara del celular</button></div>' +
+        '<div id="camaraBox_' + p.id + '" style="display:none;margin-bottom:10px;">' +
+          '<div id="lector_' + p.id + '" style="width:100%;max-width:320px;border-radius:10px;overflow:hidden;"></div>' +
+        '</div>' +
+        '<div class="contador-scan">Escaneadas: <b id="contadorScan_' + p.id + '">' + seriesEnCurso.length + '</b> de ' + p.cantidad + ' pedidas</div>' +
+        '<div class="lista-series" id="listaSeries_' + p.id + '"></div>' +
+        '<button class="btn-rojo" onclick="guardarAsignacion(\'' + p.id + '\')">💾 Guardar asignación</button> ' +
+        '<button class="btn-secundario" onclick="cerrarScan()">Cancelar</button>' +
+        '<div class="nota-scan" id="notaScan_' + p.id + '"></div>' +
+      '</div>';
+    }
+
+    let acciones = '';
+    if(p.estado === 'PENDIENTE'){
+      acciones = '<button class="btn-rojo" onclick="abrirScan(\'' + p.id + '\')">🔫 Escanear series</button>';
+    } else if(p.estado === 'ASIGNADO'){
+      acciones = '<button class="btn-secundario" onclick="imprimirActa(\'' + p.id + '\')">🖨️ Imprimir acta</button>' +
+        '<button class="btn-rojo" onclick="marcarEntregado(\'' + p.id + '\')">✔ Marcar entregado</button>';
+    }
+
+    return '<div class="item">' +
+      '<div class="top">' +
+        '<div>' +
+          '<div class="nombre-cli">' + (p.nombreCliente || '') + '</div>' +
+          '<div class="sub">DNI ' + p.dni + ' · Pide ' + p.cantidad + ' chip(s) · ' + p.fecha + '</div>' +
+          (p.seriesAsignadas ? '<div class="sub">Series: ' + p.seriesAsignadas + '</div>' : '') +
+          (p.correlativo ? '<div class="sub"><b>N° ' + p.correlativo + '</b></div>' : '') +
+        '</div>' +
+        '<span class="pill-estado ' + p.estado + '">' + p.estado + '</span>' +
+      '</div>' +
+      '<div class="acciones">' + acciones + '</div>' +
+      scanHtml +
+    '</div>';
+  }
+
   function render(){
     const pendientes = TODAS.filter(p => p.estado === 'PENDIENTE').length;
     const asignados = TODAS.filter(p => p.estado === 'ASIGNADO').length;
@@ -172,39 +218,20 @@
     // Más recientes primero
     const ordenada = lista.slice().reverse();
 
-    cont.innerHTML = ordenada.map(function(p){
-      const abierto = filaAbierta === p.id;
-      let scanHtml = '';
-      if(abierto){
-        scanHtml = '<div class="panel-scan abierto">' +
-          '<input type="text" id="scanInput_' + p.id + '" placeholder="Escanea o escribe la serie y presiona Enter" autocomplete="off">' +
-          '<div class="contador-scan">Escaneadas: <b id="contadorScan_' + p.id + '">' + seriesEnCurso.length + '</b> de ' + p.cantidad + ' pedidas</div>' +
-          '<div class="lista-series" id="listaSeries_' + p.id + '"></div>' +
-          '<button class="btn-rojo" onclick="guardarAsignacion(\'' + p.id + '\')">💾 Guardar asignación</button> ' +
-          '<button class="btn-secundario" onclick="cerrarScan()">Cancelar</button>' +
-          '<div class="nota-scan" id="notaScan_' + p.id + '"></div>' +
-        '</div>';
-      }
+    // Agrupa por vendedor, manteniendo el orden de aparición (más reciente primero)
+    const grupos = {};
+    const ordenVendedores = [];
+    ordenada.forEach(function(p){
+      if(!grupos[p.vendedor]){ grupos[p.vendedor] = []; ordenVendedores.push(p.vendedor); }
+      grupos[p.vendedor].push(p);
+    });
 
-      let acciones = '';
-      if(p.estado === 'PENDIENTE'){
-        acciones = '<button class="btn-rojo" onclick="abrirScan(\'' + p.id + '\')">🔫 Escanear series</button>';
-      } else if(p.estado === 'ASIGNADO'){
-        acciones = '<button class="btn-secundario" onclick="imprimirActa(\'' + p.id + '\')">🖨️ Imprimir acta</button>' +
-          '<button class="btn-rojo" onclick="marcarEntregado(\'' + p.id + '\')">✔ Marcar entregado</button>';
-      }
-
-      return '<div class="item">' +
-        '<div class="top">' +
-          '<div>' +
-            '<div class="nombre-cli">' + (p.nombreCliente || '') + '</div>' +
-            '<div class="sub">DNI ' + p.dni + ' · Vendedor: ' + p.vendedor + ' · Pide ' + p.cantidad + ' chip(s) · ' + p.fecha + '</div>' +
-            (p.seriesAsignadas ? '<div class="sub">Series: ' + p.seriesAsignadas + '</div>' : '') +
-          '</div>' +
-          '<span class="pill-estado ' + p.estado + '">' + p.estado + '</span>' +
-        '</div>' +
-        '<div class="acciones">' + acciones + '</div>' +
-        scanHtml +
+    cont.innerHTML = ordenVendedores.map(function(vend){
+      const items = grupos[vend];
+      const pendCount = items.filter(function(x){ return x.estado === 'PENDIENTE'; }).length;
+      return '<div class="grupo-vendedor">' +
+        '<div class="titulo-vendedor">👤 ' + vend + (pendCount ? ' <span class="badge-pend">' + pendCount + ' pendiente(s)</span>' : '') + '</div>' +
+        items.map(renderItem).join('') +
       '</div>';
     }).join('');
 
@@ -230,7 +257,48 @@
     render();
   }
 
+  let lectorCamara = null;
+  let camaraActivaPara = null;
+
+  function alternarCamara(id){
+    const box = document.getElementById('camaraBox_' + id);
+    const btn = document.getElementById('btnCamara_' + id);
+    if(camaraActivaPara === id){
+      // Apagar
+      if(lectorCamara){
+        lectorCamara.stop().then(function(){ lectorCamara.clear(); lectorCamara = null; }).catch(function(){ lectorCamara = null; });
+      }
+      camaraActivaPara = null;
+      box.style.display = 'none';
+      btn.textContent = '📷 Usar cámara del celular';
+      return;
+    }
+    box.style.display = 'block';
+    btn.textContent = '✕ Apagar cámara';
+    camaraActivaPara = id;
+    lectorCamara = new Html5Qrcode('lector_' + id);
+    lectorCamara.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: { width: 250, height: 120 } },
+      function(textoDecodificado){
+        agregarSerie(textoDecodificado.trim());
+        // Pequeña vibración/beep visual: reinicia el input para seguir escaneando
+      },
+      function(){ /* de-lectura, ignorar (se llama constantemente mientras no detecta nada) */ }
+    ).catch(function(err){
+      const nota = document.getElementById('notaScan_' + id);
+      if(nota) nota.textContent = 'No se pudo abrir la cámara: ' + err;
+      box.style.display = 'none';
+      btn.textContent = '📷 Usar cámara del celular';
+      camaraActivaPara = null;
+    });
+  }
+
   function cerrarScan(){
+    if(lectorCamara){
+      lectorCamara.stop().then(function(){ lectorCamara.clear(); lectorCamara = null; }).catch(function(){ lectorCamara = null; });
+      camaraActivaPara = null;
+    }
     filaAbierta = null;
     seriesEnCurso = [];
     render();
@@ -283,6 +351,10 @@
     // Actualización optimista
     const p = TODAS.find(x => x.id === id);
     if(p){ p.estado = 'ASIGNADO'; p.seriesAsignadas = seriesEnCurso.join(', '); }
+    if(lectorCamara){
+      lectorCamara.stop().then(function(){ lectorCamara.clear(); lectorCamara = null; }).catch(function(){ lectorCamara = null; });
+      camaraActivaPara = null;
+    }
     filaAbierta = null;
     seriesEnCurso = [];
     render();
@@ -309,6 +381,7 @@
     const series = (p.seriesAsignadas || '').split(',').map(s => s.trim()).filter(Boolean);
 
     document.getElementById('pFecha').textContent = 'Fecha: ' + p.fecha;
+    document.getElementById('pCorrelativo').textContent = 'N° ' + (p.correlativo || '(sin asignar aún)');
     document.getElementById('pVendedor').textContent = 'Vendedor: ' + p.vendedor;
     document.getElementById('pCliente').textContent = p.nombreCliente;
     document.getElementById('pDni').textContent = p.dni;
