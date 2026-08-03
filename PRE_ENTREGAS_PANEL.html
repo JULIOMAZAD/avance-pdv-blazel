@@ -75,10 +75,14 @@
   .acta-title{font-size:20px;font-weight:800;}
   .acta-meta{font-size:12px;margin-top:2px;}
   .acta-field{margin-bottom:6px;font-size:13px;}
+  .acta-datos-table{width:100%;border-collapse:collapse;margin-bottom:14px;font-size:13px;}
+  .acta-datos-table td{border:1px solid #000;padding:6px 10px;}
+  .acta-datos-table td:first-child{background:#f1f1f1;font-weight:700;width:180px;}
+  .acta-seccion-roja{background:#E4002B;color:#fff;font-weight:800;font-size:12px;padding:5px 10px;margin-top:14px;margin-bottom:0;}
   .acta-field b{display:inline-block;width:150px;}
   .acta-table{width:100%;border-collapse:collapse;font-size:13px;}
-  .acta-table th{text-align:left;font-size:11px;text-transform:uppercase;color:#555;padding:6px 4px;border-bottom:1.5px solid #ccc;}
-  .acta-table td{padding:6px 4px;border-bottom:1px solid #ddd;}
+  .acta-table th{text-align:left;font-size:11px;text-transform:uppercase;color:#555;padding:6px 8px;border:1px solid #000;background:#f1f1f1;}
+  .acta-table td{padding:6px 8px;border:1px solid #000;}
   .sig{display:flex;gap:40px;margin-top:50px;}
   .sig div{flex:1;text-align:center;border-top:1px solid #000;padding-top:6px;font-size:12px;}
 </style>
@@ -140,20 +144,36 @@
       </div>
     </div>
     <div style="text-align:right;border:1.5px solid #000;border-radius:6px;padding:6px 12px;">
-      <div class="acta-title" style="font-size:15px;">ACTA DE ENTREGA DE CHIPS</div>
+      <div class="acta-title" style="font-size:14px;">GUÍA DE REMISIÓN ELECTRÓNICA REMITENTE</div>
       <div class="acta-meta" id="pFecha"></div>
-      <div class="acta-meta" id="pCorrelativo" style="font-weight:800;"></div>
+      <div class="acta-meta" id="pCorrelativo" style="font-weight:800;">N° EG07-000000</div>
     </div>
   </div>
-  <div class="acta-field"><b>Vendedor:</b> <span id="pVendedor"></span></div>
-  <div class="acta-field"><b>Cliente:</b> <span id="pCliente"></span></div>
-  <div class="acta-field"><b>DNI:</b> <span id="pDni"></span></div>
-  <div class="acta-field"><b>Cantidad entregada:</b> <span id="pCant"></span></div>
-  <table class="acta-table">
-    <thead><tr><th>#</th><th>Serie / ICCID</th></tr></thead>
+  <table class="acta-datos-table">
+    <tr><td>Fecha y hora de emisión</td><td id="pFechaEmision"></td></tr>
+    <tr><td>Punto de partida</td><td>CAL. LOS ZORZALES NRO. 171 URB. SANTA CECILIA - BELLAVISTA - PROV. CONST. DEL CALLAO</td></tr>
+    <tr><td>Motivo de traslado</td><td>Otros — Obsequio / promoción, entrega a clientes</td></tr>
+    <tr><td>Punto de llegada</td><td id="pPuntoLlegada"></td></tr>
+    <tr><td>Vendedor / responsable</td><td id="pVendedor"></td></tr>
+  </table>
+  <div class="acta-seccion-roja">BIEN A TRASLADAR</div>
+  <table class="acta-table" style="border:1px solid #000;">
+    <thead><tr><th style="border:1px solid #000;">N°</th><th style="border:1px solid #000;">Bien</th><th style="border:1px solid #000;">Descripción</th><th style="border:1px solid #000;">Unidad</th><th style="border:1px solid #000;">Cantidad</th></tr></thead>
+    <tbody><tr><td style="border:1px solid #000;">1</td><td style="border:1px solid #000;">CHIPS</td><td style="border:1px solid #000;">Series detalladas en anexo adjunto</td><td style="border:1px solid #000;">UNIDAD (NIU)</td><td style="border:1px solid #000;" id="pCant"></td></tr></tbody>
+  </table>
+  <div class="acta-seccion-roja">DATOS DEL CLIENTE QUE RECIBE</div>
+  <table class="acta-datos-table">
+    <tr><td>Nombre</td><td id="pCliente"></td></tr>
+    <tr><td>DNI</td><td id="pDni"></td></tr>
+    <tr><td>Dirección</td><td id="pDireccionCliente"></td></tr>
+  </table>
+  <div class="acta-seccion-roja">ANEXO — DETALLE DE SERIES / ICCID</div>
+  <table class="acta-table" style="border:1px solid #000;">
+    <thead><tr><th style="border:1px solid #000;">#</th><th style="border:1px solid #000;">Serie / ICCID</th></tr></thead>
     <tbody id="pSeriesBody"></tbody>
   </table>
-  <div class="sig">
+  <div class="acta-seccion-roja">FIRMAS</div>
+  <div class="sig" style="margin-top:60px;">
     <div>Firma del cliente</div>
     <div>Firma del vendedor</div>
   </div>
@@ -256,6 +276,16 @@
     let scanHtml = '';
     if(abierto){
       scanHtml = '<div class="panel-scan abierto">' +
+        '<div style="background:#FFF7F5;border:1.5px solid var(--rojo);border-radius:10px;padding:10px;margin-bottom:10px;">' +
+          '<div style="font-size:12px;font-weight:700;margin-bottom:6px;">📦 Series consecutivas (por defecto) — escanea/escribe solo la PRIMERA y la ÚLTIMA del lote</div>' +
+          '<div style="display:flex;gap:8px;margin-bottom:6px;">' +
+            '<input type="text" id="rangoInicio_' + p.id + '" placeholder="Serie inicial" autocomplete="off" style="flex:1;margin-bottom:0;">' +
+            '<input type="text" id="rangoFin_' + p.id + '" placeholder="Serie final" autocomplete="off" style="flex:1;margin-bottom:0;">' +
+          '</div>' +
+          '<button class="btn-rojo" onclick="generarRango(\'' + p.id + '\')">🧮 Generar todas las del rango</button>' +
+          '<div class="nota-scan" id="notaRango_' + p.id + '"></div>' +
+        '</div>' +
+        '<div style="font-size:12px;color:var(--gris);margin-bottom:6px;">¿No son consecutivas? Agrégalas una por una aquí abajo:</div>' +
         '<div style="display:flex;gap:8px;margin-bottom:10px;">' +
           '<input type="text" id="scanInput_' + p.id + '" placeholder="Escanea o escribe la serie" autocomplete="off" style="flex:1;margin-bottom:0;">' +
           '<button class="btn-rojo" style="padding:0 18px;" onclick="agregarDesdeInput(\'' + p.id + '\')">➕ Agregar</button>' +
@@ -361,6 +391,56 @@
     }
   }
 
+  function generarRango(id){
+    const inicioEl = document.getElementById('rangoInicio_' + id);
+    const finEl = document.getElementById('rangoFin_' + id);
+    const nota = document.getElementById('notaRango_' + id);
+    const inicio = inicioEl.value.trim();
+    const fin = finEl.value.trim();
+
+    if(!inicio || !fin){
+      nota.textContent = 'Escribe la serie inicial y la final.';
+      return;
+    }
+    if(inicio.length !== fin.length || !/^\d+$/.test(inicio) || !/^\d+$/.test(fin)){
+      nota.textContent = 'Las dos series deben ser solo números y tener la misma cantidad de dígitos.';
+      return;
+    }
+
+    let ini, fn;
+    try{
+      ini = BigInt(inicio);
+      fn = BigInt(fin);
+    }catch(e){
+      nota.textContent = 'No se pudieron leer esas series como números.';
+      return;
+    }
+    if(fn < ini){ const tmp = ini; ini = fn; fn = tmp; }
+
+    const cantidad = fn - ini + 1n;
+    if(cantidad > 5000n){
+      nota.textContent = 'Ese rango es demasiado grande (' + cantidad + '). Revisa que las series estén bien escritas.';
+      return;
+    }
+
+    const largo = inicio.length;
+    const nuevas = [];
+    for(let n = ini; n <= fn; n++){
+      nuevas.push(n.toString().padStart(largo, '0'));
+    }
+
+    let agregadas = 0;
+    nuevas.forEach(function(s){
+      const yaEstaba = seriesEnCurso.length;
+      agregarSerie(s);
+      if(seriesEnCurso.length > yaEstaba) agregadas++;
+    });
+
+    nota.textContent = '✓ Se generaron y agregaron ' + agregadas + ' series (de ' + inicio + ' a ' + fin + ').';
+    inicioEl.value = '';
+    finEl.value = '';
+  }
+
   function agregarDesdeInput(id){
     const input = document.getElementById('scanInput_' + id);
     if(!input) return;
@@ -460,18 +540,31 @@
     const nota = document.getElementById('notaScan_' + id);
     if(nota) nota.textContent = 'Guardando…';
 
-    await fetch(URL_SCRIPT, {
-      method: 'POST', mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: 'asignar_series', preEntregaId: id, series: seriesEnCurso, asignadoPor: usuarioActual || 'oficina' })
-    });
+    let resultado;
+    try{
+      const resp = await fetch(URL_SCRIPT + '?modo=asignar_series_get' +
+        '&preEntregaId=' + encodeURIComponent(id) +
+        '&series=' + encodeURIComponent(seriesEnCurso.join(',')) +
+        '&asignadoPor=' + encodeURIComponent(usuarioActual || 'oficina') +
+        '&_=' + Date.now());
+      resultado = await resp.json();
+    }catch(e){
+      if(nota) nota.textContent = 'No se pudo conectar. Revisa tu internet e intenta de nuevo.';
+      return;
+    }
 
-    // Actualización optimista
+    if(!resultado || !resultado.ok){
+      if(nota) nota.textContent = '✕ ' + (resultado && resultado.error ? resultado.error : 'No se pudo guardar.');
+      return; // se queda abierto el panel de escaneo para que corrijas
+    }
+
+    // Éxito confirmado por el servidor
     const p = TODAS.find(x => x.id === id);
     if(p){
       p.estado = 'ASIGNADO';
       const previas = (p.seriesAsignadas || '').split(',').map(function(s){ return s.trim(); }).filter(Boolean);
       p.seriesAsignadas = previas.concat(seriesEnCurso).join(', ');
+      if(resultado.correlativo) p.correlativo = resultado.correlativo;
     }
     if(lectorCamara){
       lectorCamara.stop().then(function(){ lectorCamara.clear(); lectorCamara = null; }).catch(function(){ lectorCamara = null; });
@@ -480,47 +573,65 @@
     filaAbierta = null;
     seriesEnCurso = [];
     render();
-    // Refresca de verdad a los pocos segundos para confirmar contra el servidor
-    // (por si otra persona escaneó lo mismo casi al mismo tiempo).
+    // Confirma contra el servidor a los pocos segundos (por si otra persona
+    // escaneó lo mismo casi al mismo tiempo).
     setTimeout(cargarTodo, 2500);
   }
 
   async function marcarEntregado(id){
     if(!confirm('¿Confirmas que el vendedor ya entregó estos chips al cliente?')) return;
-    await fetch(URL_SCRIPT, {
-      method: 'POST', mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: 'marcar_entregado', preEntregaId: id })
-    });
+    try{
+      const resp = await fetch(URL_SCRIPT + '?modo=marcar_entregado_get&preEntregaId=' + encodeURIComponent(id) + '&_=' + Date.now());
+      const resultado = await resp.json();
+      if(!resultado || !resultado.ok){
+        alert('No se pudo marcar como entregado: ' + (resultado && resultado.error ? resultado.error : 'error desconocido'));
+        return;
+      }
+    }catch(e){
+      alert('No se pudo conectar. Revisa tu internet e intenta de nuevo.');
+      return;
+    }
     const p = TODAS.find(x => x.id === id);
     if(p) p.estado = 'ENTREGADO';
     render();
   }
 
-  function llenarActa(id){
+  async function llenarActa(id){
     const p = TODAS.find(x => x.id === id);
     if(!p) return null;
     const series = (p.seriesAsignadas || '').split(',').map(s => s.trim()).filter(Boolean);
 
+    let direccion = '', distrito = '';
+    try{
+      const r = await fetch(URL_SCRIPT + '?modo=cliente&dni=' + encodeURIComponent(p.dni) + '&_=' + Date.now());
+      const d = await r.json();
+      if(d && d.cliente){ direccion = d.cliente.direccion || ''; distrito = d.cliente.distrito || ''; }
+    }catch(e){ /* si falla, se imprime igual con los datos que ya tenemos */ }
+
+    const ahoraTxt = new Date().toLocaleString('es-PE');
     document.getElementById('pFecha').textContent = 'Fecha: ' + p.fecha;
+    document.getElementById('pFechaEmision').textContent = ahoraTxt;
     document.getElementById('pCorrelativo').textContent = 'N° ' + (p.correlativo || '(sin asignar aún)');
     document.getElementById('pVendedor').textContent = p.vendedor;
     document.getElementById('pCliente').textContent = p.nombreCliente;
     document.getElementById('pDni').textContent = p.dni;
+    document.getElementById('pDireccionCliente').textContent = direccion + (distrito ? ' - ' + distrito : '');
+    document.getElementById('pPuntoLlegada').textContent = (direccion || '(sin dirección registrada)') + (distrito ? ' - ' + distrito : '');
     document.getElementById('pCant').textContent = series.length;
     document.getElementById('pSeriesBody').innerHTML = series.map(function(s, i){
-      return '<tr><td>' + (i+1) + '</td><td>' + s + '</td></tr>';
+      return '<tr><td style="border:1px solid #000;">' + (i+1) + '</td><td style="border:1px solid #000;">' + s + '</td></tr>';
     }).join('');
     return p;
   }
 
-  function imprimirActa(id){
-    if(!llenarActa(id)) return;
+  async function imprimirActa(id){
+    const p = await llenarActa(id);
+    if(!p) return;
     window.print();
   }
 
   async function compartirActa(id){
-    const p = llenarActa(id);
+    const p = await llenarActa(id);
     if(!p) return;
     const area = document.getElementById('printArea');
     area.style.display = 'block';
@@ -534,13 +645,13 @@
     const imgH = (canvas.height * pageW) / canvas.width;
     pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pageW, imgH);
 
-    const nombreArchivo = 'Acta_' + (p.correlativo || p.id) + '_' + p.nombreCliente.replace(/[^a-zA-Z0-9]/g,'_') + '.pdf';
+    const nombreArchivo = 'Guia_' + (p.correlativo || p.id) + '_' + p.nombreCliente.replace(/[^a-zA-Z0-9]/g,'_') + '.pdf';
     const blob = pdf.output('blob');
     const archivo = new File([blob], nombreArchivo, { type: 'application/pdf' });
 
     if(navigator.canShare && navigator.canShare({ files: [archivo] })){
       try{
-        await navigator.share({ files: [archivo], title: 'Acta de entrega', text: 'Acta de entrega — ' + p.nombreCliente });
+        await navigator.share({ files: [archivo], title: 'Guía de remisión', text: 'Guía de remisión — ' + p.nombreCliente });
         return;
       }catch(e){ /* si cancela el share, cae a la descarga normal */ }
     }
