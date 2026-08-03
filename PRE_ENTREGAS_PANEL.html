@@ -221,7 +221,10 @@
     let scanHtml = '';
     if(abierto){
       scanHtml = '<div class="panel-scan abierto">' +
-        '<input type="text" id="scanInput_' + p.id + '" placeholder="Escanea o escribe la serie y presiona Enter" autocomplete="off">' +
+        '<div style="display:flex;gap:8px;margin-bottom:10px;">' +
+          '<input type="text" id="scanInput_' + p.id + '" placeholder="Escanea o escribe la serie" autocomplete="off" style="flex:1;margin-bottom:0;">' +
+          '<button class="btn-rojo" style="padding:0 18px;" onclick="agregarDesdeInput(\'' + p.id + '\')">➕ Agregar</button>' +
+        '</div>' +
         '<div style="margin-bottom:10px;"><button class="btn-secundario" id="btnCamara_' + p.id + '" onclick="alternarCamara(\'' + p.id + '\')">📷 Usar cámara del celular</button></div>' +
         '<div id="camaraBox_' + p.id + '" style="display:none;margin-bottom:10px;">' +
           '<div id="lector_' + p.id + '" style="width:100%;max-width:320px;border-radius:10px;overflow:hidden;"></div>' +
@@ -304,15 +307,22 @@
       if(input){
         input.focus();
         input.addEventListener('keydown', function(e){
-          if(e.key === 'Enter'){
+          if(e.key === 'Enter' || e.key === 'Tab'){
             e.preventDefault();
-            agregarSerie(input.value.trim());
-            input.value = '';
+            agregarDesdeInput(filaAbierta);
           }
         });
         renderListaSeries(filaAbierta);
       }
     }
+  }
+
+  function agregarDesdeInput(id){
+    const input = document.getElementById('scanInput_' + id);
+    if(!input) return;
+    agregarSerie(input.value.trim());
+    input.value = '';
+    input.focus();
   }
 
   function abrirScan(id){
