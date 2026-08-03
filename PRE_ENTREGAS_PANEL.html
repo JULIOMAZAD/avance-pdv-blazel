@@ -285,9 +285,10 @@
       scanHtml = '<div class="panel-scan abierto">' +
         '<div style="background:#FFF7F5;border:1.5px solid var(--rojo);border-radius:10px;padding:10px;margin-bottom:10px;">' +
           '<div style="font-size:12px;font-weight:700;margin-bottom:2px;">Primera serie del lote</div>' +
-          '<input type="text" id="rangoInicio_' + p.id + '" placeholder="Ej. 895110113011183729" autocomplete="off" style="margin-bottom:8px;">' +
+          '<input type="text" id="rangoInicio_' + p.id + '" placeholder="Ej. 895110113011183729" autocomplete="off" style="margin-bottom:8px;" oninput="mostrarVistaPrevia(\'' + p.id + '\')">' +
           '<div style="font-size:12px;font-weight:700;margin-bottom:2px;">Última serie del lote <span style="font-weight:400;color:var(--gris);">(déjalo vacío si es una sola)</span></div>' +
-          '<input type="text" id="rangoFin_' + p.id + '" placeholder="Ej. 895110113011183738 → si pones esta, se agregan las 10 del medio también" autocomplete="off" style="margin-bottom:8px;">' +
+          '<input type="text" id="rangoFin_' + p.id + '" placeholder="Ej. 895110113011183738 → si pones esta, se agregan las 10 del medio también" autocomplete="off" style="margin-bottom:8px;" oninput="mostrarVistaPrevia(\'' + p.id + '\')">' +
+          '<div id="vistaPrevia_' + p.id + '" style="display:none;background:#fff;border:1px dashed var(--rojo);border-radius:8px;padding:8px;margin-bottom:8px;font-size:12px;font-family:monospace;max-height:100px;overflow-y:auto;"></div>' +
           '<button class="btn-rojo" style="width:100%;" onclick="generarRango(\'' + p.id + '\')">➕ Agregar</button>' +
           '<div class="nota-scan" id="notaRango_' + p.id + '"></div>' +
         '</div>' +
@@ -426,6 +427,55 @@
     ta.value = '';
   }
 
+  // Calcula el rango entre dos series. Devuelve { ok, series, error }.
+  function calcularRango(inicio, fin){
+    if(!inicio) return { ok: false, error: '' };
+    if(!fin) return { ok: true, series: [inicio] };
+
+    if(inicio.length !== fin.length || !/^\d+$/.test(inicio) || !/^\d+$/.test(fin)){
+      return { ok: false, error: 'Si vas a usar rango, las dos series deben ser solo números y tener la misma cantidad de dígitos.' };
+    }
+    let ini, fn;
+    try{
+      ini = BigInt(inicio);
+      fn = BigInt(fin);
+    }catch(e){
+      return { ok: false, error: 'No se pudieron leer esas series como números.' };
+    }
+    if(fn < ini){ const tmp = ini; ini = fn; fn = tmp; }
+    const cantidad = fn - ini + 1n;
+    if(cantidad > 5000n){
+      return { ok: false, error: 'Ese rango es demasiado grande (' + cantidad + '). Revisa que las series estén bien escritas.' };
+    }
+    const largo = inicio.length;
+    const nuevas = [];
+    for(let n = ini; n <= fn; n++){
+      nuevas.push(n.toString().padStart(largo, '0'));
+    }
+    return { ok: true, series: nuevas };
+  }
+
+  function mostrarVistaPrevia(id){
+    const inicioEl = document.getElementById('rangoInicio_' + id);
+    const finEl = document.getElementById('rangoFin_' + id);
+    const previa = document.getElementById('vistaPrevia_' + id);
+    const inicio = inicioEl.value.trim();
+    const fin = finEl.value.trim();
+
+    if(!inicio || !fin){ previa.style.display = 'none'; return; } // con solo 1 valor no hace falta previsualizar
+
+    const r = calcularRango(inicio, fin);
+    if(!r.ok){
+      previa.style.display = 'block';
+      previa.style.color = 'var(--rojo-oscuro)';
+      previa.textContent = r.error;
+      return;
+    }
+    previa.style.display = 'block';
+    previa.style.color = 'var(--tinta)';
+    previa.textContent = 'Esto va a agregar ' + r.series.length + ' series: ' + r.series.join(', ');
+  }
+
   function generarRango(id){
     const inicioEl = document.getElementById('rangoInicio_' + id);
     const finEl = document.getElementById('rangoFin_' + id);
@@ -433,57 +483,25 @@
     const inicio = inicioEl.value.trim();
     const fin = finEl.value.trim();
 
-    if(!inicio){
-      nota.textContent = 'Escribe al menos la primera serie.';
+    const r = calcularRango(inicio, fin);
+    if(!r.ok){
+      nota.textContent = r.error || 'Escribe al menos la primera serie.';
       return;
-    }
-
-    // Si no hay "última serie", se agrega solo la de "primera" como serie suelta.
-    if(!fin){
-      agregarSerie(inicio);
-      nota.textContent = '';
-      inicioEl.value = '';
-      inicioEl.focus();
-      return;
-    }
-
-    if(inicio.length !== fin.length || !/^\d+$/.test(inicio) || !/^\d+$/.test(fin)){
-      nota.textContent = 'Si vas a usar rango, las dos series deben ser solo números y tener la misma cantidad de dígitos.';
-      return;
-    }
-
-    let ini, fn;
-    try{
-      ini = BigInt(inicio);
-      fn = BigInt(fin);
-    }catch(e){
-      nota.textContent = 'No se pudieron leer esas series como números.';
-      return;
-    }
-    if(fn < ini){ const tmp = ini; ini = fn; fn = tmp; }
-
-    const cantidad = fn - ini + 1n;
-    if(cantidad > 5000n){
-      nota.textContent = 'Ese rango es demasiado grande (' + cantidad + '). Revisa que las series estén bien escritas.';
-      return;
-    }
-
-    const largo = inicio.length;
-    const nuevas = [];
-    for(let n = ini; n <= fn; n++){
-      nuevas.push(n.toString().padStart(largo, '0'));
     }
 
     let agregadas = 0;
-    nuevas.forEach(function(s){
+    r.series.forEach(function(s){
       const yaEstaba = seriesEnCurso.length;
       agregarSerie(s);
       if(seriesEnCurso.length > yaEstaba) agregadas++;
     });
 
-    nota.textContent = '✓ Se agregaron ' + agregadas + ' series (de ' + inicio + ' a ' + fin + ', son ' + cantidad + ' en total).';
+    nota.textContent = fin
+      ? '✓ Se agregaron ' + agregadas + ' series (de ' + inicio + ' a ' + fin + ', son ' + r.series.length + ' en total).'
+      : '✓ Se agregó 1 serie.';
     inicioEl.value = '';
     finEl.value = '';
+    document.getElementById('vistaPrevia_' + id).style.display = 'none';
     inicioEl.focus();
   }
 
