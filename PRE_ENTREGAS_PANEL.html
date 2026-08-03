@@ -285,7 +285,12 @@
           '<button class="btn-rojo" onclick="generarRango(\'' + p.id + '\')">🧮 Generar todas las del rango</button>' +
           '<div class="nota-scan" id="notaRango_' + p.id + '"></div>' +
         '</div>' +
-        '<div style="font-size:12px;color:var(--gris);margin-bottom:6px;">¿No son consecutivas? Agrégalas una por una aquí abajo:</div>' +
+        '<div style="background:#F1F1F4;border-radius:10px;padding:10px;margin-bottom:10px;">' +
+          '<div style="font-size:12px;font-weight:700;margin-bottom:6px;">📋 O pega tu lista completa de series (separadas por coma o una por línea)</div>' +
+          '<textarea id="pegarLista_' + p.id + '" placeholder="895110113011183729, 895110113011183730, ..." style="width:100%;min-height:70px;padding:8px;border:1.5px solid var(--borde);border-radius:8px;font-family:monospace;font-size:12px;margin-bottom:6px;"></textarea>' +
+          '<button class="btn-secundario" onclick="agregarListaPegada(\'' + p.id + '\')">➕ Agregar toda la lista</button>' +
+        '</div>' +
+        '<div style="font-size:12px;color:var(--gris);margin-bottom:6px;">¿Una sola serie suelta? Aquí:</div>' +
         '<div style="display:flex;gap:8px;margin-bottom:10px;">' +
           '<input type="text" id="scanInput_' + p.id + '" placeholder="Escanea o escribe la serie" autocomplete="off" style="flex:1;margin-bottom:0;">' +
           '<button class="btn-rojo" style="padding:0 18px;" onclick="agregarDesdeInput(\'' + p.id + '\')">➕ Agregar</button>' +
@@ -308,8 +313,7 @@
     } else if(p.estado === 'ASIGNADO'){
       const totalEscaneadas = (p.seriesAsignadas || '').split(',').filter(function(s){ return s.trim(); }).length;
       acciones = '<button class="btn-secundario" onclick="abrirScan(\'' + p.id + '\')">➕ Agregar más series (' + totalEscaneadas + ' de ' + p.cantidad + ')</button>' +
-        '<button class="btn-secundario" onclick="imprimirActa(\'' + p.id + '\')">🖨️ Imprimir acta</button>' +
-        '<button class="btn-secundario" onclick="compartirActa(\'' + p.id + '\')">📲 Descargar / Enviar por WhatsApp</button>' +
+        '<button class="btn-secundario" onclick="compartirActa(\'' + p.id + '\')">🖨️ Descargar / Imprimir / WhatsApp</button>' +
         '<button class="btn-rojo" onclick="marcarEntregado(\'' + p.id + '\')">✔ Marcar entregado</button>';
     }
 
@@ -389,6 +393,24 @@
         renderListaSeries(filaAbierta);
       }
     }
+  }
+
+  function agregarListaPegada(id){
+    const ta = document.getElementById('pegarLista_' + id);
+    const texto = ta.value.trim();
+    if(!texto) return;
+
+    const partes = texto.split(/[,\n\r\t;]+/).map(function(s){ return s.trim(); }).filter(Boolean);
+    let agregadas = 0;
+    partes.forEach(function(s){
+      const yaEstaba = seriesEnCurso.length;
+      agregarSerie(s);
+      if(seriesEnCurso.length > yaEstaba) agregadas++;
+    });
+
+    const nota = document.getElementById('notaScan_' + id);
+    if(nota) nota.textContent = '✓ Se agregaron ' + agregadas + ' de ' + partes.length + ' series de la lista.';
+    ta.value = '';
   }
 
   function generarRango(id){
