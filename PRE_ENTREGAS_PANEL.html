@@ -206,15 +206,22 @@
       (p.seriesAsignadas || '').split(',').map(function(s){ return s.trim(); }).filter(Boolean).forEach(function(s){ todasLasSeries.push(s); });
     });
     const ids = pendientesGre.map(function(p){ return p.id; });
+
+    const bloquesCliente = pendientesGre.map(function(p){
+      const seriesCliente = (p.seriesAsignadas || '').split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+      return 'Cliente: ' + p.nombreCliente + ' (DNI ' + p.dni + ') — N° acta ' + (p.correlativo || 'sin asignar') + ' — ' + seriesCliente.length + ' chip(s)\n' +
+        seriesCliente.map(function(s){ return '  - ' + s; }).join('\n');
+    }).join('\n\n');
+
     const mensaje = 'Solicitud de GRE — ' + vend + '\n' +
       'Fecha: ' + new Date().toLocaleDateString('es-PE') + '\n' +
       'Motivo: Otros — Obsequio / promoción, entrega a clientes\n' +
       'Cantidad total: ' + todasLasSeries.length + ' chips\n' +
       'Clientes atendidos: ' + pendientesGre.length + '\n\n' +
-      'Series (todas):\n' + todasLasSeries.map(function(s){ return '- ' + s; }).join('\n');
+      bloquesCliente;
 
     return '<div class="panel-scan abierto" style="margin-bottom:14px;">' +
-      '<textarea id="greTexto_' + vend + '" readonly style="width:100%;min-height:160px;padding:10px;border:1.5px solid var(--borde);border-radius:10px;font-family:monospace;font-size:12px;margin-bottom:10px;">' + mensaje + '</textarea>' +
+      '<textarea id="greTexto_' + vend + '" readonly style="width:100%;min-height:200px;padding:10px;border:1.5px solid var(--borde);border-radius:10px;font-family:monospace;font-size:12px;margin-bottom:10px;">' + mensaje + '</textarea>' +
       '<button class="btn-secundario" onclick="copiarGre(\'' + vend + '\')">📋 Copiar mensaje</button> ' +
       '<input type="text" id="greNumero_' + vend + '" placeholder="N° de GRE que te dio almacén" style="width:220px;padding:9px;border:1.5px solid var(--borde);border-radius:10px;margin-left:8px;">' +
       '<button class="btn-rojo" onclick="guardarGreRecibida(\'' + vend + '\', ' + JSON.stringify(ids) + ')">✔ Marcar GRE recibida</button>' +
@@ -364,7 +371,8 @@
       const itemsVendedorTodos = TODAS.filter(function(x){ return x.vendedor === vend; });
       const pendCount = itemsVendedorTodos.filter(function(x){ return x.estado === 'PENDIENTE'; }).length;
       const totalClientes = itemsVendedorTodos.length;
-      const totalChips = itemsVendedorTodos.reduce(function(sum, x){ return sum + (Number(x.cantidad) || 0); }, 0);
+      const totalPedido = itemsVendedorTodos.reduce(function(sum, x){ return sum + (Number(x.cantidad) || 0); }, 0);
+      const totalAsignado = itemsVendedorTodos.reduce(function(sum, x){ return sum + (x.seriesAsignadas || '').split(',').filter(function(s){return s.trim();}).length; }, 0);
       const pendientesGre = TODAS.filter(function(x){ return x.vendedor === vend && x.estado === 'ASIGNADO' && !x.greNumero; });
       const btnGre = pendientesGre.length
         ? '<button class="btn-secundario" style="margin-left:10px;" onclick="abrirGre(\'' + vend + '\')">📋 Pedir GRE (' + pendientesGre.length + ' cliente(s))</button>'
@@ -373,7 +381,7 @@
       return '<div class="grupo-vendedor">' +
         '<div class="titulo-vendedor">👤 ' + vend +
           ' <span class="badge-total">' + totalClientes + ' cliente(s)</span>' +
-          ' <span class="badge-total">' + totalChips + ' chip(s)</span>' +
+          ' <span class="badge-total">' + totalAsignado + ' de ' + totalPedido + ' chip(s) asignados</span>' +
           (pendCount ? ' <span class="badge-pend">' + pendCount + ' pendiente(s)</span>' : '') +
           btnGre + '</div>' +
         panelGre +
