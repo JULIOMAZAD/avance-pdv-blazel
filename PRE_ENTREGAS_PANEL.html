@@ -42,6 +42,12 @@
   .btn-secundario{background:var(--gris-claro);color:var(--tinta);}
   .btn-rojo{background:var(--rojo);color:#fff;}
   .estado-carga{padding:40px;text-align:center;color:var(--gris);}
+  .buscador-reclamo{background:#fff;border:2px solid var(--tinta);border-radius:14px;padding:16px 18px;margin-bottom:20px;}
+  .buscador-reclamo label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--gris);display:block;margin-bottom:8px;}
+  .buscador-reclamo input[type=text]{flex:1;padding:11px 12px;border:1.5px solid var(--borde);border-radius:10px;font-size:14px;}
+  .resultado-serie{margin-top:12px;padding:12px 14px;border-radius:10px;font-size:13px;line-height:1.6;}
+  .resultado-serie.ok{background:#E9F7EF;}
+  .resultado-serie.no{background:#FDEAEA;color:var(--rojo-oscuro);font-weight:700;}
   .grupo-vendedor{margin-bottom:22px;}
   .titulo-vendedor{font-size:15px;font-weight:800;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--tinta);}
   .badge-pend{background:var(--ambar);color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;}
@@ -81,6 +87,15 @@
 <div class="wrap">
   <div class="marca"><span class="b">JMD-GERENCIA</span><span class="l">•PRE-ENTREGAS</span></div>
   <div class="subtitulo">Pedidos de chips desde campo — enlaza cada pedido con las series físicas a entregar</div>
+
+  <div class="buscador-reclamo">
+    <label>🔍 Buscar chip por serie (para reclamos)</label>
+    <div style="display:flex;gap:8px;">
+      <input type="text" id="inputBuscarSerie" placeholder="Escanea o escribe la serie del chip" autocomplete="off">
+      <button class="btn-rojo" onclick="buscarPorSerieUI()">Buscar</button>
+    </div>
+    <div id="resultadoBuscarSerie"></div>
+  </div>
 
   <div class="kpis">
     <div class="kpi pend"><div class="n" id="kpiPendientes">–</div><div class="t">Pendientes</div></div>
@@ -506,6 +521,36 @@
     }
     pdf.save(nombreArchivo);
   }
+
+  async function buscarPorSerieUI(){
+    const serie = document.getElementById('inputBuscarSerie').value.trim();
+    const cont = document.getElementById('resultadoBuscarSerie');
+    if(!serie){ cont.innerHTML = ''; return; }
+    cont.innerHTML = '<div class="resultado-serie">Buscando…</div>';
+    try{
+      const resp = await fetch(URL_SCRIPT + '?modo=buscar_serie&serie=' + encodeURIComponent(serie) + '&_=' + Date.now());
+      const data = await resp.json();
+      const r = data && data.resultado;
+      if(!r){
+        cont.innerHTML = '<div class="resultado-serie no">✕ Esa serie no está registrada en ninguna entrega.</div>';
+        return;
+      }
+      cont.innerHTML = '<div class="resultado-serie ok">' +
+        '<b>Cliente:</b> ' + r.nombreCliente + ' (DNI ' + r.dni + ')<br>' +
+        '<b>Vendedor:</b> ' + r.vendedor + '<br>' +
+        '<b>Fecha de asignación:</b> ' + r.fecha + '<br>' +
+        '<b>Asignado por:</b> ' + (r.asignadoPor || '—') + '<br>' +
+        '<b>Estado del pedido:</b> ' + (r.estado || '—') + '<br>' +
+        '<b>N° acta:</b> ' + (r.correlativo || '—') + (r.greNumero ? ' · <b>GRE:</b> ' + r.greNumero : '') +
+      '</div>';
+    }catch(err){
+      cont.innerHTML = '<div class="resultado-serie no">No se pudo buscar. Revisa tu conexión.</div>';
+    }
+  }
+
+  document.getElementById('inputBuscarSerie').addEventListener('keydown', function(e){
+    if(e.key === 'Enter'){ e.preventDefault(); buscarPorSerieUI(); }
+  });
 
   cargarTodo();
 </script>
