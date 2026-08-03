@@ -256,7 +256,7 @@
         '<div id="camaraBox_' + p.id + '" style="display:none;margin-bottom:10px;">' +
           '<div id="lector_' + p.id + '" style="width:100%;max-width:320px;border-radius:10px;overflow:hidden;"></div>' +
         '</div>' +
-        '<div class="contador-scan">Escaneadas: <b id="contadorScan_' + p.id + '">' + seriesEnCurso.length + '</b> de ' + p.cantidad + ' pedidas</div>' +
+        '<div class="contador-scan">' + ((p.seriesAsignadas || '').trim() ? 'Ya tiene ' + (p.seriesAsignadas.split(",").filter(function(s){return s.trim();}).length) + ' asignada(s) antes. ' : '') + 'Nuevas en este lote: <b id="contadorScan_' + p.id + '">' + seriesEnCurso.length + '</b> · Pedido total: ' + p.cantidad + '</div>' +
         '<div class="lista-series" id="listaSeries_' + p.id + '"></div>' +
         '<button class="btn-rojo" onclick="guardarAsignacion(\'' + p.id + '\')">💾 Guardar asignación</button> ' +
         '<button class="btn-secundario" onclick="cerrarScan()">Cancelar</button>' +
@@ -268,7 +268,9 @@
     if(p.estado === 'PENDIENTE'){
       acciones = '<button class="btn-rojo" onclick="abrirScan(\'' + p.id + '\')">🔫 Escanear series</button>';
     } else if(p.estado === 'ASIGNADO'){
-      acciones = '<button class="btn-secundario" onclick="imprimirActa(\'' + p.id + '\')">🖨️ Imprimir acta</button>' +
+      const totalEscaneadas = (p.seriesAsignadas || '').split(',').filter(function(s){ return s.trim(); }).length;
+      acciones = '<button class="btn-secundario" onclick="abrirScan(\'' + p.id + '\')">➕ Agregar más series (' + totalEscaneadas + ' de ' + p.cantidad + ')</button>' +
+        '<button class="btn-secundario" onclick="imprimirActa(\'' + p.id + '\')">🖨️ Imprimir acta</button>' +
         '<button class="btn-secundario" onclick="compartirActa(\'' + p.id + '\')">📲 Descargar / Enviar por WhatsApp</button>' +
         '<button class="btn-rojo" onclick="marcarEntregado(\'' + p.id + '\')">✔ Marcar entregado</button>';
     }
@@ -458,7 +460,11 @@
 
     // Actualización optimista
     const p = TODAS.find(x => x.id === id);
-    if(p){ p.estado = 'ASIGNADO'; p.seriesAsignadas = seriesEnCurso.join(', '); }
+    if(p){
+      p.estado = 'ASIGNADO';
+      const previas = (p.seriesAsignadas || '').split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+      p.seriesAsignadas = previas.concat(seriesEnCurso).join(', ');
+    }
     if(lectorCamara){
       lectorCamara.stop().then(function(){ lectorCamara.clear(); lectorCamara = null; }).catch(function(){ lectorCamara = null; });
       camaraActivaPara = null;
