@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pre-entregas de Chips — JMD Gerencia</title>
+<style>
+  :root{
+    --rojo:#E4002B; --rojo-oscuro:#A5001F; --tinta:#1B1B1F; --gris:#6B6B75;
+    --gris-claro:#F1F1F4; --verde:#1E8E5A; --ambar:#B7791F; --borde:#E3E3E8;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--gris-claro);color:var(--tinta);padding:32px 24px 60px;}
+  .wrap{max-width:900px;margin:0 auto;}
+  .marca{display:flex;align-items:baseline;gap:2px;}
+  .marca .b{font-weight:800;font-size:20px;}
+  .marca .l{font-weight:800;font-size:20px;color:var(--rojo);}
+  .subtitulo{color:var(--gris);font-size:13px;margin-bottom:24px;}
+
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px;}
+  .kpi{background:#fff;border:1px solid var(--borde);border-radius:14px;padding:14px 16px;}
+  .kpi .n{font-size:26px;font-weight:800;}
+  .kpi .t{font-size:12px;color:var(--gris);font-weight:600;text-transform:uppercase;letter-spacing:.04em;}
+  .kpi.pend .n{color:var(--ambar);}
+  .kpi.asig .n{color:var(--verde);}
+
+  .tabs{display:flex;gap:8px;margin-bottom:16px;}
+  .tab{padding:9px 16px;border-radius:20px;font-size:13px;font-weight:700;background:#fff;border:1.5px solid var(--borde);color:var(--gris);cursor:pointer;}
+  .tab.activo{background:var(--tinta);color:#fff;border-color:var(--tinta);}
+
+  button{font-family:inherit;font-weight:700;font-size:13px;border:none;border-radius:10px;padding:10px 16px;cursor:pointer;}
+  button.recargar{background:var(--tinta);color:#fff;}
+  .item{background:#fff;border:1px solid var(--borde);border-radius:14px;padding:16px 18px;margin-bottom:12px;}
+  .item .top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;}
+  .item .nombre-cli{font-weight:800;font-size:15px;}
+  .item .sub{color:var(--gris);font-size:13px;margin-top:2px;}
+  .pill-estado{font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;white-space:nowrap;}
+  .pill-estado.PENDIENTE{background:#FDF3E3;color:var(--ambar);}
+  .pill-estado.ASIGNADO{background:#E9F7EF;color:var(--verde);}
+  .pill-estado.ENTREGADO{background:var(--gris-claro);color:var(--gris);}
+  .item .acciones{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;}
+  .btn-secundario{background:var(--gris-claro);color:var(--tinta);}
+  .btn-rojo{background:var(--rojo);color:#fff;}
+  .estado-carga{padding:40px;text-align:center;color:var(--gris);}
+
+  .panel-scan{margin-top:14px;padding-top:14px;border-top:1px dashed var(--borde);display:none;}
+  .panel-scan.abierto{display:block;}
+  .panel-scan input[type=text]{
+    width:100%;padding:12px;border:2px dashed var(--rojo);border-radius:10px;
+    font-family:"SF Mono",Consolas,monospace;font-size:15px;background:#FFF7F5;margin-bottom:10px;
+  }
+  .lista-series{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
+  .serie-chip{background:var(--gris-claro);border-radius:8px;padding:5px 10px;font-size:12px;font-family:"SF Mono",Consolas,monospace;display:flex;align-items:center;gap:6px;}
+  .serie-chip button{background:none;color:var(--rojo);padding:0;font-size:14px;border-radius:0;}
+  .contador-scan{font-size:12px;color:var(--gris);margin-bottom:10px;}
+  .nota-scan{font-size:12px;color:var(--rojo-oscuro);margin-top:6px;min-height:16px;}
+
+  #printArea{display:none;}
+  @media print{
+    body *{visibility:hidden;}
+    #printArea, #printArea *{visibility:visible;}
+    #printArea{display:block;position:absolute;top:0;left:0;width:100%;padding:20px;}
+  }
+  .acta-h{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:16px;}
+  .acta-title{font-size:20px;font-weight:800;}
+  .acta-meta{font-size:12px;margin-top:2px;}
+  .acta-field{margin-bottom:6px;font-size:13px;}
+  .acta-field b{display:inline-block;width:150px;}
+  .acta-table{width:100%;border-collapse:collapse;font-size:13px;}
+  .acta-table th{text-align:left;font-size:11px;text-transform:uppercase;color:#555;padding:6px 4px;border-bottom:1.5px solid #ccc;}
+  .acta-table td{padding:6px 4px;border-bottom:1px solid #ddd;}
+  .sig{display:flex;gap:40px;margin-top:50px;}
+  .sig div{flex:1;text-align:center;border-top:1px solid #000;padding-top:6px;font-size:12px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="marca"><span class="b">JMD-GERENCIA</span><span class="l">•PRE-ENTREGAS</span></div>
+  <div class="subtitulo">Pedidos de chips desde campo — enlaza cada pedido con las series físicas a entregar</div>
+
+  <div class="kpis">
+    <div class="kpi pend"><div class="n" id="kpiPendientes">–</div><div class="t">Pendientes</div></div>
+    <div class="kpi asig"><div class="n" id="kpiAsignados">–</div><div class="t">Listos para recoger</div></div>
+    <div class="kpi"><div class="n" id="kpiTotal">–</div><div class="t">Total del día</div></div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab activo" id="tabPend" onclick="cambiarFiltro('PENDIENTE')">🟠 Pendientes</div>
+    <div class="tab" id="tabAsig" onclick="cambiarFiltro('ASIGNADO')">🟢 Listos para recoger</div>
+    <div class="tab" id="tabEnt" onclick="cambiarFiltro('ENTREGADO')">⚪ Entregados</div>
+    <div class="tab" id="tabTodo" onclick="cambiarFiltro('TODOS')">Todos</div>
+  </div>
+
+  <div style="margin-bottom:14px;">
+    <button class="recargar" onclick="cargarTodo()">🔄 Actualizar</button>
+    <span class="nota-scan" id="ultimaActualizacion" style="color:var(--gris);margin-left:10px;"></span>
+  </div>
+
+  <div id="contenedorLista"><div class="estado-carga">Cargando…</div></div>
+</div>
+
+<div id="printArea">
+  <div class="acta-h">
+    <div>
+      <div class="acta-title">Acta de Entrega de Chips</div>
+      <div class="acta-meta" id="pFecha"></div>
+    </div>
+    <div class="acta-meta" id="pVendedor"></div>
+  </div>
+  <div class="acta-field"><b>Cliente:</b> <span id="pCliente"></span></div>
+  <div class="acta-field"><b>DNI:</b> <span id="pDni"></span></div>
+  <div class="acta-field"><b>Cantidad entregada:</b> <span id="pCant"></span></div>
+  <table class="acta-table">
+    <thead><tr><th>#</th><th>Serie / ICCID</th></tr></thead>
+    <tbody id="pSeriesBody"></tbody>
+  </table>
+  <div class="sig">
+    <div>Firma del cliente</div>
+    <div>Firma del vendedor</div>
+  </div>
+</div>
+
+<script>
+  // Mismo Apps Script que la app de marcado / pre-entrega.
+  const URL_SCRIPT = "https://script.google.com/macros/s/AKfycbw125n4ceKoQwUBq8zRHKeGzHue_EzZj8yd1zYt_xym0BUbiOgnr5rJFtLuapDJA3kfsA/exec";
+
+  const parametros = new URLSearchParams(window.location.search);
+  const usuarioActual = parametros.get('u') || '';
+
+  let TODAS = [];
+  let filtroActual = 'PENDIENTE';
+  let filaAbierta = null;
+  let seriesEnCurso = [];
+
+  function cambiarFiltro(f){
+    filtroActual = f;
+    ['tabPend','tabAsig','tabEnt','tabTodo'].forEach(id => document.getElementById(id).classList.remove('activo'));
+    const mapa = { PENDIENTE:'tabPend', ASIGNADO:'tabAsig', ENTREGADO:'tabEnt', TODOS:'tabTodo' };
+    document.getElementById(mapa[f]).classList.add('activo');
+    filaAbierta = null;
+    render();
+  }
+
+  async function cargarTodo(){
+    document.getElementById('contenedorLista').innerHTML = '<div class="estado-carga">Cargando…</div>';
+    try{
+      const resp = await fetch(URL_SCRIPT + '?modo=preentregas&_=' + Date.now());
+      const data = await resp.json();
+      TODAS = (data && data.preentregas) || [];
+      document.getElementById('ultimaActualizacion').textContent = 'Actualizado ' + new Date().toLocaleTimeString('es-PE');
+      render();
+    }catch(err){
+      document.getElementById('contenedorLista').innerHTML = '<div class="estado-carga">No se pudo cargar. Revisa tu conexión. (' + err.message + ')</div>';
+    }
+  }
+
+  function render(){
+    const pendientes = TODAS.filter(p => p.estado === 'PENDIENTE').length;
+    const asignados = TODAS.filter(p => p.estado === 'ASIGNADO').length;
+    document.getElementById('kpiPendientes').textContent = pendientes;
+    document.getElementById('kpiAsignados').textContent = asignados;
+    document.getElementById('kpiTotal').textContent = TODAS.length;
+
+    const lista = filtroActual === 'TODOS' ? TODAS : TODAS.filter(p => p.estado === filtroActual);
+    const cont = document.getElementById('contenedorLista');
+
+    if(!lista.length){
+      cont.innerHTML = '<div class="estado-carga">No hay pedidos en esta vista.</div>';
+      return;
+    }
+
+    // Más recientes primero
+    const ordenada = lista.slice().reverse();
+
+    cont.innerHTML = ordenada.map(function(p){
+      const abierto = filaAbierta === p.id;
+      let scanHtml = '';
+      if(abierto){
+        scanHtml = '<div class="panel-scan abierto">' +
+          '<input type="text" id="scanInput_' + p.id + '" placeholder="Escanea o escribe la serie y presiona Enter" autocomplete="off">' +
+          '<div class="contador-scan">Escaneadas: <b id="contadorScan_' + p.id + '">' + seriesEnCurso.length + '</b> de ' + p.cantidad + ' pedidas</div>' +
+          '<div class="lista-series" id="listaSeries_' + p.id + '"></div>' +
+          '<button class="btn-rojo" onclick="guardarAsignacion(\'' + p.id + '\')">💾 Guardar asignación</button> ' +
+          '<button class="btn-secundario" onclick="cerrarScan()">Cancelar</button>' +
+          '<div class="nota-scan" id="notaScan_' + p.id + '"></div>' +
+        '</div>';
+      }
+
+      let acciones = '';
+      if(p.estado === 'PENDIENTE'){
+        acciones = '<button class="btn-rojo" onclick="abrirScan(\'' + p.id + '\')">🔫 Escanear series</button>';
+      } else if(p.estado === 'ASIGNADO'){
+        acciones = '<button class="btn-secundario" onclick="imprimirActa(\'' + p.id + '\')">🖨️ Imprimir acta</button>' +
+          '<button class="btn-rojo" onclick="marcarEntregado(\'' + p.id + '\')">✔ Marcar entregado</button>';
+      }
+
+      return '<div class="item">' +
+        '<div class="top">' +
+          '<div>' +
+            '<div class="nombre-cli">' + (p.nombreCliente || '') + '</div>' +
+            '<div class="sub">DNI ' + p.dni + ' · Vendedor: ' + p.vendedor + ' · Pide ' + p.cantidad + ' chip(s) · ' + p.fecha + '</div>' +
+            (p.seriesAsignadas ? '<div class="sub">Series: ' + p.seriesAsignadas + '</div>' : '') +
+          '</div>' +
+          '<span class="pill-estado ' + p.estado + '">' + p.estado + '</span>' +
+        '</div>' +
+        '<div class="acciones">' + acciones + '</div>' +
+        scanHtml +
+      '</div>';
+    }).join('');
+
+    if(filaAbierta){
+      const input = document.getElementById('scanInput_' + filaAbierta);
+      if(input){
+        input.focus();
+        input.addEventListener('keydown', function(e){
+          if(e.key === 'Enter'){
+            e.preventDefault();
+            agregarSerie(input.value.trim());
+            input.value = '';
+          }
+        });
+        renderListaSeries(filaAbierta);
+      }
+    }
+  }
+
+  function abrirScan(id){
+    filaAbierta = id;
+    seriesEnCurso = [];
+    render();
+  }
+
+  function cerrarScan(){
+    filaAbierta = null;
+    seriesEnCurso = [];
+    render();
+  }
+
+  function agregarSerie(serie){
+    if(!serie) return;
+    const up = serie.toUpperCase();
+    if(seriesEnCurso.map(s=>s.toUpperCase()).indexOf(up) !== -1){
+      const nota = document.getElementById('notaScan_' + filaAbierta);
+      if(nota) nota.textContent = '⚠ Esa serie ya la escaneaste en este lote.';
+      return;
+    }
+    seriesEnCurso.push(serie);
+    const nota = document.getElementById('notaScan_' + filaAbierta);
+    if(nota) nota.textContent = '';
+    renderListaSeries(filaAbierta);
+  }
+
+  function quitarSerie(idx){
+    seriesEnCurso.splice(idx, 1);
+    renderListaSeries(filaAbierta);
+  }
+
+  function renderListaSeries(id){
+    const cont = document.getElementById('listaSeries_' + id);
+    const contador = document.getElementById('contadorScan_' + id);
+    if(!cont) return;
+    cont.innerHTML = seriesEnCurso.map(function(s, i){
+      return '<span class="serie-chip">' + s + ' <button onclick="quitarSerie(' + i + ')">✕</button></span>';
+    }).join('');
+    if(contador) contador.textContent = seriesEnCurso.length;
+  }
+
+  async function guardarAsignacion(id){
+    if(!seriesEnCurso.length){
+      const nota = document.getElementById('notaScan_' + id);
+      if(nota) nota.textContent = 'Escanea al menos una serie antes de guardar.';
+      return;
+    }
+    const nota = document.getElementById('notaScan_' + id);
+    if(nota) nota.textContent = 'Guardando…';
+
+    await fetch(URL_SCRIPT, {
+      method: 'POST', mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'asignar_series', preEntregaId: id, series: seriesEnCurso, asignadoPor: usuarioActual || 'oficina' })
+    });
+
+    // Actualización optimista
+    const p = TODAS.find(x => x.id === id);
+    if(p){ p.estado = 'ASIGNADO'; p.seriesAsignadas = seriesEnCurso.join(', '); }
+    filaAbierta = null;
+    seriesEnCurso = [];
+    render();
+    // Refresca de verdad a los pocos segundos para confirmar contra el servidor
+    // (por si otra persona escaneó lo mismo casi al mismo tiempo).
+    setTimeout(cargarTodo, 2500);
+  }
+
+  async function marcarEntregado(id){
+    if(!confirm('¿Confirmas que el vendedor ya entregó estos chips al cliente?')) return;
+    await fetch(URL_SCRIPT, {
+      method: 'POST', mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'marcar_entregado', preEntregaId: id })
+    });
+    const p = TODAS.find(x => x.id === id);
+    if(p) p.estado = 'ENTREGADO';
+    render();
+  }
+
+  function imprimirActa(id){
+    const p = TODAS.find(x => x.id === id);
+    if(!p) return;
+    const series = (p.seriesAsignadas || '').split(',').map(s => s.trim()).filter(Boolean);
+
+    document.getElementById('pFecha').textContent = 'Fecha: ' + p.fecha;
+    document.getElementById('pVendedor').textContent = 'Vendedor: ' + p.vendedor;
+    document.getElementById('pCliente').textContent = p.nombreCliente;
+    document.getElementById('pDni').textContent = p.dni;
+    document.getElementById('pCant').textContent = series.length;
+    document.getElementById('pSeriesBody').innerHTML = series.map(function(s, i){
+      return '<tr><td>' + (i+1) + '</td><td>' + s + '</td></tr>';
+    }).join('');
+
+    window.print();
+  }
+
+  cargarTodo();
+</script>
+</body>
+</html>
