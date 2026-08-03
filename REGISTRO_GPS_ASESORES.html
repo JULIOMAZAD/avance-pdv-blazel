@@ -483,10 +483,11 @@
 
     const infoUbic = document.getElementById('clienteUbicacionInfo');
     const btnActualizar = document.getElementById('btnActualizarUbicacion');
-    infoUbic.textContent = '';
     if(c.lat && c.lng){
+      infoUbic.textContent = '';
       btnActualizar.style.display = 'block';
     } else {
+      infoUbic.textContent = '📍 Se registrará tu ubicación actual al guardar (primera vez).';
       btnActualizar.style.display = 'none';
     }
 
