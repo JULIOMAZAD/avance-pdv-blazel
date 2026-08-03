@@ -313,7 +313,8 @@
     } else if(p.estado === 'ASIGNADO'){
       const totalEscaneadas = (p.seriesAsignadas || '').split(',').filter(function(s){ return s.trim(); }).length;
       acciones = '<button class="btn-secundario" onclick="abrirScan(\'' + p.id + '\')">➕ Agregar más series (' + totalEscaneadas + ' de ' + p.cantidad + ')</button>' +
-        '<button class="btn-secundario" onclick="compartirActa(\'' + p.id + '\')">🖨️ Descargar / Imprimir / WhatsApp</button>' +
+        '<button class="btn-secundario" onclick="descargarActa(\'' + p.id + '\')">💾 Descargar PDF</button>' +
+        '<button class="btn-secundario" onclick="compartirActa(\'' + p.id + '\')">📲 Enviar por WhatsApp</button>' +
         '<button class="btn-rojo" onclick="marcarEntregado(\'' + p.id + '\')">✔ Marcar entregado</button>';
     }
 
@@ -652,9 +653,9 @@
     window.print();
   }
 
-  async function compartirActa(id){
+  async function generarPdfActa(id){
     const p = await llenarActa(id);
-    if(!p) return;
+    if(!p) return null;
     const area = document.getElementById('printArea');
     area.style.display = 'block';
     area.style.width = '760px';   // ancho fijo, para que no capture todo el ancho de la pantalla
@@ -687,14 +688,32 @@
     pdf.addImage(imgData, 'JPEG', margen, margen, anchoUtil, Math.min(imgH, pageH - margen * 2));
 
     const nombreArchivo = 'Guia_' + (p.correlativo || p.id) + '_' + p.nombreCliente.replace(/[^a-zA-Z0-9]/g,'_') + '.pdf';
-    const blob = pdf.output('blob');
-    const archivo = new File([blob], nombreArchivo, { type: 'application/pdf' });
+    return { pdf, nombreArchivo, p };
+  }
 
-    if(navigator.canShare && navigator.canShare({ files: [archivo] })){
-      try{
-        await navigator.share({ files: [archivo], title: 'Guía de remisión', text: 'Guía de remisión — ' + p.nombreCliente });
-        return;
-      }catch(e){ /* si cancela el share, cae a la descarga normal */ }
+  async function descargarActa(id){
+    const res = await generarPdfActa(id);
+    if(!res) return;
+    res.pdf.save(res.nombreArchivo);
+  }
+
+  async function compartirActa(id){
+    const res = await generarPdfActa(id);
+    if(!res) return;
+    const { pdf, nombreArchivo, p } = res;
+
+    const esCelular = /Android|iPhone|iPad/i.test(navigator.userAgent);
+    if(esCelular && navigator.canShare){
+      const blob = pdf.output('blob');
+      const archivo = new File([blob], nombreArchivo, { type: 'application/pdf' });
+      if(navigator.canShare({ files: [archivo] })){
+        try{
+          await navigator.share({ files: [archivo], title: 'Guía de remisión', text: 'Guía de remisión — ' + p.nombreCliente });
+          return;
+        }catch(e){ /* si cancela el share, cae a la descarga normal */ }
+      }
+    } else if(!esCelular){
+      alert('El envío directo por WhatsApp solo funciona desde el celular. En la computadora se descargó el PDF — ábrelo desde WhatsApp Web y adjúntalo manualmente.');
     }
     pdf.save(nombreArchivo);
   }
