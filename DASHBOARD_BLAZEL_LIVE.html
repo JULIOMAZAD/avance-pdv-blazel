@@ -97,7 +97,7 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
   </div>
 </div>
 <header>
-  <div class="logo">BLA<b>ZEL</b><small>CREADO POR JULIO MAZA D. · v12 (línea de tendencia continua en Evolución Cargo Fijo)</small></div>
+  <div class="logo">BLA<b>ZEL</b><small>CREADO POR JULIO MAZA D. · v13 (nueva pestaña Postpago/Prepago)</small></div>
   <div class="filtros" id="filtrosCont"></div>
   <div id="filtroDiaCont" style="display:none">
     <div>
@@ -139,6 +139,7 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
   <div class="tab" data-s="mix">📡 Mix Fija</div>
   <div class="tab" data-s="evolucion">📈 Evolución x Tienda</div>
   <div class="tab" data-s="cuotas">🎯 Cuotas</div>
+  <div class="tab" data-s="pospre">📊 Postpago/Prepago</div>
   <div class="tab" data-s="asesores">🏆 Asesores</div>
   <div class="tab" data-s="dia">📅 Ventas × Día</div>
   <div class="tab" data-s="equipos">📱 Equipos</div>
@@ -186,6 +187,16 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
   <div class="card">
     <h3 id="tEvoHfc">Fija (HFC) — mes a mes por tienda</h3>
     <div class="tscroll"><table id="tblEvoHfc"></table></div>
+  </div>
+</section>
+
+<section class="sec" id="s-pospre">
+  <div id="posPreBanner" style="display:none;background:#3a2a1a;border:1px solid #6b4a1f;border-radius:10px;padding:10px 14px;margin-bottom:12px;color:#f5b041;font-size:13px"></div>
+  <div id="posPreBody"></div>
+  <div class="card" style="margin-top:14px">
+    <div style="color:var(--mut);font-size:12px;line-height:1.5">
+      ⚠️ <b>Venta 100% Online</b> y el comparativo <b>YoY (interanual)</b> no se muestran aquí porque no tenemos esos datos cargados: los datos de cuotas históricos empiezan en enero 2026 (no hay mes equivalente de 2025 para comparar), y no existe ningún campo que distinga canal de venta online vs. presencial. Si consigues esos reportes, los agrego.
+    </div>
   </div>
 </section>
 
@@ -860,17 +871,6 @@ function setActiveData(data){
     F.moda = Array.isArray(vista.moda) ? vista.moda : [];
     F.dia  = (typeof vista.dia==='number') ? vista.dia : 0;
     window._tabPendiente = vista.tab || null;
-    // Si la vista guardada apunta a un año/mes sin datos (p.ej. quedó en un mes
-    // que aún no tiene información cargada), caemos al último periodo con datos
-    // reales en vez de mostrar todo en cero.
-    if(F.anio.length===1 && F.mes.length===1){
-      const a=F.anio[0], m=F.mes[0];
-      const hayDatos = (DATA.cargo||[]).some(r=>r[0]===a && r[1]===m) || (DATA.ops||[]).some(r=>r[0]===a && r[1]===m);
-      if(!hayDatos){
-        F.anio = [DATA.anioActual];
-        F.mes = [DATA.mesActual];
-      }
-    }
   } else {
     // valores por defecto del filtro: año y mes actuales, todas las tiendas, todos los productos
     F.anio = [DATA.anioActual];
@@ -1977,6 +1977,101 @@ function renderCuotas(){
   document.getElementById('cardCuotasNota').innerHTML = `<div style="color:var(--mut);font-size:13px;padding:4px 0">${nota}</div>`;
 }
 
+// ===================== POSTPAGO / PREPAGO (estilo resumen Claro) =====================
+const PP_GROUPS = {
+  'Alta Prepago':'Prepago','Portabilidad Prepago':'Prepago','Pack Prepago':'Prepago',
+  'Alta Postpago':'Postpago','Portabilidad Postpago ≥90 días':'Postpago','Packs Postpago':'Postpago','Líneas Adicionales':'Postpago',
+  'HFC':null,'Clientes Inalámbricos':null,'OLO':null,'Accesorios':null,'Portabilidad Alto Valor':null
+};
+function ppSumGroup(cats,grupo){
+  let meta=0,avance=0,found=false;
+  (cats||[]).forEach(c=>{ if(PP_GROUPS[c.cat]===grupo){ meta+=c.meta||0; avance+=(c.avance||0); found=true; } });
+  return found? {meta,avance} : null;
+}
+function ppCatsActual(key){
+  const C = CUOTAS_HIST[key]; if(!C) return null;
+  const todasLasTiendas = selPdvs().length===DATA.pdvs.length;
+  const pdvsConCuota = selPdvs().filter(p=>C.stores[p]);
+  if(todasLasTiendas) return {C, cats:C.global.cats, avance_dia:C.avance_dia, dias_mes:C.dias_mes};
+  if(!pdvsConCuota.length) return {C, cats:null, avance_dia:C.avance_dia, dias_mes:C.dias_mes};
+  const cats = C.global.cats.map(c=>({cat:c.cat, meta:0, avance:0}));
+  pdvsConCuota.forEach(p=>{ C.stores[p].cats.forEach((c,i)=>{ cats[i].meta+=c.meta||0; cats[i].avance+=(c.avance||0); }); });
+  return {C, cats, avance_dia:C.avance_dia, dias_mes:C.dias_mes};
+}
+function ppCardHTML(titulo,grupo,data){
+  if(!data || !data.cats){
+    return `<div class="card"><h3>${titulo}</h3><div style="color:var(--mut);font-size:13px">Sin datos de cuota para la tienda seleccionada en este mes.</div></div>`;
+  }
+  const g = ppSumGroup(data.cats, grupo);
+  if(!g) return `<div class="card"><h3>${titulo}</h3><div style="color:var(--mut);font-size:13px">Sin categorías de ${grupo} registradas.</div></div>`;
+  const proy = data.avance_dia>0? g.avance/data.avance_dia*data.dias_mes : g.avance;
+  const cumplPct = g.meta>0? (proy/g.meta*100) : null;
+  const barPct = cumplPct==null? 0 : Math.max(0,Math.min(100,cumplPct));
+  return `<div class="card">
+    <h3>${titulo}</h3>
+    <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">
+      <div style="min-width:110px">
+        <div style="font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:1px">Real (unid.)</div>
+        <div style="font-size:26px;font-weight:800">${fmt(g.avance)}</div>
+      </div>
+      <div style="flex:1;min-width:180px">
+        <div style="font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:1px">Cumplimiento% (Proyección / Cuota)</div>
+        <div style="font-size:20px;font-weight:800;margin:4px 0">${cumplPct==null?'—':pct(cumplPct/100)}</div>
+        <div style="background:#0d1117;border-radius:6px;height:8px;overflow:hidden"><div style="width:${barPct}%;height:100%;background:${cumplPct>=100?'var(--verde)':cumplPct>=70?'var(--ambar)':'var(--rojo2)'}"></div></div>
+        <div style="font-size:11px;color:var(--mut);margin-top:4px">Proy. ${fmt(Math.round(proy))} / Cuota ${g.meta>0?fmt(g.meta):'—'}</div>
+      </div>
+    </div>
+  </div>`;
+}
+function renderPosPre(){
+  const key = cuotasKeyActual();
+  const data = ppCatsActual(key);
+  const banner = document.getElementById('posPreBanner');
+  if(!data){
+    banner.style.display='block';
+    banner.textContent = 'No hay datos de cuotas cargados para este periodo.';
+    document.getElementById('posPreBody').innerHTML='';
+    return;
+  }
+  banner.style.display='none';
+  let body = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+    ${ppCardHTML('Postpago','Postpago',data)}
+    ${ppCardHTML('Prepago','Prepago',data)}
+  </div>`;
+
+  // MoM % (comparando avance del mes actual vs. mes anterior, ambos al corte disponible) + YTD
+  const [ya,ym] = key.split('-').map(Number);
+  const prevKey = ym===1? (ya-1)+'-12' : ya+'-'+String(ym-1).padStart(2,'0');
+  const dataPrev = CUOTAS_HIST[prevKey] ? ppCatsActual(prevKey) : null;
+  const yearKeys = CUOTAS_MESES_ORDEN.filter(k=>k.startsWith(ya+'-') && k<=key && CUOTAS_HIST[k]);
+
+  ['Postpago','Prepago'].forEach(grupo=>{
+    const gAct = data.cats? ppSumGroup(data.cats,grupo) : null;
+    const gPrev = (dataPrev && dataPrev.cats)? ppSumGroup(dataPrev.cats,grupo) : null;
+    const mom = (gAct && gPrev && gPrev.avance>0)? ((gAct.avance-gPrev.avance)/gPrev.avance*100) : null;
+    let ytdAvance=0, ytdMeta=0, ytdFound=false;
+    yearKeys.forEach(k=>{
+      const dk = ppCatsActual(k);
+      const gk = (dk && dk.cats)? ppSumGroup(dk.cats,grupo) : null;
+      if(gk){ ytdAvance+=gk.avance; ytdMeta+=gk.meta; ytdFound=true; }
+    });
+    const ytdPct = (ytdFound && ytdMeta>0)? (ytdAvance/ytdMeta*100) : null;
+    body += `<div class="card" style="margin-top:14px">
+      <h3>Métricas ${grupo}</h3>
+      <div style="display:flex;gap:24px;flex-wrap:wrap">
+        <div><div style="font-size:10px;color:var(--mut);text-transform:uppercase">MoM (vs. ${prevKey})</div>
+          <div style="font-size:18px;font-weight:800;color:${mom==null?'var(--mut)':mom>=0?'var(--verde)':'var(--rojo2)'}">${mom==null?'—':(mom>=0?'+':'')+mom.toFixed(1)+'%'}</div></div>
+        <div><div style="font-size:10px;color:var(--mut);text-transform:uppercase">YoY</div>
+          <div style="font-size:18px;font-weight:800;color:var(--mut)">N/D</div></div>
+        <div><div style="font-size:10px;color:var(--mut);text-transform:uppercase">YTD Cumplimiento</div>
+          <div style="font-size:18px;font-weight:800;color:${ytdPct==null?'var(--mut)':ytdPct>=100?'var(--verde)':ytdPct>=70?'var(--ambar)':'var(--rojo2)'}">${ytdPct==null?'—':ytdPct.toFixed(1)+'%'}</div></div>
+      </div>
+    </div>`;
+  });
+
+  document.getElementById('posPreBody').innerHTML = body;
+}
+
 // ===================== ASESORES =====================
 function aseAgg(){
   const map={};
@@ -2276,7 +2371,7 @@ function actualizarProjBox(){
     });
   }
 }
-function render(){actualizarProjBox();renderResumen();renderCargo();renderHfc();renderMix();renderEvolucion();renderCuotas();renderAse();renderDia();var _e=document.getElementById('s-equipos');if(_e&&_e.classList.contains('act')&&window.renderEquipos)window.renderEquipos();}
+function render(){actualizarProjBox();renderResumen();renderCargo();renderHfc();renderMix();renderEvolucion();renderCuotas();renderPosPre();renderAse();renderDia();var _e=document.getElementById('s-equipos');if(_e&&_e.classList.contains('act')&&window.renderEquipos)window.renderEquipos();}
 
 // ===================== CARGA DE EXCEL Y PERSISTENCIA =====================
 function saveDataToStorage(data, key){
@@ -2448,12 +2543,6 @@ async function fetchCuotasFromAPI(){
 function isValidData(d){
   return d && Array.isArray(d.cargo) && Array.isArray(d.ops) && Array.isArray(d.pdvs);
 }
-function maxPeriodOf(d){
-  let mx=0;
-  (d.cargo||[]).forEach(r=>{const p=r[0]*100+r[1]; if(p>mx)mx=p;});
-  (d.ops||[]).forEach(r=>{const p=r[0]*100+r[1]; if(p>mx)mx=p;});
-  return mx;
-}
 function isValidCuotasHist(d){
   return d && typeof d==='object' && Object.keys(d).length>0 &&
     Object.values(d).every(m=>m && m.global && Array.isArray(m.global.cats));
@@ -2472,7 +2561,7 @@ function init(){
     localStorage.removeItem(STORAGE_KEY_CUOTAS);
     storedCuotas = null;
   }
-  setActiveData((stored && maxPeriodOf(stored) >= maxPeriodOf(EMBEDDED_DATA)) ? stored : EMBEDDED_DATA);
+  setActiveData(EMBEDDED_DATA);
   CUOTAS_HIST = EMBEDDED_CUOTAS_HIST;
   buildFiltroDOM();
   syncFiltroDOM();
@@ -2783,7 +2872,6 @@ async function loadLive(){
     const ND=buildDataFromBase(baseRows);
     let rmax=1; for(let r=1;r<baseRows.length;r++){const d=excelDateToJSDate(baseRows[r][0]); if(d&&!isNaN(d.getTime())&&d.getFullYear()===ND.anioActual&&(d.getMonth()+1)===ND.mesActual&&d.getDate()>rmax)rmax=d.getDate();}
     ND.maxDia=rmax;
-    saveDataToStorage(ND, STORAGE_KEY);
     setActiveData(ND);
     const eqRows=Object.entries(eqAgg).map(([k,c])=>{const p=k.split('|');return [parseInt(p[0]),parseInt(p[1]),p[2],p[3],p[4],p[5],c];});
     if(window.__setEqData) window.__setEqData({rows:eqRows,anios:[...eqAnios].sort((a,b)=>a-b),tiendas:[...eqTiendas].sort()});
