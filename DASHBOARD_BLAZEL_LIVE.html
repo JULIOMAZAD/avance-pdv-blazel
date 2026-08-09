@@ -97,7 +97,7 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
   </div>
 </div>
 <header>
-  <div class="logo">BLA<b>ZEL</b><small>CREADO POR JULIO MAZA D. · v13 (nueva pestaña Postpago/Prepago)</small></div>
+  <div class="logo">BLA<b>ZEL</b><small>CREADO POR JULIO MAZA D. · v16 (tabla MoM Cuota / DoD Avance por producto)</small></div>
   <div class="filtros" id="filtrosCont"></div>
   <div id="filtroDiaCont" style="display:none">
     <div>
@@ -206,6 +206,7 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
   <div class="card"><h3>Evolución mensual · Meta vs Cierre (Cargo Fijo)</h3><div class="cwrap"><canvas id="chCuotasEvo"></canvas></div></div>
   <div class="card"><h3 id="tCuotas">Cuotas vs Avance vs Proyección</h3><div class="tscroll" style="max-height:none;overflow:visible"><table id="tblCuotas"></table></div></div>
   <div class="card" id="cardCuotasNota" style="display:none"><div style="color:var(--mut);font-size:13px;padding:4px 0">Datos de cuotas al corte indicado arriba. Para actualizar, sube un nuevo Excel de cuotas.</div></div>
+  <div class="card"><h3 id="tMomDod">Comparativo MoM (Cuota) · DoD (Avance) por producto</h3><div class="tscroll" style="max-height:none;overflow:visible"><table id="tblMomDod"></table></div></div>
 </section>
 
 <section class="sec" id="s-asesores">
@@ -232,6 +233,14 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
   <div class="card"><h3 id="tHeat">Mapa de calor · Ventas por día y tienda</h3><div style="overflow-x:auto"><div class="heat" id="heatPdv"></div></div></div>
   <div class="card"><h3>Ritmo diario acumulado vs. necesario</h3><div class="cwrap sm"><canvas id="chRitmo"></canvas></div></div>
   <div class="card" id="cardHeatV"><h3>Junio 2026 · Productividad diaria por asesor (PDV filtrado)</h3><div style="overflow-x:auto"><div class="heat" id="heatVend"></div></div></div>
+  <div class="card">
+    <h3 id="tDiaComp">Comparativo día a día · mes a mes</h3>
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <button id="diaCompTabTienda" class="chip trend-tab-btn on" onclick="setDiaCompModo('tienda')">Por Tienda</button>
+      <button id="diaCompTabVendedor" class="chip trend-tab-btn" onclick="setDiaCompModo('vendedor')">Por Vendedor</button>
+    </div>
+    <div id="diaCompBody"></div>
+  </div>
 </section>
 
 <section class="sec" id="s-equipos">
@@ -1975,6 +1984,58 @@ function renderCuotas(){
     nota = `Sin datos de cuota para: ${sinCuota.map(pdvShort).join(', ')} en ${C.mes} ${C.anio}. ` + nota;
   }
   document.getElementById('cardCuotasNota').innerHTML = `<div style="color:var(--mut);font-size:13px;padding:4px 0">${nota}</div>`;
+  renderMomDod();
+}
+
+// ===================== COMPARATIVO MoM (Cuota) · DoD (Avance) POR PRODUCTO =====================
+const MOMDOD_GROUPS = {
+  'Alta Prepago':'Prepago','Portabilidad Prepago':'Prepago','Pack Prepago':'Prepago',
+  'Alta Postpago':'Postpago','Portabilidad Postpago ≥90 días':'Postpago','Packs Postpago':'Postpago','Líneas Adicionales':'Postpago',
+  'HFC':'Residencial','Clientes Inalámbricos':'Residencial',
+  'OLO':'Otros','Accesorios':'Otros','Portabilidad Alto Valor':'Otros'
+};
+function renderMomDod(){
+  const curKey = cuotasKeyActual();
+  const dataCur = ppCatsActual(curKey);
+  const tbl = document.getElementById('tblMomDod');
+  if(!tbl) return;
+  if(!dataCur || !dataCur.cats){
+    tbl.innerHTML = ''; 
+    document.getElementById('tMomDod').textContent = 'Comparativo MoM (Cuota) · DoD (Avance) por producto — sin datos de cuota para este periodo.';
+    return;
+  }
+  const [ya,ym] = curKey.split('-').map(Number);
+  const prevKey = ym===1? (ya-1)+'-12' : ya+'-'+String(ym-1).padStart(2,'0');
+  const dataPrev = CUOTAS_HIST[prevKey] ? ppCatsActual(prevKey) : null;
+  const labelCur = dataCur.C.mes ? dataCur.C.mes.toUpperCase() : curKey;
+  const labelPrev = dataPrev && dataPrev.C.mes ? dataPrev.C.mes.toUpperCase() : prevKey;
+  const diaCur = dataCur.avance_dia, diaPrev = dataPrev ? dataPrev.avance_dia : null;
+
+  let html = `<thead>
+    <tr><th rowspan="2">PRODUCTO</th><th colspan="2" style="text-align:center">MoM (Cuota)</th><th colspan="2" style="text-align:center">DoD (Avance)</th><th rowspan="2" class="r">DoD %</th></tr>
+    <tr><th class="r">${labelPrev}</th><th class="r">${labelCur}</th><th class="r">${diaPrev?('DÍA '+diaPrev):'—'}</th><th class="r">DÍA ${diaCur}</th></tr>
+  </thead><tbody>`;
+
+  let lastGroup=null;
+  dataCur.cats.forEach(c=>{
+    const g = MOMDOD_GROUPS[c.cat];
+    if(g!==lastGroup){ html += `<tr><td colspan="6" style="background:#f5b04122;color:#f5b041;font-weight:700">${g}</td></tr>`; lastGroup=g; }
+    const cuotaCur = c.meta;
+    const cPrev = dataPrev && dataPrev.cats ? dataPrev.cats.find(x=>x.cat===c.cat) : null;
+    const cuotaPrev = cPrev ? cPrev.meta : null;
+    const avanceCur = c.avance;
+    const avancePrev = cPrev ? cPrev.avance : null;
+    const dodPct = (avancePrev!=null && avancePrev>0 && avanceCur!=null) ? (avanceCur/avancePrev*100) : null;
+    html += `<tr><td>${c.cat}</td>
+      <td class="r">${cuotaPrev!=null?fmt(cuotaPrev):'—'}</td>
+      <td class="r">${fmt(cuotaCur)}</td>
+      <td class="r">${avancePrev!=null?fmt(avancePrev):'—'}</td>
+      <td class="r">${fmt(avanceCur)}</td>
+      <td class="r">${dodPct!=null?dodPct.toFixed(2):'—'}</td></tr>`;
+  });
+  html += '</tbody>';
+  tbl.innerHTML = html;
+  document.getElementById('tMomDod').textContent = `Comparativo MoM (Cuota) · DoD (Avance) por producto · ${dataCur.C.mes||''} ${dataCur.C.anio||''}`.trim();
 }
 
 // ===================== POSTPAGO / PREPAGO (estilo resumen Claro) =====================
@@ -2314,6 +2375,65 @@ function renderDia(){
       h+=`<div class="hcell" style="background:#2a3344"><b>${t}</b></div>`;});
     hv.innerHTML=h;
   } else cv.style.display='none';
+  renderDiaComp();
+}
+
+let DIA_COMP_MODO = 'tienda';
+function setDiaCompModo(m){
+  DIA_COMP_MODO = m;
+  document.getElementById('diaCompTabTienda').classList.toggle('on', m==='tienda');
+  document.getElementById('diaCompTabVendedor').classList.toggle('on', m==='vendedor');
+  renderDiaComp();
+}
+function renderDiaComp(){
+  const body = document.getElementById('diaCompBody');
+  if(!body) return;
+  if(DIA_COMP_MODO==='tienda') renderDiaCompTienda(body);
+  else renderDiaCompVendedor(body);
+}
+function diaCompTableHtml(mesesArr, dataPorMes){
+  // dataPorMes[mesKey][dia] = valor
+  let rows = '<tr><th>Día</th>' + mesesArr.map(m=>`<th class="r">${MESES[+m-1]}</th>`).join('') + '</tr>';
+  const totals={}; mesesArr.forEach(m=>totals[m]=0);
+  for(let d=1; d<=31; d++){
+    if(!mesesArr.some(m=>dataPorMes[m][d]!=null)) continue;
+    rows += `<tr><td>${d}</td>` + mesesArr.map(m=>{ const v=dataPorMes[m][d]; if(v!=null) totals[m]+=v; return `<td class="r">${v!=null?fmt(v):'—'}</td>`; }).join('') + '</tr>';
+  }
+  rows += `<tr style="background:#1b2230;font-weight:700"><td>TOTAL</td>` + mesesArr.map(m=>`<td class="r">${fmt(totals[m])}</td>`).join('') + '</tr>';
+  return rows;
+}
+function renderDiaCompTienda(body){
+  const mesesSet = new Set();
+  (DATA.dias||[]).forEach(r=>mesesSet.add(r[0].slice(0,2)));
+  const mesesArr = Array.from(mesesSet).sort();
+  if(!mesesArr.length){ body.innerHTML='<div style="color:var(--mut);padding:10px">Sin datos diarios cargados.</div>'; return; }
+  const tiendas = selPdvs().length ? selPdvs() : DATA.pdvs;
+  let html = `<div style="color:var(--mut);font-size:12px;margin-bottom:12px">Ventas (unidades) por día, una tabla por tienda. Columnas = meses con datos diarios cargados (${mesesArr.map(m=>MESES[+m-1]).join(', ')}).</div>`;
+  tiendas.forEach(pdv=>{
+    const map = {}; mesesArr.forEach(m=>map[m]={});
+    let tieneDatos=false;
+    (DATA.dias||[]).forEach(r=>{
+      if(r[1]!==pdv) return;
+      const mm=r[0].slice(0,2), dd=+r[0].slice(3);
+      map[mm][dd]=(map[mm][dd]||0)+r[2]; tieneDatos=true;
+    });
+    if(!tieneDatos) return;
+    html += `<div style="margin-top:18px;font-weight:700;font-size:13px;color:var(--txt)">${pdvShort(pdv)}</div>
+      <div class="tscroll"><table>${diaCompTableHtml(mesesArr, map)}</table></div>`;
+  });
+  body.innerHTML = html;
+}
+function renderDiaCompVendedor(body){
+  let html = `<div style="color:var(--mut);font-size:12px;margin-bottom:12px">⚠️ El detalle diario por vendedor solo está disponible para el mes actual (no tenemos historial diario por vendedor de meses anteriores para comparar mes a mes). Se muestra el detalle del mes en curso.</div>`;
+  const vm={}; let vmax=0;
+  (DATA.junv||[]).forEach(r=>{ if(inPdv(r[2])){ (vm[r[1]]=vm[r[1]]||{})[r[0]]=((vm[r[1]]||{})[r[0]]||0)+r[3]; vmax=Math.max(vmax,vm[r[1]][r[0]]); } });
+  const vend=Object.keys(vm).map(v=>({v,t:Object.values(vm[v]).reduce((a,b)=>a+b,0)})).sort((a,b)=>b.t-a.t);
+  if(!vend.length){ body.innerHTML = html + '<div style="color:var(--mut);padding:10px">Sin datos para el filtro actual.</div>'; return; }
+  let rows = `<tr><th>Vendedor</th>` + Array.from({length:DATA.maxDia},(_,i)=>i+1).map(d=>`<th class="r">${d}</th>`).join('') + `<th class="r">TOTAL</th></tr>`;
+  vend.forEach(({v,t})=>{
+    rows += `<tr><td>${v}</td>` + Array.from({length:DATA.maxDia},(_,i)=>i+1).map(d=>`<td class="r">${vm[v][d]?fmt(vm[v][d]):'—'}</td>`).join('') + `<td class="r" style="font-weight:700">${fmt(t)}</td></tr>`;
+  });
+  body.innerHTML = html + `<div class="tscroll"><table>${rows}</table></div>`;
 }
 
 function actualizarProjBox(){
