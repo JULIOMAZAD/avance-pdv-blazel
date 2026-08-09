@@ -97,7 +97,7 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
   </div>
 </div>
 <header>
-  <div class="logo">BLA<b>ZEL</b><small>CREADO POR JULIO MAZA D.</small></div>
+  <div class="logo">BLA<b>ZEL</b><small>CREADO POR JULIO MAZA D. · v26 (quitado mapa de calor/ritmo diario y pestaña Cuotas)</small></div>
   <div class="filtros" id="filtrosCont"></div>
   <div id="filtroDiaCont" style="display:none">
     <div>
@@ -134,11 +134,8 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
 </header>
 <div class="tabs">
   <div class="tab act" data-s="resumen">⚡ Resumen Ejecutivo</div>
-  <div class="tab" data-s="cargo">💰 Cargo Fijo</div>
   <div class="tab" data-s="hfc">📶 HFC</div>
-  <div class="tab" data-s="mix">📡 Mix Fija</div>
   <div class="tab" data-s="evolucion">📈 Evolución x Tienda</div>
-  <div class="tab" data-s="cuotas">🎯 Cuotas</div>
   <div class="tab" data-s="pospre">📊 Postpago/Prepago</div>
   <div class="tab" data-s="asesores">🏆 Asesores</div>
   <div class="tab" data-s="dia">📅 Ventas × Día</div>
@@ -155,27 +152,12 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
   <div class="card"><h3 id="tSemaforo">Semáforo por Tienda</h3><div class="tscroll"><table id="tblSem"></table></div></div>
 </section>
 
-<section class="sec" id="s-cargo">
-  <div class="kpis" id="kpisCargo"></div>
-  <div class="card"><h3>Cargo Fijo mensual 2023 → 2026</h3><div class="cwrap" style="height:360px"><canvas id="chCargoFull"></canvas></div></div>
-  <div class="grid11">
-    <div class="card"><h3 id="tCargoPdv">Cargo Fijo por tienda</h3><div class="cwrap sm"><canvas id="chCargoPdv"></canvas></div></div>
-    <div class="card"><h3>Comparativo interanual (mismo mes)</h3><div class="cwrap sm"><canvas id="chYoY"></canvas></div></div>
-  </div>
-</section>
-
 <section class="sec" id="s-hfc">
   <div class="kpis" id="kpisHfc"></div>
   <div class="card"><h3 id="tHfcEvo">HFC mensual 2023 → 2026</h3><div class="cwrap" style="height:320px"><canvas id="chHfcFull"></canvas></div></div>
   <div class="card"><h3 id="tHfcPdv">Ranking de tiendas · Ritmo HFC</h3><div class="tscroll"><table id="tblHfcPdv"></table></div></div>
   <div class="card"><h3 id="tHfcAse">Top 15 Asesores · HFC</h3><div id="rankHfcAse"></div></div>
   <div class="card"><h3 id="tHfcCmpVend">HFC por vendedor · Cierre mes anterior vs Avance mes actual</h3><div id="hfcCmpNota"></div><div class="tscroll"><table id="tblHfcCmpVend"></table></div></div>
-</section>
-
-<section class="sec" id="s-mix">
-  <div class="kpis" id="kpisMix"></div>
-  <div class="card"><h3>MIX FIJA % mensual (HFC / Portabilidad+Renovación+Porta-AD)</h3><div class="cwrap"><canvas id="chMix"></canvas></div></div>
-  <div class="card"><h3 id="tMixPdv">MIX FIJA por tienda</h3><div class="tscroll"><table id="tblMix"></table></div></div>
 </section>
 
 <section class="sec" id="s-evolucion">
@@ -200,14 +182,6 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
   </div>
 </section>
 
-<section class="sec" id="s-cuotas">
-  <div id="cuotasFallbackBanner" style="display:none;background:#3a2a1a;border:1px solid #6b4a1f;border-radius:10px;padding:10px 14px;margin-bottom:12px;color:#f5b041;font-size:13px"></div>
-  <div class="kpis" id="kpisCuotas"></div>
-  <div class="card"><h3>Evolución mensual · Meta vs Cierre (Cargo Fijo)</h3><div class="cwrap"><canvas id="chCuotasEvo"></canvas></div></div>
-  <div class="card"><h3 id="tCuotas">Cuotas vs Avance vs Proyección</h3><div class="tscroll" style="max-height:none;overflow:visible"><table id="tblCuotas"></table></div></div>
-  <div class="card" id="cardCuotasNota" style="display:none"><div style="color:var(--mut);font-size:13px;padding:4px 0">Datos de cuotas al corte indicado arriba. Para actualizar, sube un nuevo Excel de cuotas.</div></div>
-</section>
-
 <section class="sec" id="s-asesores">
   <div class="kpis" id="kpisAse"></div>
   <div class="card">
@@ -229,8 +203,6 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
 
 <section class="sec" id="s-dia">
   <div class="kpis" id="kpisDia"></div>
-  <div class="card"><h3 id="tHeat">Mapa de calor · Ventas por día y tienda</h3><div style="overflow-x:auto"><div class="heat" id="heatPdv"></div></div></div>
-  <div class="card"><h3>Ritmo diario acumulado vs. necesario</h3><div class="cwrap sm"><canvas id="chRitmo"></canvas></div></div>
   <div class="card" id="cardHeatV"><h3>Junio 2026 · Productividad diaria por asesor (PDV filtrado)</h3><div style="overflow-x:auto"><div class="heat" id="heatVend"></div></div></div>
 </section>
 
@@ -2039,35 +2011,40 @@ function renderPosPre(){
     ${ppCardHTML('Prepago','Prepago',data)}
   </div>`;
 
-  // MoM % (comparando avance del mes actual vs. mes anterior, ambos al corte disponible) + YTD
+  // MoM (Cuota) · DoD (Avance) por producto — tabla única, como referencia del usuario
   const [ya,ym] = key.split('-').map(Number);
   const prevKey = ym===1? (ya-1)+'-12' : ya+'-'+String(ym-1).padStart(2,'0');
   const dataPrev = CUOTAS_HIST[prevKey] ? ppCatsActual(prevKey) : null;
-  const yearKeys = CUOTAS_MESES_ORDEN.filter(k=>k.startsWith(ya+'-') && k<=key && CUOTAS_HIST[k]);
-
-  ['Postpago','Prepago'].forEach(grupo=>{
-    const gAct = data.cats? ppSumGroup(data.cats,grupo) : null;
-    const gPrev = (dataPrev && dataPrev.cats)? ppSumGroup(dataPrev.cats,grupo) : null;
-    const mom = (gAct && gPrev && gPrev.avance>0)? ((gAct.avance-gPrev.avance)/gPrev.avance*100) : null;
-    let ytdAvance=0, ytdMeta=0, ytdFound=false;
-    yearKeys.forEach(k=>{
-      const dk = ppCatsActual(k);
-      const gk = (dk && dk.cats)? ppSumGroup(dk.cats,grupo) : null;
-      if(gk){ ytdAvance+=gk.avance; ytdMeta+=gk.meta; ytdFound=true; }
-    });
-    const ytdPct = (ytdFound && ytdMeta>0)? (ytdAvance/ytdMeta*100) : null;
-    body += `<div class="card" style="margin-top:14px">
-      <h3>Métricas ${grupo}</h3>
-      <div style="display:flex;gap:24px;flex-wrap:wrap">
-        <div><div style="font-size:10px;color:var(--mut);text-transform:uppercase">MoM (vs. ${prevKey})</div>
-          <div style="font-size:18px;font-weight:800;color:${mom==null?'var(--mut)':mom>=0?'var(--verde)':'var(--rojo2)'}">${mom==null?'—':(mom>=0?'+':'')+mom.toFixed(1)+'%'}</div></div>
-        <div><div style="font-size:10px;color:var(--mut);text-transform:uppercase">YoY</div>
-          <div style="font-size:18px;font-weight:800;color:var(--mut)">N/D</div></div>
-        <div><div style="font-size:10px;color:var(--mut);text-transform:uppercase">YTD Cumplimiento</div>
-          <div style="font-size:18px;font-weight:800;color:${ytdPct==null?'var(--mut)':ytdPct>=100?'var(--verde)':ytdPct>=70?'var(--ambar)':'var(--rojo2)'}">${ytdPct==null?'—':ytdPct.toFixed(1)+'%'}</div></div>
-      </div>
-    </div>`;
+  const labelCur = data.C.mes ? data.C.mes.toUpperCase() : key;
+  const labelPrev = dataPrev && dataPrev.C.mes ? dataPrev.C.mes.toUpperCase() : prevKey;
+  const diaCur = data.avance_dia, diaPrev = dataPrev ? dataPrev.avance_dia : null;
+  function grupoProducto(cat){
+    if(/prepago/i.test(cat) && !/postpago/i.test(cat)) return 'PREPAGO';
+    if(/postpago/i.test(cat)) return 'POSTPAGO';
+    if(/hfc|inal[aá]mbric/i.test(cat)) return 'RESIDENCIAL';
+    return 'OTROS';
+  }
+  let tbl = `<tr><th rowspan="2">PRODUCTO</th><th colspan="2" style="text-align:center">MoM</th><th colspan="2" style="text-align:center">DoD</th><th rowspan="2" class="r">DoD %</th></tr>
+    <tr><th class="r">${labelPrev}</th><th class="r">${labelCur}</th><th class="r">${diaPrev?('DÍA '+diaPrev):'—'}</th><th class="r">DÍA ${diaCur}</th></tr>`;
+  let lastGroup=null;
+  (data.cats||[]).forEach(c=>{
+    const g = grupoProducto(c.cat);
+    if(g!==lastGroup){ tbl += `<tr><td colspan="6" style="background:#1b2230;font-weight:700;color:var(--mut)">${g}</td></tr>`; lastGroup=g; }
+    const cPrev = dataPrev && dataPrev.cats ? dataPrev.cats.find(x=>x.cat===c.cat) : null;
+    const cuotaPrev = cPrev ? cPrev.meta : null;
+    const avancePrev = cPrev ? cPrev.avance : null;
+    const dodPct = (avancePrev!=null && avancePrev>0 && c.avance!=null) ? (c.avance/avancePrev*100) : null;
+    tbl += `<tr><td>${c.cat}</td>
+      <td class="r">${cuotaPrev!=null?fmt(cuotaPrev):'—'}</td>
+      <td class="r">${fmt(c.meta)}</td>
+      <td class="r">${avancePrev!=null?fmt(avancePrev):'—'}</td>
+      <td class="r">${fmt(c.avance)}</td>
+      <td class="r">${dodPct!=null?dodPct.toFixed(2)+'%':'—'}</td></tr>`;
   });
+  body += `<div class="card" style="margin-top:14px">
+    <h3>Comparativo MoM (Cuota) · DoD (Avance) por producto</h3>
+    <div class="tscroll" style="max-height:none;overflow:visible"><table>${tbl}</table></div>
+  </div>`;
 
   document.getElementById('posPreBody').innerHTML = body;
 }
@@ -2274,30 +2251,6 @@ function renderDia(){
     kpiHTML('Proyección unidades',fmt(Math.round((refA===DATA.anioActual&&refM===DATA.mesActual)? tot/DATA.maxDia*diasMes(refM) : tot)),'al cierre del mes','a') +
     (mejorDia? kpiHTML('Mejor día', mejorDia.d+' de '+MESES[refM-1].toLowerCase(), fmt(mejorDia.v)+' ventas','v'):'')
     : kpiHTML('Detalle diario','—','Disponible solo para 2026');
-  // heatmap pdv
-  const hp=document.getElementById('heatPdv');
-  document.getElementById('tHeat').textContent=`Mapa de calor · día × tienda · ${MESES[refM-1]} ${refA}`;
-  if(!esViz||tot===0){hp.innerHTML='<div style="color:var(--mut);padding:10px">Sin datos diarios para este periodo.</div>';}
-  else{
-    const pdvsAct=Object.keys(map).sort((a,b)=>Object.values(map[b]).reduce((x,y)=>x+y,0)-Object.values(map[a]).reduce((x,y)=>x+y,0));
-    hp.style.gridTemplateColumns=`150px repeat(${days},1fr)`;
-    let h=`<div class="hlabel"><b>TIENDA</b></div>`; for(let d=1;d<=days;d++)h+=`<div class="hcell" style="background:none;color:var(--mut)">${d}</div>`;
-    pdvsAct.forEach(p=>{ h+=`<div class="hlabel" title="${p}">${pdvShort(p)}</div>`;
-      for(let d=1;d<=days;d++){const v=map[p][d]||0; const op=v?0.15+0.85*(v/maxV):0;
-        h+=`<div class="hcell" style="background:rgba(230,51,41,${op.toFixed(2)});color:${v/maxV>0.5?'#fff':'#cbd5e1'}">${v||''}</div>`;}});
-    hp.innerHTML=h;
-  }
-  // ritmo acumulado
-  if(esViz&&tot>0){
-    const tDia={}; Object.values(map).forEach(o=>Object.entries(o).forEach(([d,v])=>tDia[d]=(tDia[d]||0)+v));
-    const labels=[],acum=[],lineal=[]; let s=0;
-    const metaTotal=(refA===DATA.anioActual&&refM===DATA.mesActual)? tot/DATA.maxDia*diasMes(refM) : tot;
-    for(let d=1;d<=days;d++){s+=tDia[d]||0;labels.push(d);acum.push(s);lineal.push(Math.round(metaTotal/diasMes(refM)*d));}
-    mkChart('chRitmo',{type:'line',data:{labels,datasets:[
-      {label:'Acumulado real',data:acum,borderColor:'#e63329',backgroundColor:'#e6332922',fill:true,tension:.25,pointRadius:3},
-      {label:'Ritmo lineal proyectado',data:lineal,borderColor:'#8b97a8',borderDash:[5,4],pointRadius:0}]},
-      options:{maintainAspectRatio:false,plugins:{legend:{labels:{boxWidth:14,font:{size:11}}}},scales:{y:{ticks:{callback:fmt}}}}});
-  } else if(charts['chRitmo']){charts['chRitmo'].destroy();delete charts['chRitmo'];}
   // heatmap asesores (solo mes/año actual)
   const cv=document.getElementById('cardHeatV'), hv=document.getElementById('heatVend');
   if(refA===DATA.anioActual && refM===DATA.mesActual){
@@ -2371,7 +2324,7 @@ function actualizarProjBox(){
     });
   }
 }
-function render(){actualizarProjBox();renderResumen();renderCargo();renderHfc();renderMix();renderEvolucion();renderCuotas();renderPosPre();renderAse();renderDia();var _e=document.getElementById('s-equipos');if(_e&&_e.classList.contains('act')&&window.renderEquipos)window.renderEquipos();}
+function render(){actualizarProjBox();renderResumen();renderHfc();renderEvolucion();renderPosPre();renderAse();renderDia();var _e=document.getElementById('s-equipos');if(_e&&_e.classList.contains('act')&&window.renderEquipos)window.renderEquipos();}
 
 // ===================== CARGA DE EXCEL Y PERSISTENCIA =====================
 function saveDataToStorage(data, key){
