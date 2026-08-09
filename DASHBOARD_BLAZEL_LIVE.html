@@ -97,7 +97,7 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
   </div>
 </div>
 <header>
-  <div class="logo">BLA<b>ZEL</b><small>CREADO POR JULIO MAZA D. · v16 (tabla MoM Cuota / DoD Avance por producto)</small></div>
+  <div class="logo">BLA<b>ZEL</b><small>CREADO POR JULIO MAZA D. · v17 (tabla MoM/DoD reemplaza tarjetas de métricas en Postpago/Prepago)</small></div>
   <div class="filtros" id="filtrosCont"></div>
   <div id="filtroDiaCont" style="display:none">
     <div>
@@ -206,7 +206,6 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
   <div class="card"><h3>Evolución mensual · Meta vs Cierre (Cargo Fijo)</h3><div class="cwrap"><canvas id="chCuotasEvo"></canvas></div></div>
   <div class="card"><h3 id="tCuotas">Cuotas vs Avance vs Proyección</h3><div class="tscroll" style="max-height:none;overflow:visible"><table id="tblCuotas"></table></div></div>
   <div class="card" id="cardCuotasNota" style="display:none"><div style="color:var(--mut);font-size:13px;padding:4px 0">Datos de cuotas al corte indicado arriba. Para actualizar, sube un nuevo Excel de cuotas.</div></div>
-  <div class="card"><h3 id="tMomDod">Comparativo MoM (Cuota) · DoD (Avance) por producto</h3><div class="tscroll" style="max-height:none;overflow:visible"><table id="tblMomDod"></table></div></div>
 </section>
 
 <section class="sec" id="s-asesores">
@@ -1984,58 +1983,6 @@ function renderCuotas(){
     nota = `Sin datos de cuota para: ${sinCuota.map(pdvShort).join(', ')} en ${C.mes} ${C.anio}. ` + nota;
   }
   document.getElementById('cardCuotasNota').innerHTML = `<div style="color:var(--mut);font-size:13px;padding:4px 0">${nota}</div>`;
-  renderMomDod();
-}
-
-// ===================== COMPARATIVO MoM (Cuota) · DoD (Avance) POR PRODUCTO =====================
-const MOMDOD_GROUPS = {
-  'Alta Prepago':'Prepago','Portabilidad Prepago':'Prepago','Pack Prepago':'Prepago',
-  'Alta Postpago':'Postpago','Portabilidad Postpago ≥90 días':'Postpago','Packs Postpago':'Postpago','Líneas Adicionales':'Postpago',
-  'HFC':'Residencial','Clientes Inalámbricos':'Residencial',
-  'OLO':'Otros','Accesorios':'Otros','Portabilidad Alto Valor':'Otros'
-};
-function renderMomDod(){
-  const curKey = cuotasKeyActual();
-  const dataCur = ppCatsActual(curKey);
-  const tbl = document.getElementById('tblMomDod');
-  if(!tbl) return;
-  if(!dataCur || !dataCur.cats){
-    tbl.innerHTML = ''; 
-    document.getElementById('tMomDod').textContent = 'Comparativo MoM (Cuota) · DoD (Avance) por producto — sin datos de cuota para este periodo.';
-    return;
-  }
-  const [ya,ym] = curKey.split('-').map(Number);
-  const prevKey = ym===1? (ya-1)+'-12' : ya+'-'+String(ym-1).padStart(2,'0');
-  const dataPrev = CUOTAS_HIST[prevKey] ? ppCatsActual(prevKey) : null;
-  const labelCur = dataCur.C.mes ? dataCur.C.mes.toUpperCase() : curKey;
-  const labelPrev = dataPrev && dataPrev.C.mes ? dataPrev.C.mes.toUpperCase() : prevKey;
-  const diaCur = dataCur.avance_dia, diaPrev = dataPrev ? dataPrev.avance_dia : null;
-
-  let html = `<thead>
-    <tr><th rowspan="2">PRODUCTO</th><th colspan="2" style="text-align:center">MoM (Cuota)</th><th colspan="2" style="text-align:center">DoD (Avance)</th><th rowspan="2" class="r">DoD %</th></tr>
-    <tr><th class="r">${labelPrev}</th><th class="r">${labelCur}</th><th class="r">${diaPrev?('DÍA '+diaPrev):'—'}</th><th class="r">DÍA ${diaCur}</th></tr>
-  </thead><tbody>`;
-
-  let lastGroup=null;
-  dataCur.cats.forEach(c=>{
-    const g = MOMDOD_GROUPS[c.cat];
-    if(g!==lastGroup){ html += `<tr><td colspan="6" style="background:#f5b04122;color:#f5b041;font-weight:700">${g}</td></tr>`; lastGroup=g; }
-    const cuotaCur = c.meta;
-    const cPrev = dataPrev && dataPrev.cats ? dataPrev.cats.find(x=>x.cat===c.cat) : null;
-    const cuotaPrev = cPrev ? cPrev.meta : null;
-    const avanceCur = c.avance;
-    const avancePrev = cPrev ? cPrev.avance : null;
-    const dodPct = (avancePrev!=null && avancePrev>0 && avanceCur!=null) ? (avanceCur/avancePrev*100) : null;
-    html += `<tr><td>${c.cat}</td>
-      <td class="r">${cuotaPrev!=null?fmt(cuotaPrev):'—'}</td>
-      <td class="r">${fmt(cuotaCur)}</td>
-      <td class="r">${avancePrev!=null?fmt(avancePrev):'—'}</td>
-      <td class="r">${fmt(avanceCur)}</td>
-      <td class="r">${dodPct!=null?dodPct.toFixed(2):'—'}</td></tr>`;
-  });
-  html += '</tbody>';
-  tbl.innerHTML = html;
-  document.getElementById('tMomDod').textContent = `Comparativo MoM (Cuota) · DoD (Avance) por producto · ${dataCur.C.mes||''} ${dataCur.C.anio||''}`.trim();
 }
 
 // ===================== POSTPAGO / PREPAGO (estilo resumen Claro) =====================
@@ -2100,35 +2047,40 @@ function renderPosPre(){
     ${ppCardHTML('Prepago','Prepago',data)}
   </div>`;
 
-  // MoM % (comparando avance del mes actual vs. mes anterior, ambos al corte disponible) + YTD
+  // Comparativo MoM (Cuota) · DoD (Avance) por producto — reemplaza las tarjetas de métricas anteriores
   const [ya,ym] = key.split('-').map(Number);
   const prevKey = ym===1? (ya-1)+'-12' : ya+'-'+String(ym-1).padStart(2,'0');
   const dataPrev = CUOTAS_HIST[prevKey] ? ppCatsActual(prevKey) : null;
-  const yearKeys = CUOTAS_MESES_ORDEN.filter(k=>k.startsWith(ya+'-') && k<=key && CUOTAS_HIST[k]);
+  const labelCur = data.C.mes ? data.C.mes.toUpperCase() : key;
+  const labelPrev = dataPrev && dataPrev.C.mes ? dataPrev.C.mes.toUpperCase() : prevKey;
+  const diaCur = data.avance_dia, diaPrev = dataPrev ? dataPrev.avance_dia : null;
 
-  ['Postpago','Prepago'].forEach(grupo=>{
-    const gAct = data.cats? ppSumGroup(data.cats,grupo) : null;
-    const gPrev = (dataPrev && dataPrev.cats)? ppSumGroup(dataPrev.cats,grupo) : null;
-    const mom = (gAct && gPrev && gPrev.avance>0)? ((gAct.avance-gPrev.avance)/gPrev.avance*100) : null;
-    let ytdAvance=0, ytdMeta=0, ytdFound=false;
-    yearKeys.forEach(k=>{
-      const dk = ppCatsActual(k);
-      const gk = (dk && dk.cats)? ppSumGroup(dk.cats,grupo) : null;
-      if(gk){ ytdAvance+=gk.avance; ytdMeta+=gk.meta; ytdFound=true; }
-    });
-    const ytdPct = (ytdFound && ytdMeta>0)? (ytdAvance/ytdMeta*100) : null;
-    body += `<div class="card" style="margin-top:14px">
-      <h3>Métricas ${grupo}</h3>
-      <div style="display:flex;gap:24px;flex-wrap:wrap">
-        <div><div style="font-size:10px;color:var(--mut);text-transform:uppercase">MoM (vs. ${prevKey})</div>
-          <div style="font-size:18px;font-weight:800;color:${mom==null?'var(--mut)':mom>=0?'var(--verde)':'var(--rojo2)'}">${mom==null?'—':(mom>=0?'+':'')+mom.toFixed(1)+'%'}</div></div>
-        <div><div style="font-size:10px;color:var(--mut);text-transform:uppercase">YoY</div>
-          <div style="font-size:18px;font-weight:800;color:var(--mut)">N/D</div></div>
-        <div><div style="font-size:10px;color:var(--mut);text-transform:uppercase">YTD Cumplimiento</div>
-          <div style="font-size:18px;font-weight:800;color:${ytdPct==null?'var(--mut)':ytdPct>=100?'var(--verde)':ytdPct>=70?'var(--ambar)':'var(--rojo2)'}">${ytdPct==null?'—':ytdPct.toFixed(1)+'%'}</div></div>
-      </div>
-    </div>`;
+  let tblRows = `<thead>
+    <tr><th rowspan="2">PRODUCTO</th><th colspan="2" style="text-align:center">MoM (Cuota)</th><th colspan="2" style="text-align:center">DoD (Avance)</th><th rowspan="2" class="r">DoD %</th></tr>
+    <tr><th class="r">${labelPrev}</th><th class="r">${labelCur}</th><th class="r">${diaPrev?('DÍA '+diaPrev):'—'}</th><th class="r">DÍA ${diaCur}</th></tr>
+  </thead><tbody>`;
+  let lastGroup=null;
+  (data.cats||[]).forEach(c=>{
+    const g = PP_GROUPS[c.cat] || (['HFC','Clientes Inalámbricos'].includes(c.cat)?'Residencial':'Otros');
+    if(g!==lastGroup){ tblRows += `<tr><td colspan="6" style="background:#f5b04122;color:#f5b041;font-weight:700">${g}</td></tr>`; lastGroup=g; }
+    const cuotaCur = c.meta;
+    const cPrev = dataPrev && dataPrev.cats ? dataPrev.cats.find(x=>x.cat===c.cat) : null;
+    const cuotaPrev = cPrev ? cPrev.meta : null;
+    const avanceCur = c.avance;
+    const avancePrev = cPrev ? cPrev.avance : null;
+    const dodPct = (avancePrev!=null && avancePrev>0 && avanceCur!=null) ? (avanceCur/avancePrev*100) : null;
+    tblRows += `<tr><td>${c.cat}</td>
+      <td class="r">${cuotaPrev!=null?fmt(cuotaPrev):'—'}</td>
+      <td class="r">${fmt(cuotaCur)}</td>
+      <td class="r">${avancePrev!=null?fmt(avancePrev):'—'}</td>
+      <td class="r">${fmt(avanceCur)}</td>
+      <td class="r">${dodPct!=null?dodPct.toFixed(2)+'%':'—'}</td></tr>`;
   });
+  tblRows += '</tbody>';
+  body += `<div class="card" style="margin-top:14px">
+    <h3>Comparativo MoM (Cuota) · DoD (Avance) por producto</h3>
+    <div class="tscroll" style="max-height:none;overflow:visible"><table>${tblRows}</table></div>
+  </div>`;
 
   document.getElementById('posPreBody').innerHTML = body;
 }
