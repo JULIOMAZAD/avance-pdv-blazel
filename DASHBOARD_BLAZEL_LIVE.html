@@ -863,14 +863,13 @@ Chart.defaults.set('plugins.datalabels', {
     return v!=null && v!==0 && !isNaN(v);
   },
   color: '#ffffff',
-  font: { weight: '800', size: 12 },
+  font: { weight: '800', size: 11 },
   formatter: (value) => (typeof value === 'number') ? fmt(Math.round(value)) : value,
   anchor: 'end',
-  align: 'end',
-  offset: 3,
+  align: 'start',
   clip: false,
   clamp: true,
-  textStrokeColor: 'rgba(0,0,0,0.65)',
+  textStrokeColor: 'rgba(0,0,0,0.7)',
   textStrokeWidth: 3
 });
 
