@@ -197,11 +197,14 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
       </div>
       <div>
         <div style="font-size:10px;color:var(--mut);text-transform:uppercase;margin-bottom:4px">Comparar mes (anterior)</div>
-        <select id="ppMesA" style="padding:8px 10px;border-radius:8px;border:1px solid #2a3344;background:#161d29;color:#eef2f7;font-size:13px"></select>
+        <input type="text" id="ppMesA" list="listaMesesPP" placeholder="Ej: mayo..." autocomplete="off"
+          style="width:150px;padding:8px 10px;border-radius:8px;border:1px solid #2a3344;background:#161d29;color:#eef2f7;font-size:13px">
       </div>
       <div>
         <div style="font-size:10px;color:var(--mut);text-transform:uppercase;margin-bottom:4px">vs. mes (actual)</div>
-        <select id="ppMesB" style="padding:8px 10px;border-radius:8px;border:1px solid #2a3344;background:#161d29;color:#eef2f7;font-size:13px"></select>
+        <input type="text" id="ppMesB" list="listaMesesPP" placeholder="Ej: junio..." autocomplete="off"
+          style="width:150px;padding:8px 10px;border-radius:8px;border:1px solid #2a3344;background:#161d29;color:#eef2f7;font-size:13px">
+        <datalist id="listaMesesPP"></datalist>
       </div>
       <div>
         <div style="font-size:10px;color:var(--mut);text-transform:uppercase;margin-bottom:4px">Comparar hasta el día</div>
@@ -255,16 +258,6 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
     <h3>Equipos por mes</h3>
     <div id="eqMesNota" style="font-size:12px;color:var(--mut);padding:2px 0 10px">Top 5 marcas de cada mes con datos (respeta Año/Tienda de arriba, no depende del filtro de Mes). Se muestra siempre y va creciendo solo conforme entran más meses.</div>
     <div id="eqMesGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px"></div>
-  </div>
-  <div class="card">
-    <h3>Equipos por vendedor · consulta una tienda y verás a sus vendedores (mes ant. vs mes actual, mismo día)</h3>
-    <div id="eqVendNota" style="font-size:12px;color:var(--mut);padding:2px 0 8px"></div>
-    <div class="tscroll"><table id="tEqVend"></table></div>
-  </div>
-  <div class="card">
-    <h3>Equipos por tienda · Mes anterior vs Mes actual</h3>
-    <div id="eqTiendaNota" style="font-size:12px;color:var(--mut);padding:2px 0 8px"></div>
-    <div class="tscroll"><table id="tEqTienda"></table></div>
   </div>
 
   <div class="grid2">
@@ -859,6 +852,8 @@ Chart.defaults.font.family = "'Segoe UI',system-ui,sans-serif";
 // Cuadrícula de fondo más sutil: ahora que las barras muestran su valor, las líneas
 // de fondo solo deben servir de referencia leve, no competir visualmente.
 Chart.defaults.scale.grid.color = 'rgba(255,255,255,0.06)';
+// Espacio extra arriba/al costado para que el número de la barra más alta no se corte.
+Chart.defaults.layout.padding = {top:18, right:14};
 if(window.ChartDataLabels){ Chart.register(ChartDataLabels); }
 Chart.defaults.set('plugins.datalabels', {
   display: (ctx) => {
@@ -867,13 +862,16 @@ Chart.defaults.set('plugins.datalabels', {
     const v = ctx.dataset.data[ctx.dataIndex];
     return v!=null && v!==0 && !isNaN(v);
   },
-  color: '#eef2f7',
-  font: { weight: '700', size: 10 },
+  color: '#ffffff',
+  font: { weight: '800', size: 12 },
   formatter: (value) => (typeof value === 'number') ? fmt(Math.round(value)) : value,
   anchor: 'end',
   align: 'end',
-  offset: 2,
-  clip: false
+  offset: 3,
+  clip: false,
+  clamp: true,
+  textStrokeColor: 'rgba(0,0,0,0.65)',
+  textStrokeWidth: 3
 });
 
 const STORAGE_KEY = 'blazel_dashboard_data_v1';
@@ -1975,19 +1973,28 @@ function renderPosPre(){
   const prevKeyDefault = ym0===1? (ya0-1)+'-12' : ya0+'-'+String(ym0-1).padStart(2,'0');
   if(!PP_MES_A || !mesesOpsDisp.includes(PP_MES_A)) PP_MES_A = mesesOpsDisp.includes(prevKeyDefault)? prevKeyDefault : mesesOpsDisp[Math.max(0,mesesOpsDisp.length-2)];
   if(!PP_MES_B || !mesesOpsDisp.includes(PP_MES_B)) PP_MES_B = mesesOpsDisp.includes(keyActualOps)? keyActualOps : mesesOpsDisp[mesesOpsDisp.length-1];
-  const selA = document.getElementById('ppMesA'), selB = document.getElementById('ppMesB');
-  function fillMesSelect(sel, val){
-    sel.innerHTML = mesesOpsDisp.map(k=>{
-      const [a,m] = k.split('-').map(Number);
-      return `<option value="${k}" ${k===val?'selected':''}>${MESES[m-1]} ${a}</option>`;
-    }).join('');
+  const mesLabel = k=>{ const [a,m]=k.split('-').map(Number); return `${MESES[m-1]} ${a}`; };
+  const inputA = document.getElementById('ppMesA'), inputB = document.getElementById('ppMesB');
+  const listaMeses = document.getElementById('listaMesesPP');
+  if(listaMeses && !listaMeses.dataset.filled){
+    listaMeses.dataset.filled='1';
+    listaMeses.innerHTML = mesesOpsDisp.map(k=>`<option value="${mesLabel(k)}">`).join('');
   }
-  if(selA && selB){
-    fillMesSelect(selA, PP_MES_A);
-    fillMesSelect(selB, PP_MES_B);
-    if(!selA.dataset.wired){ selA.dataset.wired='1'; selA.addEventListener('change', ()=>{ PP_MES_A=selA.value; renderPosPre(); }); }
-    if(!selB.dataset.wired){ selB.dataset.wired='1'; selB.addEventListener('change', ()=>{ PP_MES_B=selB.value; renderPosPre(); }); }
+  function wireMesInput(input, getVal, setVal){
+    if(!input) return;
+    input.value = mesLabel(getVal());
+    if(!input.dataset.wired){
+      input.dataset.wired='1';
+      input.addEventListener('change', ()=>{
+        const q = input.value.trim().toLowerCase();
+        const match = mesesOpsDisp.find(k=>mesLabel(k).toLowerCase()===q) ||
+                      mesesOpsDisp.find(k=>mesLabel(k).toLowerCase().includes(q));
+        if(match){ setVal(match); renderPosPre(); } else { input.value = mesLabel(getVal()); }
+      });
+    }
   }
+  wireMesInput(inputA, ()=>PP_MES_A, v=>PP_MES_A=v);
+  wireMesInput(inputB, ()=>PP_MES_B, v=>PP_MES_B=v);
   const diaCorteInput = document.getElementById('ppDiaCorte');
   if(diaCorteInput && !diaCorteInput.dataset.wired){
     diaCorteInput.dataset.wired='1';
@@ -2044,16 +2051,16 @@ function renderPosPre(){
     + `</tr><tr><th class="r">${mNombreA} ${yaA}</th><th class="r">${mNombreB} ${yaB}</th>`
     + (hayDetalleDia? `<th class="r">${mNombreA}</th><th class="r">${mNombreB}</th>` : '')
     + `</tr>`;
-  const cfDodPct = (hayCargoDia && cfDodA>0) ? (cfDodB/cfDodA*100) : null;
+  const cfDodPct = hayCargoDia ? evoPctCell(cfDodB, cfDodA) : '—';
   tbl += `<tr style="background:#1b2230;font-weight:700"><td>Cargo Fijo (S/)</td><td class="r">S/ ${fmt(cfMomA)}</td><td class="r">S/ ${fmt(cfMomB)}</td>`
-    + (hayDetalleDia? `<td class="r">${hayCargoDia?'S/ '+fmt(cfDodA):'—'}</td><td class="r">${hayCargoDia?'S/ '+fmt(cfDodB):'—'}</td><td class="r">${cfDodPct!=null?cfDodPct.toFixed(1)+'%':'—'}</td>` : '')
+    + (hayDetalleDia? `<td class="r">${hayCargoDia?'S/ '+fmt(cfDodA):'—'}</td><td class="r">${hayCargoDia?'S/ '+fmt(cfDodB):'—'}</td><td class="r">${cfDodPct}</td>` : '')
     + `</tr>`;
   todasCats.forEach(cat=>{
     const vA = momA[cat]||0, vB = momB[cat]||0;
     const dA = dodA[cat]||0, dB = dodB[cat]||0;
-    const dodPct = (hayDetalleDia && dA>0) ? (dB/dA*100) : null;
+    const dodPct = hayDetalleDia ? evoPctCell(dB, dA) : '—';
     tbl += `<tr><td>${cat}</td><td class="r">${fmt(vA)}</td><td class="r">${fmt(vB)}</td>`
-      + (hayDetalleDia? `<td class="r">${fmt(dA)}</td><td class="r">${fmt(dB)}</td><td class="r">${dodPct!=null?dodPct.toFixed(1)+'%':'—'}</td>` : '')
+      + (hayDetalleDia? `<td class="r">${fmt(dA)}</td><td class="r">${fmt(dB)}</td><td class="r">${dodPct}</td>` : '')
       + `</tr>`;
   });
   body += `<div class="card" style="margin-top:14px">
