@@ -158,7 +158,7 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
   <div class="kpis" id="kpisSameStore"></div>
   <div class="card">
     <h3>Cargo Fijo · Mismas Tiendas (Same-Store Sales)</h3>
-    <div style="font-size:12px;color:var(--mut);padding:2px 0 10px">Compara el Cargo Fijo total (S/, todas las tiendas) contra el de solo las tiendas con <b>12+ meses</b> operando. Si la línea de "Total" sube pero la de "Mismas tiendas" está plana o cae, el crecimiento viene de aperturas nuevas, no de mejora real en las tiendas existentes.</div>
+    <div style="font-size:12px;color:var(--mut);padding:2px 0 10px">Compara el Cargo Fijo total (S/, incluye todos los canales: tiendas, Call center, Multimarca, etc. — coincide con el Resumen Ejecutivo) contra el de solo <b>tiendas físicas con 12+ meses</b> operando. Si la línea de "Total" sube pero la de "Mismas tiendas" está plana o cae, el crecimiento viene de aperturas nuevas u otros canales, no de mejora real en las tiendas existentes.</div>
     <div class="cwrap" style="height:380px"><canvas id="chSameStore"></canvas></div>
     <div class="tscroll" style="margin-top:14px"><table id="tblSameStore"></table></div>
   </div>
@@ -1478,9 +1478,11 @@ function renderSameStore(){
   const seq = []; let a=DATA.anioActual, m=DATA.mesActual;
   for(let i=0;i<seqN;i++){ seq.unshift([a,m]); m--; if(m<1){m=12;a--;} }
 
-  const cargoPorMesPdv = {}; // "anio-mes" -> {pdv: cargoFijo$}
+  const cargoPorMesPdv = {}; // "anio-mes" -> {pdv: cargoFijo$} — solo tiendas físicas (para "mismas tiendas")
+  const cargoPorMesTotal = {}; // "anio-mes" -> total real, TODOS los canales (para que coincida con el resto del dashboard)
   for(const r of DATA.cargo){
     const k = r[0]+'-'+r[1];
+    cargoPorMesTotal[k] = (cargoPorMesTotal[k]||0) + r[3];
     if(!tiendas.includes(r[2])) continue;
     if(!cargoPorMesPdv[k]) cargoPorMesPdv[k]={};
     cargoPorMesPdv[k][r[2]] = (cargoPorMesPdv[k][r[2]]||0) + r[3];
@@ -1492,17 +1494,16 @@ function renderSameStore(){
     const key = ya+'-'+ym;
     const porPdv = cargoPorMesPdv[key] || {};
     const mesKey = ya*100+ym;
-    let total=0, same=0;
+    let same=0;
     tiendas.forEach(p=>{
       const v = porPdv[p]||0;
-      total += v;
       const pm = primerMes[p];
       if(pm!=null){
         const edadMeses = Math.floor((Math.floor(mesKey/100)-Math.floor(pm/100))*12 + (mesKey%100-pm%100));
         if(edadMeses >= MADUREZ_MESES) same += v;
       }
     });
-    totalArr.push(Math.round(total)); sameArr.push(Math.round(same));
+    totalArr.push(Math.round(cargoPorMesTotal[key]||0)); sameArr.push(Math.round(same));
   });
 
   // ---- KPIs: aporte de tiendas nuevas y variación de tiendas maduras (mes de referencia = último de la serie) ----
