@@ -853,7 +853,7 @@ Chart.defaults.font.family = "'Segoe UI',system-ui,sans-serif";
 // de fondo solo deben servir de referencia leve, no competir visualmente.
 Chart.defaults.scale.grid.color = 'rgba(255,255,255,0.06)';
 // Espacio extra arriba/al costado para que el número de la barra más alta no se corte.
-Chart.defaults.layout.padding = {top:18, right:14};
+Chart.defaults.layout.padding = {top:22, right:38, bottom:4, left:4};
 if(window.ChartDataLabels){ Chart.register(ChartDataLabels); }
 Chart.defaults.set('plugins.datalabels', {
   display: (ctx) => {
@@ -862,15 +862,16 @@ Chart.defaults.set('plugins.datalabels', {
     const v = ctx.dataset.data[ctx.dataIndex];
     return v!=null && v!==0 && !isNaN(v);
   },
-  color: '#ffffff',
-  font: { weight: '800', size: 11 },
+  color: '#eef2f7',
+  font: { weight: '700', size: 11 },
   formatter: (value) => (typeof value === 'number') ? fmt(Math.round(value)) : value,
   anchor: 'end',
-  align: 'start',
+  align: 'end',
+  offset: 4,
   clip: false,
   clamp: true,
-  textStrokeColor: 'rgba(0,0,0,0.7)',
-  textStrokeWidth: 3
+  textStrokeColor: 'rgba(0,0,0,0.6)',
+  textStrokeWidth: 2
 });
 
 const STORAGE_KEY = 'blazel_dashboard_data_v1';
