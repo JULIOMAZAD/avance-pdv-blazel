@@ -159,6 +159,7 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
   <div class="card">
     <h3>Cargo Fijo · Mismas Tiendas (Same-Store Sales)</h3>
     <div style="font-size:12px;color:var(--mut);padding:2px 0 10px">Compara el Cargo Fijo total (S/, incluye todos los canales: tiendas, Call center, Multimarca, etc. — coincide con el Resumen Ejecutivo) contra el de solo <b>tiendas físicas con 12+ meses</b> operando. Si la línea de "Total" sube pero la de "Mismas tiendas" está plana o cae, el crecimiento viene de aperturas nuevas u otros canales, no de mejora real en las tiendas existentes.</div>
+    <div id="sameStoreFiltroNota" style="font-size:12px;color:var(--ambar,#f5b041);padding:0 0 10px;display:none"></div>
     <div class="cwrap" style="height:380px"><canvas id="chSameStore"></canvas></div>
     <div class="tscroll" style="margin-top:14px"><table id="tblSameStore"></table></div>
   </div>
@@ -1461,7 +1462,17 @@ function renderSameStore(){
   const cv = document.getElementById('chSameStore'), tb = document.getElementById('tblSameStore');
   if(!cv || !tb) return;
   const NON_STORE = new Set(['Call center','Multimarca','Campo','Otros']);
-  const tiendas = DATA.pdvs.filter(p=>!NON_STORE.has(p));
+  const filtroActivo = F.pdv && F.pdv.length>0 && F.pdv.length<DATA.pdvs.length;
+  const tiendas = DATA.pdvs.filter(p=>!NON_STORE.has(p) && (!filtroActivo || inPdv(p)));
+  const nota = document.getElementById('sameStoreFiltroNota');
+  if(nota){
+    if(filtroActivo){
+      nota.style.display='block';
+      nota.innerHTML = `📌 Filtro de tienda activo — comparando solo: <b>${tiendas.map(pdvShort).join(', ')}</b>. Usa el filtro TIENDA de arriba (con buscador) para agregar o quitar tiendas de esta comparación.`;
+    } else {
+      nota.style.display='none';
+    }
+  }
   const MADUREZ_MESES = 12;
 
   // primer mes con Cargo Fijo (anio*100+mes) para cada tienda, usando DATA.cargo
@@ -1472,17 +1483,21 @@ function renderSameStore(){
     if(primerMes[r[2]]==null || k<primerMes[r[2]]) primerMes[r[2]] = k;
   }
 
-  // últimos 13 meses hacia atrás desde el mes actual real (no depende del filtro de arriba,
-  // para que la comparación histórica siempre se vea completa)
+  // últimos 13 meses hacia atrás desde el mes actual real (no depende del filtro de MES/AÑO de arriba,
+  // para que la comparación histórica siempre se vea completa; sí respeta el filtro de TIENDA)
   const seqN = 13;
   const seq = []; let a=DATA.anioActual, m=DATA.mesActual;
   for(let i=0;i<seqN;i++){ seq.unshift([a,m]); m--; if(m<1){m=12;a--;} }
 
-  const cargoPorMesPdv = {}; // "anio-mes" -> {pdv: cargoFijo$} — solo tiendas físicas (para "mismas tiendas")
-  const cargoPorMesTotal = {}; // "anio-mes" -> total real, TODOS los canales (para que coincida con el resto del dashboard)
+  const cargoPorMesPdv = {}; // "anio-mes" -> {pdv: cargoFijo$} — solo tiendas incluidas (para "mismas tiendas")
+  const cargoPorMesTotal = {}; // "anio-mes" -> total real
   for(const r of DATA.cargo){
     const k = r[0]+'-'+r[1];
-    cargoPorMesTotal[k] = (cargoPorMesTotal[k]||0) + r[3];
+    // Sin filtro de tienda activo: el total incluye TODOS los canales (coincide con el Resumen Ejecutivo).
+    // Con filtro de tienda activo: el total respeta las tiendas que elegiste arriba.
+    if(!filtroActivo || tiendas.includes(r[2])){
+      cargoPorMesTotal[k] = (cargoPorMesTotal[k]||0) + r[3];
+    }
     if(!tiendas.includes(r[2])) continue;
     if(!cargoPorMesPdv[k]) cargoPorMesPdv[k]={};
     cargoPorMesPdv[k][r[2]] = (cargoPorMesPdv[k][r[2]]||0) + r[3];
