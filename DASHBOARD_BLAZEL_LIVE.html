@@ -97,7 +97,7 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
   </div>
 </div>
 <header>
-  <div class="logo">BLA<b>ZEL</b><small>CREADO POR JULIO MAZA D. · v26 (quitado mapa de calor/ritmo diario y pestaña Cuotas)</small></div>
+  <div class="logo">BLA<b>ZEL</b><small>CREADO POR JULIO MAZA D. · v27 (buscador asesor, buscador tienda + meses en Postpago/Prepago, HFC por vendedor por día)</small></div>
   <div class="filtros" id="filtrosCont"></div>
   <div id="filtroDiaCont" style="display:none">
     <div>
@@ -157,7 +157,19 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
   <div class="card"><h3 id="tHfcEvo">HFC mensual 2023 → 2026</h3><div class="cwrap" style="height:320px"><canvas id="chHfcFull"></canvas></div></div>
   <div class="card"><h3 id="tHfcPdv">Ranking de tiendas · Ritmo HFC</h3><div class="tscroll"><table id="tblHfcPdv"></table></div></div>
   <div class="card"><h3 id="tHfcAse">Top 15 Asesores · HFC</h3><div id="rankHfcAse"></div></div>
-  <div class="card"><h3 id="tHfcCmpVend">HFC por vendedor · Cierre mes anterior vs Avance mes actual</h3><div id="hfcCmpNota"></div><div class="tscroll"><table id="tblHfcCmpVend"></table></div></div>
+  <div class="card">
+    <h3 id="tHfcCmpVend">HFC por vendedor · Cierre mes anterior vs Avance mes actual</h3>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+      <button id="hfcCmpTabMes" class="chip trend-tab-btn on" onclick="setHfcCmpVendModo('mes')">Por Mes</button>
+      <button id="hfcCmpTabDia" class="chip trend-tab-btn" onclick="setHfcCmpVendModo('dia')">Por Día</button>
+      <span id="hfcCmpDiaSelWrap" style="display:none;align-items:center;gap:6px">
+        <span style="font-size:12px;color:var(--mut)">Comparar hasta el día:</span>
+        <input type="number" id="hfcCmpDiaInput" min="1" max="31" value="1" style="width:60px;padding:6px 8px;border-radius:8px;border:1px solid #2a3344;background:#161d29;color:#eef2f7;font-size:13px">
+      </span>
+    </div>
+    <div id="hfcCmpNota"></div>
+    <div class="tscroll"><table id="tblHfcCmpVend"></table></div>
+  </div>
 </section>
 
 <section class="sec" id="s-evolucion">
@@ -174,6 +186,24 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
 
 <section class="sec" id="s-pospre">
   <div id="posPreBanner" style="display:none;background:#3a2a1a;border:1px solid #6b4a1f;border-radius:10px;padding:10px 14px;margin-bottom:12px;color:#f5b041;font-size:13px"></div>
+  <div class="card" style="margin-bottom:14px">
+    <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-end">
+      <div>
+        <div style="font-size:10px;color:var(--mut);text-transform:uppercase;margin-bottom:4px">Buscar tienda / PDV</div>
+        <input type="text" id="buscarTiendaPP" list="listaTiendasPP" placeholder="Ej: mega..." autocomplete="off"
+          style="width:220px;padding:8px 12px;border-radius:8px;border:1px solid #2a3344;background:#161d29;color:#eef2f7;font-size:13px">
+        <datalist id="listaTiendasPP"></datalist>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--mut);text-transform:uppercase;margin-bottom:4px">Comparar mes (anterior)</div>
+        <select id="ppMesA" style="padding:8px 10px;border-radius:8px;border:1px solid #2a3344;background:#161d29;color:#eef2f7;font-size:13px"></select>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--mut);text-transform:uppercase;margin-bottom:4px">vs. mes (actual)</div>
+        <select id="ppMesB" style="padding:8px 10px;border-radius:8px;border:1px solid #2a3344;background:#161d29;color:#eef2f7;font-size:13px"></select>
+      </div>
+    </div>
+  </div>
   <div id="posPreBody"></div>
   <div class="card" style="margin-top:14px">
     <div style="color:var(--mut);font-size:12px;line-height:1.5">
@@ -203,7 +233,14 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
 
 <section class="sec" id="s-dia">
   <div class="kpis" id="kpisDia"></div>
-  <div class="card" id="cardHeatV"><h3>Junio 2026 · Productividad diaria por asesor (PDV filtrado)</h3><div style="overflow-x:auto"><div class="heat" id="heatVend"></div></div></div>
+  <div class="card" id="cardHeatV">
+    <h3>Junio 2026 · Productividad diaria por asesor (PDV filtrado)</h3>
+    <div style="margin-bottom:10px">
+      <input type="text" id="buscarAsesorDia" placeholder="Buscar asesor por nombre..." autocomplete="off"
+        style="width:100%;max-width:340px;padding:8px 12px;border-radius:8px;border:1px solid #2a3344;background:#161d29;color:#eef2f7;font-size:13px">
+    </div>
+    <div style="overflow-x:auto"><div class="heat" id="heatVend"></div></div>
+  </div>
 </section>
 
 <section class="sec" id="s-equipos">
@@ -1995,8 +2032,61 @@ function ppCardHTML(titulo,grupo,data){
     </div>
   </div>`;
 }
+let PP_MES_A = null, PP_MES_B = null;
 function renderPosPre(){
+  // --- buscador de tienda (autocomplete) ---
+  const inputTienda = document.getElementById('buscarTiendaPP');
+  const listaTiendas = document.getElementById('listaTiendasPP');
+  if(inputTienda && listaTiendas){
+    if(!listaTiendas.dataset.filled){
+      listaTiendas.dataset.filled='1';
+      listaTiendas.innerHTML = DATA.pdvs.map(p=>`<option value="${p}">`).join('');
+    }
+    if(!inputTienda.dataset.wired){
+      inputTienda.dataset.wired='1';
+      // reflejar la tienda ya filtrada (si hay una sola) al entrar a la pestaña
+      if(F.pdv.length===1) inputTienda.value = F.pdv[0];
+      inputTienda.addEventListener('change', ()=>{
+        const q = inputTienda.value.trim();
+        if(!q){
+          F.pdv = [];
+          const panel = document.querySelector('#msel-pdv .msel-panel');
+          if(panel) panel.querySelectorAll('input[type=checkbox]').forEach(b=>b.checked=true);
+        } else {
+          const match = DATA.pdvs.find(p=>p.toLowerCase()===q.toLowerCase()) ||
+                        DATA.pdvs.find(p=>p.toLowerCase().includes(q.toLowerCase()));
+          if(match){
+            inputTienda.value = match;
+            F.pdv = [match];
+            const panel = document.querySelector('#msel-pdv .msel-panel');
+            if(panel) panel.querySelectorAll('input[type=checkbox]').forEach(b=>{ b.checked = (b.value===match); });
+          }
+        }
+        refreshFiltroLabels(); guardarVistaFiltros(); render();
+      });
+    }
+  }
+  // --- selectores de mes para el comparativo MoM/DoD ---
+  const mesesDisp = CUOTAS_MESES_ORDEN.filter(k=>CUOTAS_HIST[k]);
   const key = cuotasKeyActual();
+  const [ya0,ym0] = key.split('-').map(Number);
+  const prevKeyDefault = ym0===1? (ya0-1)+'-12' : ya0+'-'+String(ym0-1).padStart(2,'0');
+  if(!PP_MES_A || !mesesDisp.includes(PP_MES_A)) PP_MES_A = mesesDisp.includes(prevKeyDefault)? prevKeyDefault : mesesDisp[0];
+  if(!PP_MES_B || !mesesDisp.includes(PP_MES_B)) PP_MES_B = key;
+  const selA = document.getElementById('ppMesA'), selB = document.getElementById('ppMesB');
+  function fillMesSelect(sel, val){
+    sel.innerHTML = mesesDisp.map(k=>{
+      const [a,m] = k.split('-').map(Number);
+      return `<option value="${k}" ${k===val?'selected':''}>${MESES[m-1]} ${a}</option>`;
+    }).join('');
+  }
+  if(selA && selB){
+    fillMesSelect(selA, PP_MES_A);
+    fillMesSelect(selB, PP_MES_B);
+    if(!selA.dataset.wired){ selA.dataset.wired='1'; selA.addEventListener('change', ()=>{ PP_MES_A=selA.value; renderPosPre(); }); }
+    if(!selB.dataset.wired){ selB.dataset.wired='1'; selB.addEventListener('change', ()=>{ PP_MES_B=selB.value; renderPosPre(); }); }
+  }
+
   const data = ppCatsActual(key);
   const banner = document.getElementById('posPreBanner');
   if(!data){
@@ -2011,13 +2101,12 @@ function renderPosPre(){
     ${ppCardHTML('Prepago','Prepago',data)}
   </div>`;
 
-  // MoM (Cuota) · DoD (Avance) por producto — tabla única, como referencia del usuario
-  const [ya,ym] = key.split('-').map(Number);
-  const prevKey = ym===1? (ya-1)+'-12' : ya+'-'+String(ym-1).padStart(2,'0');
-  const dataPrev = CUOTAS_HIST[prevKey] ? ppCatsActual(prevKey) : null;
-  const labelCur = data.C.mes ? data.C.mes.toUpperCase() : key;
-  const labelPrev = dataPrev && dataPrev.C.mes ? dataPrev.C.mes.toUpperCase() : prevKey;
-  const diaCur = data.avance_dia, diaPrev = dataPrev ? dataPrev.avance_dia : null;
+  // MoM (Cuota) · DoD (Avance) por producto — meses elegidos por el usuario arriba
+  const dataB = ppCatsActual(PP_MES_B) || data;
+  const dataPrev = ppCatsActual(PP_MES_A);
+  const labelCur = (dataB.C && dataB.C.mes) ? dataB.C.mes.toUpperCase() : PP_MES_B;
+  const labelPrev = (dataPrev && dataPrev.C && dataPrev.C.mes) ? dataPrev.C.mes.toUpperCase() : PP_MES_A;
+  const diaCur = dataB.avance_dia, diaPrev = dataPrev ? dataPrev.avance_dia : null;
   function grupoProducto(cat){
     if(/prepago/i.test(cat) && !/postpago/i.test(cat)) return 'PREPAGO';
     if(/postpago/i.test(cat)) return 'POSTPAGO';
@@ -2027,7 +2116,7 @@ function renderPosPre(){
   let tbl = `<tr><th rowspan="2">PRODUCTO</th><th colspan="2" style="text-align:center">MoM</th><th colspan="2" style="text-align:center">DoD</th><th rowspan="2" class="r">DoD %</th></tr>
     <tr><th class="r">${labelPrev}</th><th class="r">${labelCur}</th><th class="r">${diaPrev?('DÍA '+diaPrev):'—'}</th><th class="r">DÍA ${diaCur}</th></tr>`;
   let lastGroup=null;
-  (data.cats||[]).forEach(c=>{
+  (dataB.cats||[]).forEach(c=>{
     const g = grupoProducto(c.cat);
     if(g!==lastGroup){ tbl += `<tr><td colspan="6" style="background:#1b2230;font-weight:700;color:var(--mut)">${g}</td></tr>`; lastGroup=g; }
     const cPrev = dataPrev && dataPrev.cats ? dataPrev.cats.find(x=>x.cat===c.cat) : null;
@@ -2083,6 +2172,14 @@ function renderAse(){
 }
 
 // ===================== PUNTO 2: HFC POR VENDEDOR — MES ANT vs AVANCE ACTUAL =====================
+let HFC_CMP_VEND_MODO = 'mes';
+function setHfcCmpVendModo(m){
+  HFC_CMP_VEND_MODO = m;
+  document.getElementById('hfcCmpTabMes').classList.toggle('on', m==='mes');
+  document.getElementById('hfcCmpTabDia').classList.toggle('on', m==='dia');
+  document.getElementById('hfcCmpDiaSelWrap').style.display = (m==='dia') ? 'inline-flex' : 'none';
+  renderHfcCmpVend();
+}
 function renderHfcCmpVend(){
   const tbl = document.getElementById('tblHfcCmpVend');
   const nota = document.getElementById('hfcCmpNota');
@@ -2092,6 +2189,54 @@ function renderHfcCmpVend(){
   const esActual = (refA===DATA.anioActual && refM===DATA.mesActual);
   const da = diasAvanceEfectivo();
   const dmes = diasMes(refM);
+
+  const diaInput = document.getElementById('hfcCmpDiaInput');
+  if(diaInput && !diaInput.dataset.wired){
+    diaInput.dataset.wired='1';
+    diaInput.value = da || 1;
+    diaInput.addEventListener('change', renderHfcCmpVend);
+  }
+
+  if(HFC_CMP_VEND_MODO === 'dia'){
+    if(!DATA.aseProdDia || !DATA.aseProdDia.length){
+      if(nota) nota.innerHTML = `<div style="color:var(--mut);font-size:13px;padding:8px 0">La comparación <b>por día</b> necesita el detalle diario por producto × asesor, que se construye al cargar tu Excel BASE (arrástralo en la zona de carga). Los datos actuales no incluyen ese cruce.</div>`;
+      tbl.innerHTML = '';
+      return;
+    }
+    const diaCorte = Math.max(1, Math.min(31, parseInt(diaInput && diaInput.value,10) || da || 1));
+    // aseProdDia: [anio, mes, dia, pdv, vendedor, tipoOp, count]
+    const cur={}, prev={};
+    for(const r of DATA.aseProdDia){
+      if(r[5]!=='HFC' || r[2]>diaCorte) continue;
+      if(!inPdv(r[3])) continue;
+      if(r[0]===refA && r[1]===refM){ if(!cur[r[4]]) cur[r[4]]={hfc:0,pdv:r[3]}; cur[r[4]].hfc+=r[6]; if(cur[r[4]].pdv!==r[3])cur[r[4]].pdv='Varios'; }
+      if(r[0]===pa  && r[1]===pm ){ prev[r[4]]=(prev[r[4]]||0)+r[6]; }
+    }
+    const names=[...new Set([...Object.keys(cur),...Object.keys(prev)])];
+    const rowsArr=names.map(v=>{
+      const hAct=(cur[v]&&cur[v].hfc)||0, hPrev=prev[v]||0;
+      return {v, pdv:(cur[v]&&cur[v].pdv)|| 'Varios', hAct, hPrev};
+    }).filter(x=>x.hAct>0||x.hPrev>0).sort((a,b)=>b.hAct-a.hAct);
+
+    if(nota) nota.innerHTML = `<div style="color:var(--mut);font-size:12px;padding:2px 0 8px">
+      HFC acumulado hasta el <b>día ${diaCorte}</b>. Izquierda: <b>${MESES[pm-1]} ${pa}</b>. Derecha: <b>${MESES[refM-1]} ${refA}</b>.</div>`;
+
+    let h='<tr><th>#</th><th>Asesor</th><th>Tienda</th>'
+        + `<th class="r" style="border-left:2px solid #2a3344">HFC día ${diaCorte} · ${MESES[pm-1]}</th>`
+        + `<th class="r" style="border-left:2px solid #2a3344">HFC día ${diaCorte} · ${MESES[refM-1]}</th>`
+        + '<th class="r">Δ vs mes ant.</th></tr>';
+    rowsArr.forEach((x,i)=>{
+      let delta='—';
+      if(x.hPrev>0){ const d=(x.hAct-x.hPrev)/x.hPrev*100, up=d>=0; delta=`<b class="${up?'up':'dn'}">${up?'▲':'▼'} ${Math.abs(d).toFixed(0)}%</b>`; }
+      h+=`<tr><td>${i+1}</td><td>${x.v}</td><td>${pdvShort(x.pdv)}</td>`
+       + `<td class="r" style="border-left:2px solid #2a3344">${x.hPrev}</td>`
+       + `<td class="r" style="border-left:2px solid #2a3344"><b>${x.hAct}</b></td>`
+       + `<td class="r">${delta}</td></tr>`;
+    });
+    tbl.innerHTML = rowsArr.length? h : '<tr><td style="color:var(--mut);padding:10px">Sin HFC por vendedor hasta ese día.</td></tr>';
+    return;
+  }
+
   // HFC por vendedor: actual (refA/refM) y mes anterior (pa/pm), respetando tienda
   const cur={}, prev={};
   for(const r of DATA.ases){
@@ -2253,14 +2398,23 @@ function renderDia(){
     : kpiHTML('Detalle diario','—','Disponible solo para 2026');
   // heatmap asesores (solo mes/año actual)
   const cv=document.getElementById('cardHeatV'), hv=document.getElementById('heatVend');
+  const buscarAsesor = document.getElementById('buscarAsesorDia');
+  if(buscarAsesor && !buscarAsesor.dataset.wired){
+    buscarAsesor.dataset.wired='1';
+    buscarAsesor.addEventListener('input', renderDia);
+  }
   if(refA===DATA.anioActual && refM===DATA.mesActual){
     cv.style.display='block';
     document.querySelector('#cardHeatV h3').textContent = `${MESES[refM-1]} ${refA} · Productividad diaria por asesor (filtro aplicado)`;
     const vm={}; let vmax=0;
     for(const r of DATA.junv){ if(inPdv(r[2])){ (vm[r[1]]=vm[r[1]]||{})[r[0]]=((vm[r[1]]||{})[r[0]]||0)+r[3]; vmax=Math.max(vmax,vm[r[1]][r[0]]); } }
-    const vend=Object.keys(vm).map(v=>({v,t:Object.values(vm[v]).reduce((a,b)=>a+b,0)})).sort((a,b)=>b.t-a.t).slice(0,30);
+    const qAse = (buscarAsesor && buscarAsesor.value || '').trim().toLowerCase();
+    let vend=Object.keys(vm).map(v=>({v,t:Object.values(vm[v]).reduce((a,b)=>a+b,0)})).sort((a,b)=>b.t-a.t);
+    if(qAse) vend = vend.filter(x=>x.v.toLowerCase().includes(qAse));
+    else vend = vend.slice(0,30);
     hv.style.gridTemplateColumns=`170px repeat(${DATA.maxDia},1fr) 60px`;
     let h=`<div class="hlabel"><b>ASESOR</b></div>`; for(let d=1;d<=DATA.maxDia;d++)h+=`<div class="hcell" style="background:none;color:var(--mut)">${d}</div>`; h+=`<div class="hcell" style="background:none;color:var(--mut)">TOT</div>`;
+    if(vend.length===0){ h+=`<div class="hlabel" style="grid-column:1/-1;color:var(--mut)">Sin asesores que coincidan con "${buscarAsesor.value}".</div>`; }
     vend.forEach(({v,t})=>{ h+=`<div class="hlabel" title="${v}">${v}</div>`;
       for(let d=1;d<=DATA.maxDia;d++){const x=vm[v][d]||0; const op=x?0.15+0.85*(x/vmax):0;
         h+=`<div class="hcell" style="background:rgba(57,208,216,${op.toFixed(2)});color:${x/vmax>0.5?'#06262a':'#cbd5e1'}">${x||''}</div>`;}
