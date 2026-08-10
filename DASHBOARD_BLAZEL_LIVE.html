@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BLAZEL · Centro de Mando Comercial</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -209,11 +210,6 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
     </div>
   </div>
   <div id="posPreBody"></div>
-  <div class="card" style="margin-top:14px">
-    <div style="color:var(--mut);font-size:12px;line-height:1.5">
-      ⚠️ <b>Venta 100% Online</b> y el comparativo <b>YoY (interanual)</b> no se muestran aquí porque no tenemos esos datos cargados: los datos de cuotas históricos empiezan en enero 2026 (no hay mes equivalente de 2025 para comparar), y no existe ningún campo que distinga canal de venta online vs. presencial. Si consigues esos reportes, los agrego.
-    </div>
-  </div>
 </section>
 
 <section class="sec" id="s-asesores">
@@ -229,6 +225,10 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
         <input type="checkbox" id="aseMostrarTodos" style="cursor:pointer">
         Mostrar también inactivos (más de 12 meses sin ventas)
       </label>
+      <div style="display:flex;align-items:center;gap:8px">
+        <label style="font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:1px">Meses a mostrar</label>
+        <input type="number" id="aseMesesN" min="1" max="36" value="12" style="width:70px;padding:7px 10px;border-radius:8px;border:1px solid #2a3344;background:#161d29;color:#eef2f7;font-size:13px">
+      </div>
     </div>
     <div id="aseProdNota"></div>
     <div class="tscroll" style="max-height:none;overflow:visible"><table id="tblAseProd"></table></div>
@@ -253,7 +253,7 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
   <div id="eqPeriodoBanner" style="display:none"></div>
   <div class="card" id="cardEqMes">
     <h3>Equipos por mes</h3>
-    <div id="eqMesNota" style="font-size:12px;color:var(--mut);padding:2px 0 10px">Top 5 marcas de cada mes, según los filtros de arriba. Útil cuando seleccionas varios meses en el filtro MES.</div>
+    <div id="eqMesNota" style="font-size:12px;color:var(--mut);padding:2px 0 10px">Top 5 marcas de cada mes con datos (respeta Año/Tienda de arriba, no depende del filtro de Mes). Se muestra siempre y va creciendo solo conforme entran más meses.</div>
     <div id="eqMesGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px"></div>
   </div>
   <div class="card">
@@ -268,13 +268,10 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
   </div>
 
   <div class="grid2">
-    <div class="card"><h3>Top Marcas</h3><div class="cwrap"><canvas id="chEqMarcas"></canvas></div></div>
+    <div class="card"><h3>Top Modelos</h3><div class="tscroll" style="max-height:430px"><table id="tEqModelos"></table></div></div>
     <div class="card"><h3>Mix de Gama</h3><div class="cwrap"><canvas id="chEqGama"></canvas></div></div>
   </div>
-  <div class="grid2">
-    <div class="card"><h3>Top Modelos</h3><div class="tscroll" style="max-height:430px"><table id="tEqModelos"></table></div></div>
-    <div class="card" id="cardEqComparativoTienda"><h3>Comparativo por Tienda</h3><div class="tscroll" style="max-height:430px"><table id="tEqTiendas"></table></div></div>
-  </div>
+  <div class="card" id="cardEqComparativoTienda"><h3>Comparativo por Tienda</h3><div class="tscroll" style="max-height:430px"><table id="tEqTiendas"></table></div></div>
   <div class="card" id="cardEqLiderTienda"><h3>Marca líder por Tienda</h3><div class="tscroll"><table id="tEqLider"></table></div>
     <div style="font-size:11px;color:var(--mut);margin-top:10px" id="eqNote"></div></div>
 </section>
@@ -859,6 +856,25 @@ const fmt2 = n => n.toLocaleString('es-PE',{minimumFractionDigits:2,maximumFract
 const pct = n => (n*100).toFixed(1)+'%';
 Chart.defaults.color = '#8b97a8'; Chart.defaults.borderColor = '#2a3344';
 Chart.defaults.font.family = "'Segoe UI',system-ui,sans-serif";
+// Cuadrícula de fondo más sutil: ahora que las barras muestran su valor, las líneas
+// de fondo solo deben servir de referencia leve, no competir visualmente.
+Chart.defaults.scale.grid.color = 'rgba(255,255,255,0.06)';
+if(window.ChartDataLabels){ Chart.register(ChartDataLabels); }
+Chart.defaults.set('plugins.datalabels', {
+  display: (ctx) => {
+    const dsType = ctx.dataset.type || ctx.chart.config.type;
+    if(dsType !== 'bar') return false;
+    const v = ctx.dataset.data[ctx.dataIndex];
+    return v!=null && v!==0 && !isNaN(v);
+  },
+  color: '#eef2f7',
+  font: { weight: '700', size: 10 },
+  formatter: (value) => (typeof value === 'number') ? fmt(Math.round(value)) : value,
+  anchor: 'end',
+  align: 'end',
+  offset: 2,
+  clip: false
+});
 
 const STORAGE_KEY = 'blazel_dashboard_data_v1';
 const STORAGE_KEY_CUOTAS = 'blazel_dashboard_cuotas_v1';
@@ -1124,7 +1140,23 @@ function buildFiltroDOM(){
     const actions = document.createElement('div'); actions.className='msel-actions';
     actions.innerHTML = `<span data-act="all">Todos</span><span data-act="none">Ninguno</span>`;
     panel.appendChild(actions);
-    optionsFor(def.key).forEach(opt=>{
+    const opts = optionsFor(def.key);
+    if(opts.length > 6){
+      const search = document.createElement('input');
+      search.type = 'text'; search.placeholder = 'Buscar...'; search.autocomplete='off';
+      search.className = 'msel-search';
+      search.style.cssText = 'width:100%;box-sizing:border-box;margin:4px 0 6px;padding:6px 10px;border-radius:6px;border:1px solid #2a3344;background:#161d29;color:#eef2f7;font-size:12px';
+      search.onclick = (e)=>e.stopPropagation();
+      search.oninput = ()=>{
+        const q = search.value.trim().toLowerCase();
+        panel.querySelectorAll('.msel-opt').forEach(row=>{
+          const txt = row.textContent.toLowerCase();
+          row.style.display = (!q || txt.includes(q)) ? '' : 'none';
+        });
+      };
+      panel.appendChild(search);
+    }
+    opts.forEach(opt=>{
       const row = document.createElement('label'); row.className='msel-opt';
       row.innerHTML = `<input type="checkbox" value="${opt.value}"> <span>${opt.label}</span>`;
       panel.appendChild(row);
@@ -1963,13 +1995,9 @@ function renderPosPre(){
     diaCorteInput.addEventListener('change', renderPosPre);
   }
 
-  const data = ppCatsActual(cuotasKeyActual());
   const banner = document.getElementById('posPreBanner');
   banner.style.display='none';
-  let body = data ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-    ${ppCardHTML('Postpago','Postpago',data)}
-    ${ppCardHTML('Prepago','Prepago',data)}
-  </div>` : '';
+  let body = '';
 
   // AVANCE real por producto (operaciones) — MoM y DoD, sin comparar contra cuota
   const [yaA,ymA] = PP_MES_A.split('-').map(Number);
@@ -1979,6 +2007,13 @@ function renderPosPre(){
     if(!inPdv(r[2])) continue;
     if(r[0]===yaA && r[1]===ymA) momA[r[3]] = (momA[r[3]]||0) + r[4];
     if(r[0]===yaB && r[1]===ymB) momB[r[3]] = (momB[r[3]]||0) + r[4];
+  }
+  // Cargo Fijo (S/) — mensual siempre disponible; por día solo si ambos meses son del año en curso
+  let cfMomA=0, cfMomB=0;
+  for(const r of DATA.cargo){ // [anio, mes, pdv, cargoFijo$]
+    if(!inPdv(r[2])) continue;
+    if(r[0]===yaA && r[1]===ymA) cfMomA += r[3];
+    if(r[0]===yaB && r[1]===ymB) cfMomB += r[3];
   }
   const diaCorte = Math.max(1, Math.min(31, parseInt(diaCorteInput && diaCorteInput.value,10) || DATA.maxDia || 1));
   const dodA = {}, dodB = {};
@@ -1991,6 +2026,16 @@ function renderPosPre(){
       if(r[0]===yaB && r[1]===ymB) dodB[r[5]] = (dodB[r[5]]||0) + r[6];
     }
   }
+  const hayCargoDia = DATA.cargoDia && DATA.cargoDia.length>0 && yaA===DATA.anioActual && yaB===DATA.anioActual;
+  let cfDodA=0, cfDodB=0;
+  if(hayCargoDia){
+    for(const r of DATA.cargoDia){ // [mes, dia, pdv, cargoFijo$, hfc]
+      if(r[1]>diaCorte) continue;
+      if(!inPdv(r[2])) continue;
+      if(r[0]===ymA) cfDodA += r[3];
+      if(r[0]===ymB) cfDodB += r[3];
+    }
+  }
   const todasCats = Array.from(new Set([...Object.keys(momA), ...Object.keys(momB)])).sort((a,b)=>(momB[b]||0)-(momA[a]||0));
   const [mNombreA] = [MESES[ymA-1]], [mNombreB] = [MESES[ymB-1]];
 
@@ -1998,6 +2043,10 @@ function renderPosPre(){
     + (hayDetalleDia? `<th colspan="2" style="text-align:center">DoD (hasta día ${diaCorte})</th><th rowspan="2" class="r">DoD %</th>` : '')
     + `</tr><tr><th class="r">${mNombreA} ${yaA}</th><th class="r">${mNombreB} ${yaB}</th>`
     + (hayDetalleDia? `<th class="r">${mNombreA}</th><th class="r">${mNombreB}</th>` : '')
+    + `</tr>`;
+  const cfDodPct = (hayCargoDia && cfDodA>0) ? (cfDodB/cfDodA*100) : null;
+  tbl += `<tr style="background:#1b2230;font-weight:700"><td>Cargo Fijo (S/)</td><td class="r">S/ ${fmt(cfMomA)}</td><td class="r">S/ ${fmt(cfMomB)}</td>`
+    + (hayDetalleDia? `<td class="r">${hayCargoDia?'S/ '+fmt(cfDodA):'—'}</td><td class="r">${hayCargoDia?'S/ '+fmt(cfDodB):'—'}</td><td class="r">${cfDodPct!=null?cfDodPct.toFixed(1)+'%':'—'}</td>` : '')
     + `</tr>`;
   todasCats.forEach(cat=>{
     const vA = momA[cat]||0, vB = momB[cat]||0;
@@ -2007,10 +2056,8 @@ function renderPosPre(){
       + (hayDetalleDia? `<td class="r">${fmt(dA)}</td><td class="r">${fmt(dB)}</td><td class="r">${dodPct!=null?dodPct.toFixed(1)+'%':'—'}</td>` : '')
       + `</tr>`;
   });
-  const notaDia = hayDetalleDia ? '' : `<div style="color:var(--mut);font-size:12px;padding:6px 0 10px">La columna <b>DoD (día a día)</b> necesita el detalle diario por producto × asesor, que se construye al cargar tu Excel BASE (arrástralo en la zona de carga). Por ahora solo se muestra el comparativo mensual (MoM).</div>`;
   body += `<div class="card" style="margin-top:14px">
     <h3>Avance real por producto (operaciones) — sin comparar contra cuota</h3>
-    ${notaDia}
     <div class="tscroll" style="max-height:none;overflow:visible"><table>${todasCats.length? tbl : '<tr><td style="color:var(--mut);padding:10px">Sin operaciones para la tienda/meses seleccionados.</td></tr>'}</table></div>
   </div>`;
 
@@ -2199,6 +2246,8 @@ function renderAseProd(){
   const V = aseSelectedVend;
 
   // Filas = meses. Columnas = productos (igual que antes) + Cargo Fijo.
+  // Nota: esta tabla ignora el filtro global de Año/Mes (usa su propio control "Meses a mostrar"),
+  // para poder ver varios meses seguidos del asesor sin tener que cambiar el filtro de arriba.
   const dia = F.dia>0 ? F.dia : 0;
   const usaDia = dia>0 && DATA.aseProdDia && DATA.aseProdDia.length;
   const src = usaDia ? DATA.aseProdDia : DATA.aseProd;
@@ -2208,7 +2257,7 @@ function renderAseProd(){
     if(usaDia){ [a,m,d,pdv,vend,op,c]=r; if(d!==dia) continue; }
     else { [a,m,pdv,vend,op,c]=r; }
     if(vend!==V) continue;
-    if(!inAnio(a)||!inMes(m)||!inPdv(pdv)) continue;
+    if(!inPdv(pdv)) continue;
     if(F.prod.length && !F.prod.includes(op)) continue;
     const k=a+'-'+m;
     if(!porMes[k]) porMes[k]={a,m,prods:{},total:0,cf:0};
@@ -2221,19 +2270,23 @@ function renderAseProd(){
   for(const r of DATA.ases){
     const [a,m,pdv,vend,,cf] = r;
     if(vend!==V) continue;
-    if(!inAnio(a)||!inMes(m)||!inPdv(pdv)) continue;
+    if(!inPdv(pdv)) continue;
     const k=a+'-'+m;
     if(!porMes[k]) porMes[k]={a,m,prods:{},total:0,cf:0};
     porMes[k].cf += cf;
   }
 
   const prods=[...prodSet].sort();
-  const meses = Object.values(porMes).sort((x,y)=> x.a-y.a || x.m-y.m);
+  const mesesN = document.getElementById('aseMesesN');
+  if(mesesN && !mesesN.dataset.wired){ mesesN.dataset.wired='1'; mesesN.addEventListener('change', renderAseProd); }
+  const nMeses = Math.max(1, Math.min(36, parseInt(mesesN && mesesN.value,10) || 12));
+  let meses = Object.values(porMes).sort((x,y)=> x.a-y.a || x.m-y.m);
+  if(meses.length > nMeses) meses = meses.slice(meses.length - nMeses);
 
   if(nota) nota.innerHTML = `<div style="color:var(--mut);font-size:12px;padding:2px 0 8px">`
     + `Tienda: <b>${pdvActual?pdvShort(pdvActual):'—'}</b>. `
     + (F.prod.length ? `Filtrado a: <b>${F.prod.join(', ')}</b>. ` : `Mostrando <b>todos</b> los productos. `)
-    + `Cada fila es un mes con datos, de más antiguo a más reciente.`
+    + `Últimos <b>${nMeses}</b> meses con datos, de más antiguo a más reciente.`
     + `</div>`;
 
   if(!meses.length){ tbl.innerHTML='<tr><td style="color:var(--mut);padding:10px">Sin ventas de este asesor en el periodo/día seleccionado.</td></tr>'; return; }
@@ -2250,12 +2303,6 @@ function renderAseProd(){
     h+=`<td class="r"><b>${x.total}</b></td><td class="r">${varTotal}</td><td class="r">S/ ${fmt(x.cf)}</td><td class="r">${varCf}</td></tr>`;
     prevTotal = x.total; prevCf = x.cf;
   });
-  // fila de totales por producto
-  h+='<tr style="border-top:2px solid #2a3344"><td><b>TOTAL</b></td>';
-  let gran=0, granCf=0;
-  prods.forEach(p=>{ const s=meses.reduce((a,b)=>a+(b.prods[p]||0),0); gran+=s; h+=`<td class="r"><b>${s}</b></td>`; });
-  granCf = meses.reduce((a,b)=>a+b.cf,0);
-  h+=`<td class="r"><b>${gran}</b></td><td></td><td class="r"><b>S/ ${fmt(granCf)}</b></td><td></td></tr>`;
   tbl.innerHTML=h;
 }
 // ===================== VENTAS X DIA =====================
@@ -2595,7 +2642,7 @@ const EQUIPOS_DATA = {"rows": [[2025, 1, "Santa Anita", "SIN MARCA", "Sin modelo
           banner.style.display='block';
           banner.style.background='#3a2a1a'; banner.style.border='1px solid #6b4a1f'; banner.style.color='#f5b041';
           banner.style.borderRadius='10px'; banner.style.padding='10px 14px'; banner.style.marginBottom='12px'; banner.style.fontSize='13px';
-          banner.innerHTML = `⚠️ Los gráficos generales (Top Marcas, Mix de Gama, Top Modelos) están <b>sumando ${mesesSel.length} meses juntos</b>: ${nombres}. Para ver un mes específico, selecciona solo ese mes arriba — o mira el desglose mes a mes en "Equipos por mes" más abajo.`;
+          banner.innerHTML = `⚠️ Los gráficos generales (Mix de Gama, Top Modelos) están <b>sumando ${mesesSel.length} meses juntos</b>: ${nombres}. Para ver un mes específico, selecciona solo ese mes arriba — o mira el desglose mes a mes en "Equipos por mes" más abajo.`;
         } else {
           banner.style.display='none';
         }
@@ -2613,13 +2660,7 @@ const EQUIPOS_DATA = {"rows": [[2025, 1, "Santa Anita", "SIN MARCA", "Sin modelo
       kpi('Gama alta',pct(gA,total),fmt(gA)+' equipos','#f59e0b')+
       kpi('Gama media',pct(gM,total),fmt(gM)+' equipos','#3b82f6')+
       kpi('Gama baja',pct(gB,total),fmt(gB)+' equipos','#8a97ab');
-    const top=marcaArr.slice(0,10);
-    if(chM)chM.destroy();
-    chM=new Chart(document.getElementById('chEqMarcas'),{type:'bar',
-      data:{labels:top.map(m=>m[0]),datasets:[{data:top.map(m=>m[1]),backgroundColor:top.map((_,i)=>PAL[i%PAL.length]),borderRadius:5}]},
-      options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
-        plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>fmt(c.raw)+' · '+pct(c.raw,total)}}},
-        scales:{x:{ticks:{color:'#8a97ab'},grid:{color:'#2a3344'}},y:{ticks:{color:'#e8edf6',font:{weight:'600'}},grid:{display:false}}}}});
+    if(chM){chM.destroy();chM=null;}
     if(chG)chG.destroy();
     chG=new Chart(document.getElementById('chEqGama'),{type:'doughnut',
       data:{labels:['Gama alta','Gama media','Gama baja'],datasets:[{data:[gA,gM,gB],backgroundColor:['#f59e0b','#3b82f6','#64748b'],borderColor:'#161b22',borderWidth:3}]},
@@ -2721,7 +2762,16 @@ const EQUIPOS_DATA = {"rows": [[2025, 1, "Santa Anita", "SIN MARCA", "Sin modelo
   let eqMesChartIds = [];
   function renderEquMes(){
     try{
-      const rows = filt(); // ya respeta F.anio / F.mes / F.pdv
+      // Esta tarjeta ignora a propósito el filtro de "Mes" de arriba (respeta Año y Tienda),
+      // para mostrar SIEMPRE el desglose mes a mes completo y que vaya creciendo solo
+      // conforme lleguen más meses de datos.
+      const anios=F.anio.length?new Set(F.anio):null;
+      const pdvs=F.pdv.length?new Set(F.pdv.map(x=>String(x).toLowerCase())):null;
+      const rows = D.rows.filter(r=>{
+        if(anios&&!anios.has(r[0]))return false;
+        if(pdvs&&!pdvs.has(String(r[2]).toLowerCase()))return false;
+        return true;
+      });
       const byMes = {};
       rows.forEach(r=>{
         const k = r[0]+'-'+String(r[1]).padStart(2,'0');
@@ -2732,18 +2782,12 @@ const EQUIPOS_DATA = {"rows": [[2025, 1, "Santa Anita", "SIN MARCA", "Sin modelo
       });
       const keys = Object.keys(byMes).sort();
       const cardEqMes = document.getElementById('cardEqMes');
-      // limpiar gráficos de un render anterior, para no dejar instancias sueltas (aplica en ambos casos)
+      // limpiar gráficos de un render anterior, para no dejar instancias sueltas
       eqMesChartIds.forEach(id=>{ if(charts[id]){ charts[id].destroy(); delete charts[id]; } });
       eqMesChartIds = [];
-      if(keys.length<=1){
-        // con 1 solo mes, esta tarjeta muestra exactamente lo mismo que Top Marcas: se oculta.
-        if(cardEqMes) cardEqMes.style.display = 'none';
-        return;
-      }
       if(cardEqMes) cardEqMes.style.display = '';
       const grid = document.getElementById('eqMesGrid');
       if(!grid) return;
-
 
       if(!keys.length){ grid.innerHTML = '<div style="color:#8a97ab;padding:10px;grid-column:1/-1">Sin datos para el periodo/filtro seleccionado.</div>'; return; }
 
