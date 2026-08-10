@@ -1545,20 +1545,32 @@ function renderSameStore(){
   ]},options:{maintainAspectRatio:false,plugins:{legend:{display:true,position:'top',labels:{boxWidth:12,font:{size:10},color:'#8b97a8'}},
     tooltip:{callbacks:{label:c=>c.dataset.label+': S/ '+fmt(c.raw)}}},scales:{y:{ticks:{callback:v=>'S/ '+fmt(v)}}}}});
 
-  // tabla de antigüedad por tienda
+  // tabla: aporte de Cargo Fijo por tienda, mes a mes desde enero del año en curso
   const mesActualKey = DATA.anioActual*100+DATA.mesActual;
+  const mesesDesdeEnero = [];
+  for(let mm=1; mm<=DATA.mesActual; mm++) mesesDesdeEnero.push([DATA.anioActual, mm]);
+  const totalPorMesEnero = mesesDesdeEnero.map(([ya,ym])=>cargoPorMesTotal[ya+'-'+ym]||0);
+
   const filas = tiendas.map(p=>{
     const pm = primerMes[p];
     if(pm==null) return null;
     const edad = Math.floor((Math.floor(mesActualKey/100)-Math.floor(pm/100))*12 + (mesActualKey%100-pm%100));
-    const pa=Math.floor(pm/100), pmes=pm%100;
-    return {p, primer: `${MESES[pmes-1]} ${pa}`, edad, madura: edad>=MADUREZ_MESES};
-  }).filter(Boolean).sort((x,y)=>x.edad-y.edad);
+    const madura = edad>=MADUREZ_MESES;
+    const vals = mesesDesdeEnero.map(([ya,ym])=> (cargoPorMesPdv[ya+'-'+ym]||{})[p]||0);
+    const totalAnio = vals.reduce((a,b)=>a+b,0);
+    return {p, vals, totalAnio, edad, madura};
+  }).filter(Boolean).sort((x,y)=>{
+    if(x.madura!==y.madura) return x.madura?1:-1; // nuevas primero, maduras después
+    return y.totalAnio-x.totalAnio;
+  });
 
-  let h = '<tr><th>Tienda</th><th class="r">Primer mes con Cargo Fijo</th><th class="r">Antigüedad</th><th>Estado</th></tr>';
+  let h = '<tr><th>Tienda</th><th>Estado</th>' + mesesDesdeEnero.map(([ya,ym])=>`<th class="r">${MESES[ym-1]} ${String(ya).slice(2)}</th>`).join('') + '</tr>';
   filas.forEach(f=>{
-    h += `<tr><td>${pdvShort(f.p)}</td><td class="r">${f.primer}</td><td class="r">${f.edad} meses</td>`
-      + `<td>${f.madura? '<span class="pill pv">MADURA</span>' : '<span class="pill pa">NUEVA</span>'}</td></tr>`;
+    h += `<tr><td>${pdvShort(f.p)}</td><td>${f.madura? '<span class="pill pv">MADURA</span>' : '<span class="pill pa">NUEVA</span>'}</td>` + f.vals.map((v,i)=>{
+      const tot = totalPorMesEnero[i];
+      const pct = (v>0 && tot>0) ? (v/tot*100).toFixed(1)+'%' : '—';
+      return `<td class="r"><b>${v>0?('S/ '+fmt(v)):'—'}</b><br><span style="color:#a8b3c4;font-size:12px;font-weight:600">${pct}</span></td>`;
+    }).join('') + `</tr>`;
   });
   tb.innerHTML = filas.length? h : '<tr><td style="color:var(--mut);padding:10px">Sin datos suficientes.</td></tr>';
 }
