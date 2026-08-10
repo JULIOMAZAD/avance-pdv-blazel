@@ -97,7 +97,7 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
   </div>
 </div>
 <header>
-  <div class="logo">BLA<b>ZEL</b><small>CREADO POR JULIO MAZA D. · v27 (buscador asesor, buscador tienda + meses en Postpago/Prepago, HFC por vendedor por día)</small></div>
+  <div class="logo">BLA<b>ZEL</b><small>CREADO POR JULIO MAZA D.</small></div>
   <div class="filtros" id="filtrosCont"></div>
   <div id="filtroDiaCont" style="display:none">
     <div>
@@ -201,6 +201,10 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
       <div>
         <div style="font-size:10px;color:var(--mut);text-transform:uppercase;margin-bottom:4px">vs. mes (actual)</div>
         <select id="ppMesB" style="padding:8px 10px;border-radius:8px;border:1px solid #2a3344;background:#161d29;color:#eef2f7;font-size:13px"></select>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--mut);text-transform:uppercase;margin-bottom:4px">Comparar hasta el día</div>
+        <input type="number" id="ppDiaCorte" min="1" max="31" value="1" style="width:70px;padding:8px 10px;border-radius:8px;border:1px solid #2a3344;background:#161d29;color:#eef2f7;font-size:13px">
       </div>
     </div>
   </div>
@@ -1845,147 +1849,6 @@ async function fetchCuotasMesLive(anio, mes){
   };
 }
 
-function triggerCuotasLiveFetch(key){
-  if(cuotasLiveAttempted[key]) return;
-  cuotasLiveAttempted[key] = true;
-  const [a, m] = key.split('-').map(Number);
-  fetchCuotasMesLive(a, m).then(data=>{
-    if(data){
-      CUOTAS_HIST[key] = data;
-      render();
-    }
-  }).catch(()=>{});
-}
-
-function renderCuotas(){
-  const requestedKey = cuotasKeyRequested();
-  if(!CUOTAS_HIST[requestedKey]) triggerCuotasLiveFetch(requestedKey);
-  const key = cuotasKeyActual();
-  actualizarCuotasFallbackBanner(key, requestedKey);
-  const C = CUOTAS_HIST[key];
-  if(!C){
-    document.getElementById('kpisCuotas').innerHTML='';
-    document.getElementById('tblCuotas').innerHTML='';
-    document.getElementById('cardCuotasNota').style.display='none';
-    if(charts['chCuotasEvo']){charts['chCuotasEvo'].destroy();delete charts['chCuotasEvo'];}
-    return;
-  }
-  const todasLasTiendas = selPdvs().length===DATA.pdvs.length;
-  const pdvsConCuota = selPdvs().filter(p=>C.stores[p]);
-  const usarGlobal = todasLasTiendas;
-
-  // ---- gráfico de evolución (siempre con datos globales, independiente del filtro de tienda) ----
-  const evoKeys = CUOTAS_MESES_ORDEN.filter(k=>CUOTAS_HIST[k]);
-  const evoLabels = evoKeys.map(k=>{
-    const m = CUOTAS_HIST[k];
-    return (m.mes? m.mes.slice(0,3) : k) + " '" + String(m.anio).slice(2);
-  });
-  const evoMeta = evoKeys.map(k=>CUOTAS_HIST[k].global.meta_total);
-  const evoAvance = evoKeys.map(k=>CUOTAS_HIST[k].global.avance_total);
-  const evoProy = evoKeys.map(k=>{
-    const m=CUOTAS_HIST[k];
-    return (m.global.avance_total!=null && m.avance_dia>0) ? m.global.avance_total/m.avance_dia*m.dias_mes : m.global.avance_total;
-  });
-  mkChart('chCuotasEvo',{type:'bar',data:{labels:evoLabels,datasets:[
-      {type:'line',label:'Meta',data:evoMeta,borderColor:'#e63329',backgroundColor:'#e63329',tension:.3,pointRadius:4,order:0},
-      {type:'line',label:'Proyección de cierre',data:evoProy,borderColor:'#f5b041',backgroundColor:'#f5b041',borderDash:[5,4],tension:.3,pointRadius:3,order:1},
-      {label:'Avance / Cierre',data:evoAvance,backgroundColor:'#39d0d8cc',borderRadius:4,order:2},
-    ]},
-    options:{maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:12,font:{size:11}}},
-      tooltip:{callbacks:{label:c=>c.dataset.label+': S/ '+fmt(c.raw)}}},
-      scales:{y:{ticks:{callback:v=>'S/ '+fmt(v)}}}}});
-
-  if(!todasLasTiendas && pdvsConCuota.length===0){
-    document.getElementById('kpisCuotas').innerHTML='';
-    document.getElementById('tCuotas').textContent=`Cuotas vs Avance vs Proyección · ${C.mes} ${C.anio}`;
-    document.getElementById('tblCuotas').innerHTML='';
-    document.getElementById('cardCuotasNota').style.display='block';
-    document.getElementById('cardCuotasNota').innerHTML = `<div style="color:var(--mut);font-size:13px;padding:4px 0">Sin datos de cuota para: ${selPdvs().map(pdvShort).join(', ')} en ${C.mes} ${C.anio}. Actualiza el Excel de cuotas para incluirlas.</div>`;
-    return;
-  }
-
-  let metaTotal, avanceTotal, cats, etiqueta, avanceTotalDisponible=true;
-  if(usarGlobal){
-    metaTotal=C.global.meta_total; avanceTotal=C.global.avance_total; cats=C.global.cats;
-    etiqueta='Todas las tiendas';
-  } else {
-    metaTotal=0; avanceTotal=0;
-    cats = C.global.cats.map(c=>({cat:c.cat, meta:0, avance:0}));
-    pdvsConCuota.forEach(p=>{
-      const s=C.stores[p];
-      metaTotal+=s.meta_total||0;
-      if(s.avance_total==null) avanceTotalDisponible=false; else avanceTotal+=s.avance_total;
-      s.cats.forEach((c,i)=>{cats[i].meta+=c.meta; cats[i].avance+=c.avance;});
-    });
-    if(!avanceTotalDisponible) avanceTotal=null;
-    etiqueta = pdvsConCuota.length===1? pdvShort(pdvsConCuota[0]) : pdvsConCuota.map(pdvShort).join(', ');
-  }
-
-  // Modalidad Prepago: dejar solo categorías prepago y recalcular totales (postpago → 0)
-  if(prepagoSolo()){
-    cats = cats.filter(c=>/prepago/i.test(c.cat));
-    metaTotal = cats.reduce((s,c)=>s+(c.meta||0),0);
-    avanceTotal = cats.reduce((s,c)=>s+(c.avance||0),0);
-  }
-
-  const diasRestantes = Math.max(C.dias_mes - C.avance_dia, 0);
-  function estadoPill(meta,p){
-    if(meta<=0) return '<span class="pill" style="background:#8b97a822;color:var(--mut)">—</span>';
-    if(p>=1) return '<span class="pill pv">EXCELENTE 🔥</span>';
-    if(p>=0.7) return '<span class="pill pa">VAMOS REGULAR 👍</span>';
-    return '<span class="pill pr">PONLE PUNCHE 💪</span>';
-  }
-
-  // KPIs
-  const hayMeta = metaTotal>0;
-  const proyTotal = (avanceTotal!=null && C.avance_dia>0)? avanceTotal/C.avance_dia*C.dias_mes : avanceTotal;
-  const pctTotal = hayMeta && avanceTotal!=null? avanceTotal/metaTotal : null;
-  const proyPctTotal = hayMeta && proyTotal!=null? proyTotal/metaTotal : null;
-  document.getElementById('kpisCuotas').innerHTML =
-    kpiHTML('Meta '+C.mes+' '+C.anio, hayMeta? 'S/ '+fmt(metaTotal) : '—', etiqueta) +
-    kpiHTML('Avance', avanceTotal!=null? 'S/ '+fmt(avanceTotal) : '—', pctTotal!=null? `${pct(pctTotal)} de la meta · día ${C.avance_dia}` : `día ${C.avance_dia} de ${C.dias_mes}`, pctTotal!=null?(pctTotal>=1?'v':pctTotal>=0.7?'a':''):'') +
-    kpiHTML('Proyección final', proyTotal!=null? 'S/ '+fmt(proyTotal) : '—', proyPctTotal!=null? `al cierre · ${pct(proyPctTotal)} de la meta` : 'al cierre','az') +
-    kpiHTML('Mix HFC', pct(prepagoSolo()?0:C.mix_hfc), 'HFC sobre venta total','c');
-
-  // tabla
-  document.getElementById('tCuotas').textContent = `Cuotas vs Avance vs Proyección · ${etiqueta} · ${C.mes} ${C.anio}`;
-  let rows = '<tr><th>Categoría</th><th class="r">Meta</th><th class="r">Avance</th><th class="r">Proyección</th><th class="r">Falta</th><th class="r">Venta/día para llegar</th><th class="r">Proy. Final</th><th>Estado</th></tr>';
-  const GROUPS = {
-    'Alta Prepago':'Prepago','Portabilidad Prepago':'Prepago','Pack Prepago':'Prepago',
-    'Alta Postpago':'Postpago','Portabilidad Postpago ≥90 días':'Postpago','Packs Postpago':'Postpago','Líneas Adicionales':'Postpago',
-    'HFC':'Residencial','Clientes Inalámbricos':'Residencial',
-    'OLO':'Otros','Accesorios':'Otros','Portabilidad Alto Valor':'Otros'
-  };
-  let lastGroup=null;
-  cats.forEach(c=>{
-    const g=GROUPS[c.cat];
-    if(g!==lastGroup){ rows+=`<tr><td colspan="8" style="background:#1b2230;font-weight:700;color:var(--mut)">${g}</td></tr>`; lastGroup=g; }
-    const proyFinal = C.avance_dia>0? c.avance/C.avance_dia*C.dias_mes : c.avance;
-    const proyPct = c.meta>0? proyFinal/c.meta : 0;
-    const falta = c.meta>0? Math.max(c.meta-c.avance,0) : null;
-    const ventaDia = (falta!=null && diasRestantes>0)? (falta/diasRestantes) : null;
-    rows+=`<tr><td>${c.cat}</td><td class="r">${c.meta>0? fmt(c.meta):'—'}</td><td class="r"><b>${fmt(c.avance)}</b></td><td class="r">${c.meta>0? pct(proyPct):'—'}</td><td class="r">${falta!=null? fmt(falta):'—'}</td><td class="r">${ventaDia!=null? ventaDia.toFixed(1):'—'}</td><td class="r">${fmt(Math.round(proyFinal))}</td><td>${estadoPill(c.meta,proyPct)}</td></tr>`;
-  });
-  // total row
-  if(hayMeta){
-    const faltaTotal = avanceTotal!=null? Math.max(metaTotal-avanceTotal,0) : null;
-    const ventaDiaTotal = (faltaTotal!=null && diasRestantes>0)? (faltaTotal/diasRestantes) : null;
-    rows+=`<tr style="background:#1b2230;font-weight:700"><td>TOTAL</td><td class="r">S/ ${fmt(metaTotal)}</td><td class="r">${avanceTotal!=null?'S/ '+fmt(avanceTotal):'—'}</td><td class="r">${proyPctTotal!=null?pct(proyPctTotal):'—'}</td><td class="r">${faltaTotal!=null?'S/ '+fmt(faltaTotal):'—'}</td><td class="r">${ventaDiaTotal!=null?'S/ '+fmt(ventaDiaTotal):'—'}</td><td class="r">${proyTotal!=null?'S/ '+fmt(proyTotal):'—'}</td><td>${estadoPill(metaTotal,proyPctTotal||0)}</td></tr>`;
-  }
-
-  document.getElementById('tblCuotas').innerHTML=rows;
-  document.getElementById('cardCuotasNota').style.display='block';
-
-  // tiendas sin cuota en el filtro actual
-  const sinCuota = selPdvs().filter(p=>!C.stores[p]);
-  let nota = `Datos de cuotas al día ${C.avance_dia} de ${C.mes} ${C.anio}. Para actualizar, sube un nuevo Excel de cuotas.`;
-  if(!hayMeta) nota = `${C.mes} ${C.anio} no tiene metas desglosadas por tienda registradas; se muestra solo el avance. ` + nota;
-  if(!usarGlobal && sinCuota.length){
-    nota = `Sin datos de cuota para: ${sinCuota.map(pdvShort).join(', ')} en ${C.mes} ${C.anio}. ` + nota;
-  }
-  document.getElementById('cardCuotasNota').innerHTML = `<div style="color:var(--mut);font-size:13px;padding:4px 0">${nota}</div>`;
-}
-
 // ===================== POSTPAGO / PREPAGO (estilo resumen Claro) =====================
 const PP_GROUPS = {
   'Alta Prepago':'Prepago','Portabilidad Prepago':'Prepago','Pack Prepago':'Prepago',
@@ -1997,14 +1860,21 @@ function ppSumGroup(cats,grupo){
   (cats||[]).forEach(c=>{ if(PP_GROUPS[c.cat]===grupo){ meta+=c.meta||0; avance+=(c.avance||0); found=true; } });
   return found? {meta,avance} : null;
 }
+function ppFindStoreKey(C, p){
+  if(C.stores[p]) return p;
+  if(C.stores['Tienda - '+p]) return 'Tienda - '+p;
+  if(C.stores['PDV - '+p]) return 'PDV - '+p;
+  const found = Object.keys(C.stores).find(k=>pdvShort(k).toLowerCase()===p.toLowerCase());
+  return found || null;
+}
 function ppCatsActual(key){
   const C = CUOTAS_HIST[key]; if(!C) return null;
   const todasLasTiendas = selPdvs().length===DATA.pdvs.length;
-  const pdvsConCuota = selPdvs().filter(p=>C.stores[p]);
+  const pdvsConCuota = selPdvs().map(p=>ppFindStoreKey(C,p)).filter(Boolean);
   if(todasLasTiendas) return {C, cats:C.global.cats, avance_dia:C.avance_dia, dias_mes:C.dias_mes};
   if(!pdvsConCuota.length) return {C, cats:null, avance_dia:C.avance_dia, dias_mes:C.dias_mes};
   const cats = C.global.cats.map(c=>({cat:c.cat, meta:0, avance:0}));
-  pdvsConCuota.forEach(p=>{ C.stores[p].cats.forEach((c,i)=>{ cats[i].meta+=c.meta||0; cats[i].avance+=(c.avance||0); }); });
+  pdvsConCuota.forEach(sk=>{ C.stores[sk].cats.forEach((c,i)=>{ cats[i].meta+=c.meta||0; cats[i].avance+=(c.avance||0); }); });
   return {C, cats, avance_dia:C.avance_dia, dias_mes:C.dias_mes};
 }
 function ppCardHTML(titulo,grupo,data){
@@ -2066,16 +1936,16 @@ function renderPosPre(){
       });
     }
   }
-  // --- selectores de mes para el comparativo MoM/DoD ---
-  const mesesDisp = CUOTAS_MESES_ORDEN.filter(k=>CUOTAS_HIST[k]);
-  const key = cuotasKeyActual();
-  const [ya0,ym0] = key.split('-').map(Number);
+  // --- selectores de mes + día para el AVANCE real (operaciones, sin cuota) ---
+  const mesesOpsDisp = Array.from(new Set(DATA.ops.map(r=>r[0]+'-'+String(r[1]).padStart(2,'0')))).sort();
+  const keyActualOps = DATA.anioActual+'-'+String(DATA.mesActual).padStart(2,'0');
+  const [ya0,ym0] = keyActualOps.split('-').map(Number);
   const prevKeyDefault = ym0===1? (ya0-1)+'-12' : ya0+'-'+String(ym0-1).padStart(2,'0');
-  if(!PP_MES_A || !mesesDisp.includes(PP_MES_A)) PP_MES_A = mesesDisp.includes(prevKeyDefault)? prevKeyDefault : mesesDisp[0];
-  if(!PP_MES_B || !mesesDisp.includes(PP_MES_B)) PP_MES_B = key;
+  if(!PP_MES_A || !mesesOpsDisp.includes(PP_MES_A)) PP_MES_A = mesesOpsDisp.includes(prevKeyDefault)? prevKeyDefault : mesesOpsDisp[Math.max(0,mesesOpsDisp.length-2)];
+  if(!PP_MES_B || !mesesOpsDisp.includes(PP_MES_B)) PP_MES_B = mesesOpsDisp.includes(keyActualOps)? keyActualOps : mesesOpsDisp[mesesOpsDisp.length-1];
   const selA = document.getElementById('ppMesA'), selB = document.getElementById('ppMesB');
   function fillMesSelect(sel, val){
-    sel.innerHTML = mesesDisp.map(k=>{
+    sel.innerHTML = mesesOpsDisp.map(k=>{
       const [a,m] = k.split('-').map(Number);
       return `<option value="${k}" ${k===val?'selected':''}>${MESES[m-1]} ${a}</option>`;
     }).join('');
@@ -2086,53 +1956,62 @@ function renderPosPre(){
     if(!selA.dataset.wired){ selA.dataset.wired='1'; selA.addEventListener('change', ()=>{ PP_MES_A=selA.value; renderPosPre(); }); }
     if(!selB.dataset.wired){ selB.dataset.wired='1'; selB.addEventListener('change', ()=>{ PP_MES_B=selB.value; renderPosPre(); }); }
   }
-
-  const data = ppCatsActual(key);
-  const banner = document.getElementById('posPreBanner');
-  if(!data){
-    banner.style.display='block';
-    banner.textContent = 'No hay datos de cuotas cargados para este periodo.';
-    document.getElementById('posPreBody').innerHTML='';
-    return;
+  const diaCorteInput = document.getElementById('ppDiaCorte');
+  if(diaCorteInput && !diaCorteInput.dataset.wired){
+    diaCorteInput.dataset.wired='1';
+    diaCorteInput.value = DATA.maxDia || 1;
+    diaCorteInput.addEventListener('change', renderPosPre);
   }
+
+  const data = ppCatsActual(cuotasKeyActual());
+  const banner = document.getElementById('posPreBanner');
   banner.style.display='none';
-  let body = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+  let body = data ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
     ${ppCardHTML('Postpago','Postpago',data)}
     ${ppCardHTML('Prepago','Prepago',data)}
-  </div>`;
+  </div>` : '';
 
-  // MoM (Cuota) · DoD (Avance) por producto — meses elegidos por el usuario arriba
-  const dataB = ppCatsActual(PP_MES_B) || data;
-  const dataPrev = ppCatsActual(PP_MES_A);
-  const labelCur = (dataB.C && dataB.C.mes) ? dataB.C.mes.toUpperCase() : PP_MES_B;
-  const labelPrev = (dataPrev && dataPrev.C && dataPrev.C.mes) ? dataPrev.C.mes.toUpperCase() : PP_MES_A;
-  const diaCur = dataB.avance_dia, diaPrev = dataPrev ? dataPrev.avance_dia : null;
-  function grupoProducto(cat){
-    if(/prepago/i.test(cat) && !/postpago/i.test(cat)) return 'PREPAGO';
-    if(/postpago/i.test(cat)) return 'POSTPAGO';
-    if(/hfc|inal[aá]mbric/i.test(cat)) return 'RESIDENCIAL';
-    return 'OTROS';
+  // AVANCE real por producto (operaciones) — MoM y DoD, sin comparar contra cuota
+  const [yaA,ymA] = PP_MES_A.split('-').map(Number);
+  const [yaB,ymB] = PP_MES_B.split('-').map(Number);
+  const momA = {}, momB = {};
+  for(const r of DATA.ops){ // [anio, mes, pdv, cat, count]
+    if(!inPdv(r[2])) continue;
+    if(r[0]===yaA && r[1]===ymA) momA[r[3]] = (momA[r[3]]||0) + r[4];
+    if(r[0]===yaB && r[1]===ymB) momB[r[3]] = (momB[r[3]]||0) + r[4];
   }
-  let tbl = `<tr><th rowspan="2">PRODUCTO</th><th colspan="2" style="text-align:center">MoM</th><th colspan="2" style="text-align:center">DoD</th><th rowspan="2" class="r">DoD %</th></tr>
-    <tr><th class="r">${labelPrev}</th><th class="r">${labelCur}</th><th class="r">${diaPrev?('DÍA '+diaPrev):'—'}</th><th class="r">DÍA ${diaCur}</th></tr>`;
-  let lastGroup=null;
-  (dataB.cats||[]).forEach(c=>{
-    const g = grupoProducto(c.cat);
-    if(g!==lastGroup){ tbl += `<tr><td colspan="6" style="background:#1b2230;font-weight:700;color:var(--mut)">${g}</td></tr>`; lastGroup=g; }
-    const cPrev = dataPrev && dataPrev.cats ? dataPrev.cats.find(x=>x.cat===c.cat) : null;
-    const cuotaPrev = cPrev ? cPrev.meta : null;
-    const avancePrev = cPrev ? cPrev.avance : null;
-    const dodPct = (avancePrev!=null && avancePrev>0 && c.avance!=null) ? (c.avance/avancePrev*100) : null;
-    tbl += `<tr><td>${c.cat}</td>
-      <td class="r">${cuotaPrev!=null?fmt(cuotaPrev):'—'}</td>
-      <td class="r">${fmt(c.meta)}</td>
-      <td class="r">${avancePrev!=null?fmt(avancePrev):'—'}</td>
-      <td class="r">${fmt(c.avance)}</td>
-      <td class="r">${dodPct!=null?dodPct.toFixed(2)+'%':'—'}</td></tr>`;
+  const diaCorte = Math.max(1, Math.min(31, parseInt(diaCorteInput && diaCorteInput.value,10) || DATA.maxDia || 1));
+  const dodA = {}, dodB = {};
+  const hayDetalleDia = DATA.aseProdDia && DATA.aseProdDia.length>0;
+  if(hayDetalleDia){
+    for(const r of DATA.aseProdDia){ // [anio, mes, dia, pdv, vendedor, tipoOp, count]
+      if(r[2]>diaCorte) continue;
+      if(!inPdv(r[3])) continue;
+      if(r[0]===yaA && r[1]===ymA) dodA[r[5]] = (dodA[r[5]]||0) + r[6];
+      if(r[0]===yaB && r[1]===ymB) dodB[r[5]] = (dodB[r[5]]||0) + r[6];
+    }
+  }
+  const todasCats = Array.from(new Set([...Object.keys(momA), ...Object.keys(momB)])).sort((a,b)=>(momB[b]||0)-(momA[a]||0));
+  const [mNombreA] = [MESES[ymA-1]], [mNombreB] = [MESES[ymB-1]];
+
+  let tbl = `<tr><th rowspan="2">PRODUCTO (operación)</th><th colspan="2" style="text-align:center">MoM (mes completo)</th>`
+    + (hayDetalleDia? `<th colspan="2" style="text-align:center">DoD (hasta día ${diaCorte})</th><th rowspan="2" class="r">DoD %</th>` : '')
+    + `</tr><tr><th class="r">${mNombreA} ${yaA}</th><th class="r">${mNombreB} ${yaB}</th>`
+    + (hayDetalleDia? `<th class="r">${mNombreA}</th><th class="r">${mNombreB}</th>` : '')
+    + `</tr>`;
+  todasCats.forEach(cat=>{
+    const vA = momA[cat]||0, vB = momB[cat]||0;
+    const dA = dodA[cat]||0, dB = dodB[cat]||0;
+    const dodPct = (hayDetalleDia && dA>0) ? (dB/dA*100) : null;
+    tbl += `<tr><td>${cat}</td><td class="r">${fmt(vA)}</td><td class="r">${fmt(vB)}</td>`
+      + (hayDetalleDia? `<td class="r">${fmt(dA)}</td><td class="r">${fmt(dB)}</td><td class="r">${dodPct!=null?dodPct.toFixed(1)+'%':'—'}</td>` : '')
+      + `</tr>`;
   });
+  const notaDia = hayDetalleDia ? '' : `<div style="color:var(--mut);font-size:12px;padding:6px 0 10px">La columna <b>DoD (día a día)</b> necesita el detalle diario por producto × asesor, que se construye al cargar tu Excel BASE (arrástralo en la zona de carga). Por ahora solo se muestra el comparativo mensual (MoM).</div>`;
   body += `<div class="card" style="margin-top:14px">
-    <h3>Comparativo MoM (Cuota) · DoD (Avance) por producto</h3>
-    <div class="tscroll" style="max-height:none;overflow:visible"><table>${tbl}</table></div>
+    <h3>Avance real por producto (operaciones) — sin comparar contra cuota</h3>
+    ${notaDia}
+    <div class="tscroll" style="max-height:none;overflow:visible"><table>${todasCats.length? tbl : '<tr><td style="color:var(--mut);padding:10px">Sin operaciones para la tienda/meses seleccionados.</td></tr>'}</table></div>
   </div>`;
 
   document.getElementById('posPreBody').innerHTML = body;
