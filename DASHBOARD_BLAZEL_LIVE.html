@@ -141,6 +141,7 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
   <div class="tab" data-s="asesores">🏆 Asesores</div>
   <div class="tab" data-s="dia">📅 Ventas × Día</div>
   <div class="tab" data-s="equipos">📱 Equipos</div>
+  <div class="tab" data-s="samestore">🏬 Mismas Tiendas</div>
 </div>
 <main>
 
@@ -151,6 +152,16 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
     <div class="card"><h3>Mix de Operaciones (Postpago)</h3><div class="cwrap"><canvas id="chDona"></canvas></div></div>
   </div>
   <div class="card"><h3 id="tSemaforo">Semáforo por Tienda</h3><div class="tscroll"><table id="tblSem"></table></div></div>
+</section>
+
+<section class="sec" id="s-samestore">
+  <div class="kpis" id="kpisSameStore"></div>
+  <div class="card">
+    <h3>Cargo Fijo · Mismas Tiendas (Same-Store Sales)</h3>
+    <div style="font-size:12px;color:var(--mut);padding:2px 0 10px">Compara el Cargo Fijo total (S/, todas las tiendas) contra el de solo las tiendas con <b>12+ meses</b> operando. Si la línea de "Total" sube pero la de "Mismas tiendas" está plana o cae, el crecimiento viene de aperturas nuevas, no de mejora real en las tiendas existentes.</div>
+    <div class="cwrap" style="height:380px"><canvas id="chSameStore"></canvas></div>
+    <div class="tscroll" style="margin-top:14px"><table id="tblSameStore"></table></div>
+  </div>
 </section>
 
 <section class="sec" id="s-hfc">
@@ -863,7 +874,7 @@ Chart.defaults.set('plugins.datalabels', {
     return v!=null && v!==0 && !isNaN(v);
   },
   color: '#eef2f7',
-  font: { weight: '700', size: 11 },
+  font: { weight: '700', size: 13 },
   formatter: (value) => (typeof value === 'number') ? fmt(Math.round(value)) : value,
   anchor: 'end',
   align: 'end',
@@ -1064,7 +1075,10 @@ function diasAvance_full(){ return F.mes.length===1? diasMes(F.mes[0]) : 30; }
 // etiqueta legible del periodo seleccionado, p.ej. "JUN 2026" o "ENE-JUN 2026" o "varios periodos"
 function periodoLabel(){
   const anios = F.anio.length? F.anio : [DATA.anioActual];
-  const meses = F.mes.length? F.mes.slice().sort((a,b)=>a-b) : [DATA.mesActual];
+  if(!F.mes.length){
+    return anios.length===1? ('Todos los meses '+anios[0]) : 'Todos los meses (periodo seleccionado)';
+  }
+  const meses = F.mes.slice().sort((a,b)=>a-b);
   if(anios.length===1 && meses.length===1) return MESES[meses[0]-1]+' '+anios[0];
   if(anios.length===1 && meses.length>1) return MESES[meses[0]-1]+'–'+MESES[meses[meses.length-1]-1]+' '+anios[0];
   return 'periodo seleccionado';
@@ -1440,6 +1454,97 @@ function renderResumen(){
     rows+=`<tr><td>${pdvShort(t.p)}</td><td class="r">S/ ${fmt(t.c)}</td><td class="r">S/ ${fmt(proyC)}</td><td class="r">${t.h}</td><td class="r"><b>${fmt(Math.round(proyH))}</b></td><td class="r">${ritmo.toFixed(1)}</td><td class="r">${t.mx!=null?pct(t.mx):'—'}</td><td>${est}</td></tr>`;
   });
   document.getElementById('tblSem').innerHTML=rows;
+}
+
+// ===================== VENTAS MISMAS TIENDAS (SAME-STORE SALES) =====================
+function renderSameStore(){
+  const cv = document.getElementById('chSameStore'), tb = document.getElementById('tblSameStore');
+  if(!cv || !tb) return;
+  const NON_STORE = new Set(['Call center','Multimarca','Campo','Otros']);
+  const tiendas = DATA.pdvs.filter(p=>!NON_STORE.has(p));
+  const MADUREZ_MESES = 12;
+
+  // primer mes con Cargo Fijo (anio*100+mes) para cada tienda, usando DATA.cargo
+  const primerMes = {};
+  for(const r of DATA.cargo){ // [anio, mes, pdv, cargoFijo$]
+    if(!tiendas.includes(r[2]) || r[3]<=0) continue;
+    const k = r[0]*100+r[1];
+    if(primerMes[r[2]]==null || k<primerMes[r[2]]) primerMes[r[2]] = k;
+  }
+
+  // últimos 13 meses hacia atrás desde el mes actual real (no depende del filtro de arriba,
+  // para que la comparación histórica siempre se vea completa)
+  const seqN = 13;
+  const seq = []; let a=DATA.anioActual, m=DATA.mesActual;
+  for(let i=0;i<seqN;i++){ seq.unshift([a,m]); m--; if(m<1){m=12;a--;} }
+
+  const cargoPorMesPdv = {}; // "anio-mes" -> {pdv: cargoFijo$}
+  for(const r of DATA.cargo){
+    const k = r[0]+'-'+r[1];
+    if(!tiendas.includes(r[2])) continue;
+    if(!cargoPorMesPdv[k]) cargoPorMesPdv[k]={};
+    cargoPorMesPdv[k][r[2]] = (cargoPorMesPdv[k][r[2]]||0) + r[3];
+  }
+
+  const labels=[], totalArr=[], sameArr=[];
+  seq.forEach(([ya,ym])=>{
+    labels.push(MESES[ym-1]+' '+String(ya).slice(2));
+    const key = ya+'-'+ym;
+    const porPdv = cargoPorMesPdv[key] || {};
+    const mesKey = ya*100+ym;
+    let total=0, same=0;
+    tiendas.forEach(p=>{
+      const v = porPdv[p]||0;
+      total += v;
+      const pm = primerMes[p];
+      if(pm!=null){
+        const edadMeses = Math.floor((Math.floor(mesKey/100)-Math.floor(pm/100))*12 + (mesKey%100-pm%100));
+        if(edadMeses >= MADUREZ_MESES) same += v;
+      }
+    });
+    totalArr.push(Math.round(total)); sameArr.push(Math.round(same));
+  });
+
+  // ---- KPIs: aporte de tiendas nuevas y variación de tiendas maduras (mes de referencia = último de la serie) ----
+  const nMes = labels.length;
+  const totalUlt = totalArr[nMes-1], sameUlt = sameArr[nMes-1];
+  const sameAnt = sameArr[nMes-2];
+  const aporteNuevas = totalUlt - sameUlt;
+  const aportePct = totalUlt>0 ? (aporteNuevas/totalUlt*100) : null;
+  const varMaduras = (sameAnt!=null) ? (sameUlt-sameAnt) : null;
+  const varMadurasPct = (sameAnt!=null && sameAnt>0) ? (varMaduras/sameAnt*100) : null;
+  const labelUlt = labels[nMes-1];
+
+  document.getElementById('kpisSameStore').innerHTML =
+    kpiHTML('Aporte tiendas nuevas · '+labelUlt, 'S/ '+fmt(aporteNuevas), aportePct!=null? `${aportePct.toFixed(1)}% del Cargo Fijo total del mes` : '', 'a') +
+    kpiHTML('Variación tiendas maduras · '+labelUlt, (varMaduras!=null? (varMaduras>=0?'+':'-')+'S/ '+fmt(Math.abs(varMaduras)) : '—'),
+      varMadurasPct!=null? `${varMadurasPct>=0?'+':''}${varMadurasPct.toFixed(1)}% vs. mes anterior (solo maduras)` : '', varMaduras!=null?(varMaduras>=0?'v':''):'') +
+    kpiHTML('Cargo Fijo total · '+labelUlt, 'S/ '+fmt(totalUlt), '') +
+    kpiHTML('Cargo Fijo mismas tiendas · '+labelUlt, 'S/ '+fmt(sameUlt), '');
+
+  mkChart('chSameStore',{type:'bar',data:{labels,datasets:[
+    {type:'line',label:'Mismas tiendas (12+ meses)',data:sameArr,borderColor:'#f5b041',backgroundColor:'#f5b041',tension:.25,pointRadius:4,pointBackgroundColor:'#f5b041',borderWidth:3,order:0,
+      datalabels:{display:true,color:'#f5b041',font:{weight:'800',size:13},formatter:v=>fmt(Math.round(v)),anchor:'end',align:'bottom',offset:6,clamp:true,clip:false,textStrokeColor:'rgba(0,0,0,0.65)',textStrokeWidth:3}},
+    {label:'Total (todas las tiendas)',data:totalArr,backgroundColor:'#4aa3ff55',borderColor:'#4aa3ff',borderWidth:1,borderRadius:5,order:1}
+  ]},options:{maintainAspectRatio:false,plugins:{legend:{display:true,position:'top',labels:{boxWidth:12,font:{size:10},color:'#8b97a8'}},
+    tooltip:{callbacks:{label:c=>c.dataset.label+': S/ '+fmt(c.raw)}}},scales:{y:{ticks:{callback:v=>'S/ '+fmt(v)}}}}});
+
+  // tabla de antigüedad por tienda
+  const mesActualKey = DATA.anioActual*100+DATA.mesActual;
+  const filas = tiendas.map(p=>{
+    const pm = primerMes[p];
+    if(pm==null) return null;
+    const edad = Math.floor((Math.floor(mesActualKey/100)-Math.floor(pm/100))*12 + (mesActualKey%100-pm%100));
+    const pa=Math.floor(pm/100), pmes=pm%100;
+    return {p, primer: `${MESES[pmes-1]} ${pa}`, edad, madura: edad>=MADUREZ_MESES};
+  }).filter(Boolean).sort((x,y)=>x.edad-y.edad);
+
+  let h = '<tr><th>Tienda</th><th class="r">Primer mes con Cargo Fijo</th><th class="r">Antigüedad</th><th>Estado</th></tr>';
+  filas.forEach(f=>{
+    h += `<tr><td>${pdvShort(f.p)}</td><td class="r">${f.primer}</td><td class="r">${f.edad} meses</td>`
+      + `<td>${f.madura? '<span class="pill pv">MADURA</span>' : '<span class="pill pa">NUEVA</span>'}</td></tr>`;
+  });
+  tb.innerHTML = filas.length? h : '<tr><td style="color:var(--mut);padding:10px">Sin datos suficientes.</td></tr>';
 }
 function diasAvance_full_real(){ return filtroDiaActivo()? F.dia : (esMesActualSolo()? DATA.maxDia : diasAvance_full()); }
 
@@ -2411,7 +2516,7 @@ function actualizarProjBox(){
     });
   }
 }
-function render(){actualizarProjBox();renderResumen();renderHfc();renderEvolucion();renderPosPre();renderAse();renderDia();var _e=document.getElementById('s-equipos');if(_e&&_e.classList.contains('act')&&window.renderEquipos)window.renderEquipos();}
+function render(){actualizarProjBox();renderResumen();renderHfc();renderEvolucion();renderPosPre();renderAse();renderDia();renderSameStore();var _e=document.getElementById('s-equipos');if(_e&&_e.classList.contains('act')&&window.renderEquipos)window.renderEquipos();}
 
 // ===================== CARGA DE EXCEL Y PERSISTENCIA =====================
 function saveDataToStorage(data, key){
