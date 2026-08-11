@@ -1101,7 +1101,8 @@ async function comisionKpiFragmentGerencia(sel){
     if(!isGlobal && sel && sel.length){
       return comisionCardsFragment(comis, null, sel, gerMes);
     } else if(comercialMode){
-      return comisionCardsFragment(comis, "Gerente Comercial (Julio)", null, gerMes);
+      return comisionCardsFragment(comis, "Gerente Comercial (Julio)", null, gerMes)
+           + comisionCardsFragment(comis, "Coordinador Comercial (Gustavo)", null, gerMes);
     } else {
       return comisionCardsFragment(comis, "Coordinador Comercial (Gustavo)", null, gerMes);
     }
