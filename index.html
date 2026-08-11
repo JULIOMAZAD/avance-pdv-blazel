@@ -276,7 +276,8 @@ const SHEET_NAME={
   "Tienda - Rambla Brasil":"rambla",
   "Tienda - Santa Anita 1":"santa anita 1",
   "Tienda - Santa Anita 2":"santa anita2",
-  "Call Center":"call center"
+  "Call Center":"call center",
+  "Tienda - San Felipe":"San Felipe"
 };
 function sheetNameFor(tienda, mes){
   if(tienda==="Tienda - Santa Anita 1" && (MES_ORDER[mes]||0) < MES_ORDER["agosto"]){
@@ -294,13 +295,15 @@ const TIENDA_LABEL={
   "Tienda - Rambla Brasil":"Rambla",
   "Tienda - Santa Anita 1":"Santa Anita 1",
   "Tienda - Santa Anita 2":"Santa Anita 2",
-  "Call Center":"Call Center"
+  "Call Center":"Call Center",
+  "Tienda - San Felipe":"San Felipe"
 };
 const GER_ALL=Object.keys(SHEET_NAME);
 const GER_GLOBAL=[
   "Tienda - Mall Bellavista","Tienda - Mall del Sur 1","Tienda - Mall del Sur 2",
   "Tienda - Mega Plaza","Tienda - Plaza Norte","Tienda - Primavera",
-  "Tienda - Rambla Brasil","Tienda - Santa Anita 1","Tienda - Santa Anita 2","Call Center"
+  "Tienda - Rambla Brasil","Tienda - Santa Anita 1","Tienda - Santa Anita 2","Call Center",
+  "Tienda - San Felipe"
 ];
 
 let MESES=[
