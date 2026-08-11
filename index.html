@@ -121,7 +121,8 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
           <option value="Tienda - Plaza Norte">Tienda - Plaza Norte</option>
           <option value="Tienda - Primavera">Tienda - Primavera</option>
           <option value="Tienda - Rambla Brasil">Tienda - Rambla Brasil</option>
-          <option value="Tienda - Santa Anita">Tienda - Santa Anita</option>
+          <option value="Tienda - Santa Anita 1">Tienda - Santa Anita 1</option>
+          <option value="Tienda - Santa Anita 2">Tienda - Santa Anita 2</option>
           <option value="Call Center">Call Center</option>
           <option value="GERENCIA">🔑 COORD. TIENDAS</option>
           <option value="AMPARO">🔑 COORD. CAMPO</option>
@@ -256,7 +257,8 @@ const PWD={
   "Tienda - Plaza Norte":"Aguila839",
   "Tienda - Primavera":"Colibri617",
   "Tienda - Rambla Brasil":"Jaguar375",
-  "Tienda - Santa Anita":"Condor942",
+  "Tienda - Santa Anita 1":"Condor942",
+  "Tienda - Santa Anita 2":"Condor943",
   "Call Center":"Fenix508",
   "GERENCIA":"tiendas",
   "AMPARO":"campo",
@@ -272,9 +274,16 @@ const SHEET_NAME={
   "Tienda - Plaza Norte":"plaza norte",
   "Tienda - Primavera":"primavera",
   "Tienda - Rambla Brasil":"rambla",
-  "Tienda - Santa Anita":"santa anita",
+  "Tienda - Santa Anita 1":"santa anita 1",
+  "Tienda - Santa Anita 2":"santa anita2",
   "Call Center":"call center"
 };
+function sheetNameFor(tienda, mes){
+  if(tienda==="Tienda - Santa Anita 1" && (MES_ORDER[mes]||0) < MES_ORDER["agosto"]){
+    return "santa anita"; // pestaña historica antes de la division en 1 y 2
+  }
+  return SHEET_NAME[tienda]||"";
+}
 const TIENDA_LABEL={
   "Tienda - Mall Bellavista":"Bellavista",
   "Tienda - Mall del Sur 1":"Sur 1",
@@ -283,20 +292,22 @@ const TIENDA_LABEL={
   "Tienda - Plaza Norte":"Plaza Norte",
   "Tienda - Primavera":"Primavera",
   "Tienda - Rambla Brasil":"Rambla",
-  "Tienda - Santa Anita":"Santa Anita",
+  "Tienda - Santa Anita 1":"Santa Anita 1",
+  "Tienda - Santa Anita 2":"Santa Anita 2",
   "Call Center":"Call Center"
 };
 const GER_ALL=Object.keys(SHEET_NAME);
 const GER_GLOBAL=[
   "Tienda - Mall Bellavista","Tienda - Mall del Sur 1","Tienda - Mall del Sur 2",
   "Tienda - Mega Plaza","Tienda - Plaza Norte","Tienda - Primavera",
-  "Tienda - Rambla Brasil","Tienda - Santa Anita","Call Center"
+  "Tienda - Rambla Brasil","Tienda - Santa Anita 1","Tienda - Santa Anita 2","Call Center"
 ];
 
 let MESES=[
   {label:"Mayo 2026", key:"mayo"},
   {label:"Junio 2026", key:"junio"},
-  {label:"Julio 2026", key:"julio"}
+  {label:"Julio 2026", key:"julio"},
+  {label:"Agosto 2026", key:"agosto"}
 ];
 const MES_ORDER={enero:1,febrero:2,marzo:3,abril:4,mayo:5,junio:6,julio:7,agosto:8,septiembre:9,setiembre:9,octubre:10,noviembre:11,diciembre:12};
 function extractMesFromRows(rows){
@@ -467,7 +478,7 @@ async function loadData(mes){
   document.getElementById("tableSection").innerHTML="";
   document.getElementById("infoRow").innerHTML="";
   try{
-    const data=await fetchTienda(SHEET_NAME[curTienda]||"", mes);
+    const data=await fetchTienda(sheetNameFor(curTienda, mes), mes);
     cache[cacheKey]=data;
     showTable(data);
   }catch(ex){
@@ -623,11 +634,12 @@ function pickGustavo(){ gerMode="gustavo"; gerSel.clear(); renderGerChips(); loa
 function renderGerChips(){
   const isAll = gerMode==="all";
   const isGustavo = gerMode==="gustavo";
+  const ocultarCallCenter = (MES_ORDER[gerMes]||0) >= MES_ORDER["agosto"];
   let html=`<div class="tchip all${isAll?" on":""}" onclick="setAll()">${isAll?"✓ ":""}Todas — Cuota Global</div>`;
   if(comercialMode){
     html+=`<div class="tchip${isGustavo?" on":""}" onclick="pickGustavo()">${isGustavo?"✓ ":""}Gustavo</div>`;
   }
-  html+=GER_ALL.map(t=>{
+  html+=GER_ALL.filter(t=>!(ocultarCallCenter && t==="Call Center")).map(t=>{
     const on = gerMode==="custom" && gerSel.has(t);
     return `<div class="tchip${on?" on":""}" onclick="toggleStore('${t.replace(/'/g,"\\'")}')">${on?"✓ ":""}${TIENDA_LABEL[t]}</div>`;
   }).join("");
@@ -691,7 +703,7 @@ async function loadGerencia(){
   const isCurrent = () => myGen === GER_GEN;
   const sel = gerMode==="custom" ? [...gerSel]
     : (gerMode==="gustavo" || (gerMode==="all" && !comercialMode)) ? GER_GLOBAL.filter(t=>t!=="Call Center")
-    : GER_GLOBAL.slice();
+    : ((MES_ORDER[gerMes]||0) >= MES_ORDER["agosto"] ? GER_GLOBAL.filter(t=>t!=="Call Center") : GER_GLOBAL.slice());
   const km=document.getElementById("gerKpis");
   const ts=document.getElementById("gerTableSection");
   const info=document.getElementById("gerInfoRow");
@@ -706,7 +718,7 @@ async function loadGerencia(){
   try{
     const comisFragPromise = comisionKpiFragmentGerencia(sel);
     const results=await withLock(()=>Promise.race([
-      fetchInBatches(sel, 9, t=>fetchTienda(SHEET_NAME[t]||"", gerMes)
+      fetchInBatches(sel, 9, t=>fetchTienda(sheetNameFor(t, gerMes), gerMes)
         .then(d=>({t,d})).catch(e=>({t,d:null,err:(e&&e.message)||"error"})), isCurrent),
       new Promise((_,rej)=>setTimeout(()=>rej(new Error("La carga tardó demasiado. Intenta de nuevo.")), 90000))
     ]));
@@ -717,7 +729,7 @@ async function loadGerencia(){
     console.log("[DIAG] gen="+myGen+" ok="+ok.length+" failed="+failed.length);
     if(failed.length){
       document.getElementById("gerLoadMsg").innerHTML='<div class="loading-sm"><span class="spinner-sm"></span>Reintentando '+failed.length+' tienda(s)...</div>';
-      const retry=await withLock(()=>fetchInBatches(failed.map(r=>r.t), 1, t=>fetchTienda(SHEET_NAME[t]||"", gerMes)
+      const retry=await withLock(()=>fetchInBatches(failed.map(r=>r.t), 1, t=>fetchTienda(sheetNameFor(t, gerMes), gerMes)
         .then(d=>({t,d})).catch(e=>({t,d:null,err:(e&&e.message)||"error"})), isCurrent));
       console.log("[DIAG] gen="+myGen+" retry resuelto, retry.length="+retry.length);
       if(!isCurrent()){ console.log("[DIAG] gen="+myGen+" DESCARTADO tras retry (actual="+GER_GEN+")"); return; }
@@ -853,7 +865,7 @@ function aggregateResults(ok){
   return {acc, order, factor, totMeta, totAv, totProy};
 }
 async function fetchMonthAgg(sel, mesKey){
-  const results = await fetchInBatches(sel, 9, t=>fetchTienda(SHEET_NAME[t]||"", mesKey).then(d=>({t,d})).catch(e=>({t,d:null})), null, null);
+  const results = await fetchInBatches(sel, 9, t=>fetchTienda(sheetNameFor(t, mesKey), mesKey).then(d=>({t,d})).catch(e=>({t,d:null})), null, null);
   const ok = results.filter(r=>r.d);
   if(!ok.length) return null;
   return aggregateResults(ok);
@@ -1153,7 +1165,7 @@ function aParse(rows,mes,anio){
   return recs;
 }
 async function aFetchJSON(u){const r=await fetch(u);if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}
-const STORE_TO_TI={"Tienda - Mall Bellavista":"Mall Bellavista","Tienda - Mall del Sur 1":"Mall del Sur I","Tienda - Mall del Sur 2":"Mall del Sur II","Tienda - Mega Plaza":"Mega Plaza","Tienda - Plaza Norte":"Plaza Norte","Tienda - Primavera":"Primavera","Tienda - Rambla Brasil":"La Rambla","Tienda - Santa Anita":"Santa Anita"};
+const STORE_TO_TI={"Tienda - Mall Bellavista":"Mall Bellavista","Tienda - Mall del Sur 1":"Mall del Sur I","Tienda - Mall del Sur 2":"Mall del Sur II","Tienda - Mega Plaza":"Mega Plaza","Tienda - Plaza Norte":"Plaza Norte","Tienda - Primavera":"Primavera","Tienda - Rambla Brasil":"La Rambla","Tienda - Santa Anita 1":"Santa Anita 1","Tienda - Santa Anita 2":"Santa Anita 2"};
 const UNIT_CATS=["Alta Prepago","Portabilidad Prepago","Packs Prepago","Portabilidad Postpago","Altas Postpago","Packs Postpago","Líneas Adicionales Postpago","HFC","UGIS Inalámbricos","OLO","Accesorios","Portabilidad CF >=95.50"];
 let asesorCache={};
 async function getAsesorData(mesKey){
@@ -1402,7 +1414,7 @@ async function renderStoreTrendTables(){
     const aggs = await withStoreTrendLock(()=>Promise.race([
       Promise.all(ultimos.map(async m=>{
         try{
-          const d = await fetchTienda(SHEET_NAME[curTienda]||"", m.key);
+          const d = await fetchTienda(sheetNameFor(curTienda, m.key), m.key);
           return aggregateResults([{t:curTienda,d}]);
         }catch(e){ return null; }
       })),
