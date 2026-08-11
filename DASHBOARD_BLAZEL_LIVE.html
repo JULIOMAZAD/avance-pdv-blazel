@@ -2987,25 +2987,7 @@ const EQUIPOS_DATA = {"rows": [[2025, 1, "Santa Anita", "SIN MARCA", "Sin modelo
 
 // ===================== DATOS EN VIVO (Sheet publicado, sin datos personales) =====================
 const CSV_URL='https://docs.google.com/spreadsheets/d/e/2PACX-1vSS4j_H53oNWTH9xYZhE7gnIla0Q__gf0OB_RM5tj3QBL4I70jTCAEg86fCTkJeOH-Bd7_3rxgx-0MQ/pub?gid=10250883&single=true&output=csv';
-function _eqnum(v){
-  var s = String(v==null?'':v).trim();
-  if(!s) return 0;
-  var hasComma = s.indexOf(',') !== -1, hasDot = s.indexOf('.') !== -1;
-  if(hasComma && hasDot){
-    // el separador que aparece MÁS A LA DERECHA es el decimal; el otro es de miles
-    if(s.lastIndexOf(',') > s.lastIndexOf('.')) s = s.replace(/\./g,'').replace(',', '.'); // "1.651,00" (PE)
-    else s = s.replace(/,/g,''); // "1,651.00" (US) -> el punto ya es decimal
-  } else if(hasComma){
-    var m = s.match(/,(\d+)$/);
-    s = (m && m[1].length===2) ? s.replace(',', '.') : s.replace(/,/g,'');
-  } else if(hasDot){
-    var m2 = s.match(/\.(\d+)$/);
-    if(m2 && m2[1].length===3) s = s.replace(/\./g,''); // "1.651" (PE, miles sin decimales)
-    // si son 1-2 dígitos tras el punto, ya es decimal estándar -> se deja tal cual
-  }
-  var n = parseFloat(s);
-  return isNaN(n)?0:n;
-}
+function _eqnum(v){var s=String(v==null?'':v).trim();s=s.replace(/\./g,'').replace(/,/g,'.');var n=parseFloat(s);return isNaN(n)?0:n;}
 function _stripPdv(p){p=String(p==null?'':p).trim();return p.replace(/^PDV - /,'').replace(/^Tienda - /,'');}
 async function loadLive(){
   try{
