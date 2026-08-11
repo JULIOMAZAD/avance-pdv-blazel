@@ -148,6 +148,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
         <div class="pdv" id="dispTienda"></div>
       </div>
       <div class="top-actions">
+        <button class="btn-vend" id="btnVolverCampo" style="display:none" onclick="showScreen('recarScreen')">⚑ Volver a Campo</button>
         <button class="btn-out" onclick="doLogout()">Cerrar sesión</button>
       </div>
     </div>
@@ -206,7 +207,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
   <div class="main-wrap">
     <div class="top-bar">
       <div class="top-left"><h2>COORD. CAMPO — Avance de Campo</h2><div class="pdv">Avance por responsable y asesor</div></div>
-      <div class="top-actions"><button class="btn-vend" id="btnRecarDash" style="display:none" onclick="abrirRecargaAmparo()">⚡ Recarga</button><button class="btn-vend" onclick="abrirPersonal('recarScreen')">🗂️ Control Personal</button><button class="btn-vend" id="btnGPSAmparo" style="display:none" onclick="openEmbed('SEGUIMIENTO_GPS.html?u=amparo','📍 Seguimiento GPS','recarScreen')">📍 Seguimiento GPS</button><button class="btn-vend" onclick="openEmbed('PRE_ENTREGAS_PANEL.html?u=amparo','📦 Pre-entregas','recarScreen')">📦 Pre-entregas</button><button class="btn-out" onclick="doLogout()">Cerrar sesión</button></div>
+      <div class="top-actions"><button class="btn-vend" onclick="abrirSanFelipeAmparo()">🏪 San Felipe</button><button class="btn-vend" id="btnRecarDash" style="display:none" onclick="abrirRecargaAmparo()">⚡ Recarga</button><button class="btn-vend" onclick="abrirPersonal('recarScreen')">🗂️ Control Personal</button><button class="btn-vend" id="btnGPSAmparo" style="display:none" onclick="openEmbed('SEGUIMIENTO_GPS.html?u=amparo','📍 Seguimiento GPS','recarScreen')">📍 Seguimiento GPS</button><button class="btn-vend" onclick="openEmbed('PRE_ENTREGAS_PANEL.html?u=amparo','📦 Pre-entregas','recarScreen')">📦 Pre-entregas</button><button class="btn-out" onclick="doLogout()">Cerrar sesión</button></div>
     </div>
     <div class="mes-tabs" id="recarMesTabs"></div>
     <div id="recarInfo" class="info-row"></div>
@@ -298,13 +299,19 @@ const TIENDA_LABEL={
   "Call Center":"Call Center",
   "Tienda - San Felipe":"San Felipe"
 };
-const GER_ALL=Object.keys(SHEET_NAME);
+const GER_ALL=[
+  "Tienda - Mall Bellavista","Tienda - Mall del Sur 1","Tienda - Mall del Sur 2",
+  "Tienda - Mega Plaza","Tienda - Plaza Norte","Tienda - Primavera",
+  "Tienda - Rambla Brasil","Tienda - Santa Anita 1","Tienda - Santa Anita 2","Call Center"
+];
+// Solo para el login COMERCIAL (jmaza): agrega San Felipe (TPC), no debe verla Gustavo
+const GER_ALL_COMERCIAL=[...GER_ALL,"Tienda - San Felipe"];
 const GER_GLOBAL=[
   "Tienda - Mall Bellavista","Tienda - Mall del Sur 1","Tienda - Mall del Sur 2",
   "Tienda - Mega Plaza","Tienda - Plaza Norte","Tienda - Primavera",
-  "Tienda - Rambla Brasil","Tienda - Santa Anita 1","Tienda - Santa Anita 2","Call Center",
-  "Tienda - San Felipe"
+  "Tienda - Rambla Brasil","Tienda - Santa Anita 1","Tienda - Santa Anita 2","Call Center"
 ];
+const GER_GLOBAL_COMERCIAL=[...GER_GLOBAL,"Tienda - San Felipe"];
 
 let MESES=[
   {label:"Mayo 2026", key:"mayo"},
@@ -420,6 +427,16 @@ function salirEmbed(){ showScreen(embedReturn); }
 function abrirMasivo(){ openEmbed("DASHBOARD_BLAZEL_LIVE.html?embed=1","📡 Masivo · Centro de Mando","gerScreen"); }
 function abrirRecargaDash(){ openEmbed("DASHBOARD_RECARGAS_BLAZEL.html?embed=1&u=jmaza","⚡ Recarga","gerScreen"); }
 function abrirRecargaAmparo(){ openEmbed("DASHBOARD_RECARGAS_BLAZEL.html?embed=1&u=amparo","⚡ Recarga","recarScreen"); }
+function abrirSanFelipeAmparo(){
+  gerenteMode=false;
+  curTienda="Tienda - San Felipe";
+  document.getElementById("dispTienda").textContent="San Felipe";
+  document.getElementById("btnVolverCampo").style.display="";
+  showScreen("mainScreen");
+  switchMainView("tienda");
+  renderTabs();
+  loadData(curMes);
+}
 function abrirPersonal(ret){
   const u = HUB_TO_PERSONAL[curLoginType] || "";
   const url = u ? ("CONTROL_DE_PERSONAL.html?auto="+u+"&key="+AUTO_KEY) : "CONTROL_DE_PERSONAL.html";
@@ -427,7 +444,7 @@ function abrirPersonal(ret){
 }
 function doLogout(){
   curTienda="";gerenteMode=false;comercialMode=false;curLoginType="";gerMode="all";gerSel.clear();
-  ["btnMasivo","btnRecarga","btnRecarDash","btnGPS","btnGPSAmparo","btnPreEntregas"].forEach(function(id){ var b=document.getElementById(id); if(b) b.style.display="none"; });
+  ["btnMasivo","btnRecarga","btnRecarDash","btnGPS","btnGPSAmparo","btnPreEntregas","btnVolverCampo"].forEach(function(id){ var b=document.getElementById(id); if(b) b.style.display="none"; });
   var _gh=document.querySelector("#gerScreen h2"); if(_gh) _gh.textContent="COORD. TIENDAS — Consolidado";
   document.getElementById("passIn").value="";
   document.getElementById("tiendaSel").value="";
@@ -642,7 +659,7 @@ function renderGerChips(){
   if(comercialMode){
     html+=`<div class="tchip${isGustavo?" on":""}" onclick="pickGustavo()">${isGustavo?"✓ ":""}Gustavo</div>`;
   }
-  html+=GER_ALL.filter(t=>!(ocultarCallCenter && t==="Call Center")).map(t=>{
+  html+=(comercialMode?GER_ALL_COMERCIAL:GER_ALL).filter(t=>!(ocultarCallCenter && t==="Call Center")).map(t=>{
     const on = gerMode==="custom" && gerSel.has(t);
     return `<div class="tchip${on?" on":""}" onclick="toggleStore('${t.replace(/'/g,"\\'")}')">${on?"✓ ":""}${TIENDA_LABEL[t]}</div>`;
   }).join("");
@@ -706,7 +723,7 @@ async function loadGerencia(){
   const isCurrent = () => myGen === GER_GEN;
   const sel = gerMode==="custom" ? [...gerSel]
     : (gerMode==="gustavo" || (gerMode==="all" && !comercialMode)) ? GER_GLOBAL.filter(t=>t!=="Call Center")
-    : ((MES_ORDER[gerMes]||0) >= MES_ORDER["agosto"] ? GER_GLOBAL.filter(t=>t!=="Call Center") : GER_GLOBAL.slice());
+    : ((MES_ORDER[gerMes]||0) >= MES_ORDER["agosto"] ? GER_GLOBAL_COMERCIAL.filter(t=>t!=="Call Center") : GER_GLOBAL_COMERCIAL.slice());
   const km=document.getElementById("gerKpis");
   const ts=document.getElementById("gerTableSection");
   const info=document.getElementById("gerInfoRow");
@@ -1046,14 +1063,24 @@ async function fetchComisiones(){
   COMIS_CACHE=j.comisiones||{};
   return COMIS_CACHE;
 }
+// Compara nombres de punto de venta ignorando el prefijo (Tienda -, PDV -, TPC -, MM -)
+// y espacios/mayúsculas, porque la hoja de comisiones usa "PDV -"/"TPC -" mientras
+// que el resto del dashboard usa "Tienda -".
+function canonPV(s){
+  return String(s||'')
+    .replace(/^(Tienda|PDV|TPC|MM)\s*-\s*/i,'')
+    .replace(/\s+/g,' ')
+    .trim()
+    .toUpperCase();
+}
 function comisionCardsFragment(comis, filtroPv, filtroList, mesSel){
   if(!mesSel || !Array.isArray(comis[mesSel])) return "";
-  const wantSet = (filtroList && filtroList.length) ? new Set(filtroList.map(x=>x.trim().toUpperCase())) : null;
+  const wantSet = (filtroList && filtroList.length) ? new Set(filtroList.map(x=>canonPV(x))) : null;
   const lbl = mesSel.charAt(0).toUpperCase()+mesSel.slice(1);
   let cards="";
   comis[mesSel].forEach(f=>{
-    const key=f.pv.trim().toUpperCase();
-    if(filtroPv && key!==filtroPv.trim().toUpperCase()) return;
+    const key=canonPV(f.pv);
+    if(filtroPv && key!==canonPV(filtroPv)) return;
     if(wantSet && !wantSet.has(key)) return;
     cards += kpiCard("💰 Comisión "+lbl, "S/ "+fmt(f.comision), f.pv);
   });
