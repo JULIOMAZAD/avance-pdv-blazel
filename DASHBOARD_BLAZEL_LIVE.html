@@ -365,8 +365,20 @@ function excelDateToJSDate(v){
     return new Date(utcMs);
   }
   if(typeof v === 'string'){
-    const d = new Date(v);
-    if(!isNaN(d.getTime())) return d;
+    const s = v.trim();
+    // Formato peruano DD/MM/AAAA o D/M/AAAA (el que usa el CSV de PUBLICAR)
+    const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+    if(m){
+      let dd = parseInt(m[1],10), mm = parseInt(m[2],10), yy = parseInt(m[3],10);
+      if(yy < 100) yy += 2000;
+      if(mm>=1 && mm<=12 && dd>=1 && dd<=31){
+        const d = new Date(yy, mm-1, dd);
+        if(!isNaN(d.getTime())) return d;
+      }
+    }
+    // Formato AAAA-MM-DD (ISO) u otros que Date() sí interpreta bien
+    const d2 = new Date(s);
+    if(!isNaN(d2.getTime())) return d2;
   }
   return null;
 }
