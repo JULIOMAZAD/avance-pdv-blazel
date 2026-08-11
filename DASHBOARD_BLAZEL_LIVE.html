@@ -209,14 +209,11 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
       </div>
       <div>
         <div style="font-size:10px;color:var(--mut);text-transform:uppercase;margin-bottom:4px">Comparar mes (anterior)</div>
-        <input type="text" id="ppMesA" list="listaMesesPP" placeholder="Ej: mayo..." autocomplete="off"
-          style="width:150px;padding:8px 10px;border-radius:8px;border:1px solid #2a3344;background:#161d29;color:#eef2f7;font-size:13px">
+        <select id="ppMesA" style="width:180px;padding:10px 12px;border-radius:8px;border:1px solid #2a3344;background:#161d29;color:#eef2f7;font-size:17px"></select>
       </div>
       <div>
         <div style="font-size:10px;color:var(--mut);text-transform:uppercase;margin-bottom:4px">vs. mes (actual)</div>
-        <input type="text" id="ppMesB" list="listaMesesPP" placeholder="Ej: junio..." autocomplete="off"
-          style="width:150px;padding:8px 10px;border-radius:8px;border:1px solid #2a3344;background:#161d29;color:#eef2f7;font-size:13px">
-        <datalist id="listaMesesPP"></datalist>
+        <select id="ppMesB" style="width:180px;padding:10px 12px;border-radius:8px;border:1px solid #2a3344;background:#161d29;color:#eef2f7;font-size:17px"></select>
       </div>
       <div>
         <div style="font-size:10px;color:var(--mut);text-transform:uppercase;margin-bottom:4px">Comparar hasta el día</div>
@@ -2119,27 +2116,23 @@ function renderPosPre(){
   if(!PP_MES_A || !mesesOpsDisp.includes(PP_MES_A)) PP_MES_A = mesesOpsDisp.includes(prevKeyDefault)? prevKeyDefault : mesesOpsDisp[Math.max(0,mesesOpsDisp.length-2)];
   if(!PP_MES_B || !mesesOpsDisp.includes(PP_MES_B)) PP_MES_B = mesesOpsDisp.includes(keyActualOps)? keyActualOps : mesesOpsDisp[mesesOpsDisp.length-1];
   const mesLabel = k=>{ const [a,m]=k.split('-').map(Number); return `${MESES[m-1]} ${a}`; };
-  const inputA = document.getElementById('ppMesA'), inputB = document.getElementById('ppMesB');
-  const listaMeses = document.getElementById('listaMesesPP');
-  if(listaMeses && !listaMeses.dataset.filled){
-    listaMeses.dataset.filled='1';
-    listaMeses.innerHTML = mesesOpsDisp.map(k=>`<option value="${mesLabel(k)}">`).join('');
+  const selA = document.getElementById('ppMesA'), selB = document.getElementById('ppMesB');
+  function fillMesSelect(sel){
+    if(!sel) return;
+    const opts = mesesOpsDisp.map(k=>`<option value="${k}">${mesLabel(k)}</option>`).join('');
+    if(sel.innerHTML !== opts) sel.innerHTML = opts;
   }
-  function wireMesInput(input, getVal, setVal){
-    if(!input) return;
-    input.value = mesLabel(getVal());
-    if(!input.dataset.wired){
-      input.dataset.wired='1';
-      input.addEventListener('change', ()=>{
-        const q = input.value.trim().toLowerCase();
-        const match = mesesOpsDisp.find(k=>mesLabel(k).toLowerCase()===q) ||
-                      mesesOpsDisp.find(k=>mesLabel(k).toLowerCase().includes(q));
-        if(match){ setVal(match); renderPosPre(); } else { input.value = mesLabel(getVal()); }
-      });
+  fillMesSelect(selA); fillMesSelect(selB);
+  function wireMesSelect(sel, getVal, setVal){
+    if(!sel) return;
+    sel.value = getVal();
+    if(!sel.dataset.wired){
+      sel.dataset.wired='1';
+      sel.addEventListener('change', ()=>{ setVal(sel.value); renderPosPre(); });
     }
   }
-  wireMesInput(inputA, ()=>PP_MES_A, v=>PP_MES_A=v);
-  wireMesInput(inputB, ()=>PP_MES_B, v=>PP_MES_B=v);
+  wireMesSelect(selA, ()=>PP_MES_A, v=>PP_MES_A=v);
+  wireMesSelect(selB, ()=>PP_MES_B, v=>PP_MES_B=v);
   const diaCorteInput = document.getElementById('ppDiaCorte');
   if(diaCorteInput && !diaCorteInput.dataset.wired){
     diaCorteInput.dataset.wired='1';
