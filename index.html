@@ -520,7 +520,7 @@ async function fetchTienda(sheet, mes){
   // (antes solo se "ignoraba" la promesa pero el fetch seguía vivo de fondo,
   // acumulando conexiones y pisando el mensaje "Sumando X de 9..." más tarde)
   const ctrl = new AbortController();
-  const killer = setTimeout(()=>ctrl.abort(), 35000); // 35s total para fetch+parseo de UNA tienda
+  const killer = setTimeout(()=>ctrl.abort(), 20000); // 20s total para fetch+parseo de UNA tienda
   try{
     const res = await fetch(url, {signal: ctrl.signal});
     const json = await res.json();
@@ -654,7 +654,7 @@ function pickGustavo(){ gerMode="gustavo"; gerSel.clear(); renderGerChips(); loa
 function renderGerChips(){
   const isAll = gerMode==="all";
   const isGustavo = gerMode==="gustavo";
-  const ocultarCallCenter = (MES_ORDER[gerMes]||0) >= MES_ORDER["agosto"];
+  const ocultarCallCenter = true; // Call Center ya no está operativo; se oculta en todos los meses
   let html=`<div class="tchip all${isAll?" on":""}" onclick="setAll()">${isAll?"✓ ":""}Todas — Cuota Global</div>`;
   if(comercialMode){
     html+=`<div class="tchip${isGustavo?" on":""}" onclick="pickGustavo()">${isGustavo?"✓ ":""}Gustavo</div>`;
@@ -723,7 +723,7 @@ async function loadGerencia(){
   const isCurrent = () => myGen === GER_GEN;
   const sel = gerMode==="custom" ? [...gerSel]
     : (gerMode==="gustavo" || (gerMode==="all" && !comercialMode)) ? GER_GLOBAL.filter(t=>t!=="Call Center")
-    : ((MES_ORDER[gerMes]||0) >= MES_ORDER["agosto"] ? GER_GLOBAL_COMERCIAL.filter(t=>t!=="Call Center") : GER_GLOBAL_COMERCIAL.slice());
+    : GER_GLOBAL_COMERCIAL.filter(t=>t!=="Call Center");
   const km=document.getElementById("gerKpis");
   const ts=document.getElementById("gerTableSection");
   const info=document.getElementById("gerInfoRow");
@@ -738,7 +738,7 @@ async function loadGerencia(){
   try{
     const comisFragPromise = comisionKpiFragmentGerencia(sel);
     const results=await withLock(()=>Promise.race([
-      fetchInBatches(sel, 3, t=>fetchTienda(sheetNameFor(t, gerMes), gerMes)
+      fetchInBatches(sel, 9, t=>fetchTienda(sheetNameFor(t, gerMes), gerMes)
         .then(d=>({t,d})).catch(e=>({t,d:null,err:(e&&e.message)||"error"})), isCurrent),
       new Promise((_,rej)=>setTimeout(()=>rej(new Error("La carga tardó demasiado. Intenta de nuevo.")), 90000))
     ]));
@@ -747,14 +747,11 @@ async function loadGerencia(){
     let ok=results.filter(r=>r.d);
     let failed=results.filter(r=>!r.d);
     console.log("[DIAG] gen="+myGen+" ok="+ok.length+" failed="+failed.length);
-    // Reintenta hasta 3 veces las tiendas que fallaron, con una pequeña pausa entre intentos
-    // (el backend a veces se satura con muchas tiendas de golpe; una pausa suele bastar).
-    for(let intento=1; failed.length && intento<=3 && isCurrent(); intento++){
-      document.getElementById("gerLoadMsg").innerHTML='<div class="loading-sm"><span class="spinner-sm"></span>Reintentando '+failed.length+' tienda(s) (intento '+intento+' de 3)...</div>';
-      await new Promise(res=>setTimeout(res, 1500*intento));
-      const retry=await withLock(()=>fetchInBatches(failed.map(r=>r.t), 2, t=>fetchTienda(sheetNameFor(t, gerMes), gerMes)
+    if(failed.length){
+      document.getElementById("gerLoadMsg").innerHTML='<div class="loading-sm"><span class="spinner-sm"></span>Reintentando '+failed.length+' tienda(s)...</div>';
+      const retry=await withLock(()=>fetchInBatches(failed.map(r=>r.t), 1, t=>fetchTienda(sheetNameFor(t, gerMes), gerMes)
         .then(d=>({t,d})).catch(e=>({t,d:null,err:(e&&e.message)||"error"})), isCurrent));
-      console.log("[DIAG] gen="+myGen+" retry intento="+intento+" resuelto, retry.length="+retry.length);
+      console.log("[DIAG] gen="+myGen+" retry resuelto, retry.length="+retry.length);
       if(!isCurrent()){ console.log("[DIAG] gen="+myGen+" DESCARTADO tras retry (actual="+GER_GEN+")"); return; }
       ok=ok.concat(retry.filter(r=>r.d));
       failed=retry.filter(r=>!r.d);
