@@ -2203,7 +2203,7 @@ function renderPosPre(){
   });
   body += `<div class="card" style="margin-top:14px">
     <h3>Avance real por producto (operaciones) — sin comparar contra cuota</h3>
-    <div class="tscroll" style="max-height:none;overflow:visible"><table>${todasCats.length? tbl : '<tr><td style="color:var(--mut);padding:10px">Sin operaciones para la tienda/meses seleccionados.</td></tr>'}</table></div>
+    <div class="tscroll" style="max-height:none;overflow:visible"><table style="font-size:17px">${todasCats.length? tbl : '<tr><td style="color:var(--mut);padding:10px">Sin operaciones para la tienda/meses seleccionados.</td></tr>'}</table></div>
   </div>`;
 
   document.getElementById('posPreBody').innerHTML = body;
