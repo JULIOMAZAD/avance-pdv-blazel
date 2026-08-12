@@ -1791,7 +1791,7 @@ function evoPctCell(cur,prev){
   if(!prev||prev<=0||cur==null) return '<span style="color:var(--mut)">–</span>';
   const d=(cur-prev)/prev*100, up=d>=0;
   const bg = up ? '#1f8a3f' : '#c0392b';
-  return `<span style="display:inline-block;background:${bg};color:#ffffff;font-weight:700;font-size:11px;padding:2px 7px;border-radius:20px;line-height:1.5">${up?'+':''}${d.toFixed(0)}%</span>`;
+  return `<span style="display:inline-block;background:${bg};color:#ffffff;font-weight:700;font-size:16px;padding:4px 11px;border-radius:20px;line-height:1.5">${up?'+':''}${d.toFixed(0)}%</span>`;
 }
 function renderEvolucion(){
   const months = evoMonths(9);
