@@ -520,7 +520,7 @@ async function fetchTienda(sheet, mes){
   // (antes solo se "ignoraba" la promesa pero el fetch seguía vivo de fondo,
   // acumulando conexiones y pisando el mensaje "Sumando X de 9..." más tarde)
   const ctrl = new AbortController();
-  const killer = setTimeout(()=>ctrl.abort(), 20000); // 20s total para fetch+parseo de UNA tienda
+  const killer = setTimeout(()=>ctrl.abort(), 35000); // 35s total para fetch+parseo de UNA tienda
   try{
     const res = await fetch(url, {signal: ctrl.signal});
     const json = await res.json();
