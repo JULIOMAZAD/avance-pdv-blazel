@@ -424,6 +424,14 @@ function buildDataFromBase(rowsWithHeader){
   const pdvSet   = new Set();
 
   let maxAnio = 0, maxAnioMes = {};
+  // FIX: si una sola fila en toda la base tiene una fecha mal escrita o corrida
+  // de columna que caiga en un mes futuro (ej. diciembre 2026 estando hoy en
+  // agosto), esa fila por sí sola "secuestraba" el cálculo de año/mes actual
+  // de todo el dashboard. Ahora se ignora cualquier fecha posterior a hoy (en
+  // la vida real) SOLO para determinar cuál es el año/mes "actual" — la fila
+  // en sí no se descarta de las demás sumas.
+  const _hoyReal = new Date();
+  const _anioRealHoy = _hoyReal.getFullYear(), _mesRealHoy = _hoyReal.getMonth()+1;
 
   const rows = rowsWithHeader.slice(1);
   for(const r of rows){
@@ -469,9 +477,12 @@ function buildDataFromBase(rowsWithHeader){
     const cargoFijo = Number(r[idx['Cargo Fijo']]) || 0;
     const vendedor  = (r[idx['Vendedor']]||'').toString().trim() || 'No Reportado';
 
-    if(anio > maxAnio) maxAnio = anio;
-    if(!maxAnioMes[anio]) maxAnioMes[anio]=0;
-    if(mes > maxAnioMes[anio]) maxAnioMes[anio]=mes;
+    const _esFuturaMasAlladeHoy = (anio > _anioRealHoy) || (anio === _anioRealHoy && mes > _mesRealHoy);
+    if(!_esFuturaMasAlladeHoy){
+      if(anio > maxAnio) maxAnio = anio;
+      if(!maxAnioMes[anio]) maxAnioMes[anio]=0;
+      if(mes > maxAnioMes[anio]) maxAnioMes[anio]=mes;
+    }
 
     // ---- cargo (solo postpago) ----
     if(modalidad === 'postpago'){
