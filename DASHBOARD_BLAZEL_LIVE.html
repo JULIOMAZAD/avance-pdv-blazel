@@ -3010,7 +3010,7 @@ function _stripPdv(p){p=String(p==null?'':p).trim();return p.replace(/^PDV - /,'
 async function loadLive(){
   try{
     setUploadStatus('Cargando datos en vivo desde tu Sheet…','ok');
-    const resp=await fetch(CSV_URL,{cache:'no-store'});
+    const resp=await fetch(CSV_URL+'&_ts='+Date.now(),{cache:'no-store'});
     if(!resp.ok) throw new Error('HTTP '+resp.status);
     const text=await resp.text();
     const parsed=Papa.parse(text,{skipEmptyLines:true});
