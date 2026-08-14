@@ -3061,6 +3061,15 @@ async function loadLive(){
     let rmax=1; for(let r=1;r<baseRows.length;r++){const d=excelDateToJSDate(baseRows[r][0]); if(d&&!isNaN(d.getTime())&&d.getFullYear()===ND.anioActual&&(d.getMonth()+1)===ND.mesActual&&d.getDate()>rmax)rmax=d.getDate();}
     ND.maxDia=rmax;
     setActiveData(ND);
+    // FIX: el filtro "Día de avance" se guardaba en el navegador (localStorage) y se quedaba
+    // pegado a un día viejo (ej. 12) para siempre, aunque llegaran datos nuevos de días
+    // posteriores — esos datos quedaban excluidos de los totales sin que se notara.
+    // Ahora, cada vez que se cargan datos en vivo, el corte de día se resetea a "Todos los
+    // días" para que el total SIEMPRE sume el 100% de lo cargado. El usuario todavía puede
+    // fijar un día específico manualmente si quiere ver un corte puntual, pero ya no se queda
+    // trabado para las próximas cargas.
+    F.dia = 0;
+    guardarVistaFiltros();
     const eqRows=Object.entries(eqAgg).map(([k,c])=>{const p=k.split('|');return [parseInt(p[0]),parseInt(p[1]),p[2],p[3],p[4],p[5],c];});
     if(window.__setEqData) window.__setEqData({rows:eqRows,anios:[...eqAnios].sort((a,b)=>a-b),tiendas:[...eqTiendas].sort()});
     const evPdvList=[...evPdvSet], evVendList=[...evVendSet];
