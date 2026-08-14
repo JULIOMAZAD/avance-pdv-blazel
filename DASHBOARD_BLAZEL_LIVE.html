@@ -363,11 +363,18 @@ function excelDateToJSDate(v){
   }
   if(typeof v === 'string'){
     const s = v.trim();
-    // Formato peruano DD/MM/AAAA o D/M/AAAA (el que usa el CSV de PUBLICAR)
+    // El CSV de PUBLICAR exporta las fechas en formato MES/DIA/AAAA (americano),
+    // que es como Google Sheets las guarda internamente en esta hoja (ej. "12/30/2021" = 30 dic 2021).
+    // Si uno de los dos números es mayor a 12, ese es forzosamente el día (heurística inequívoca);
+    // si ambos son <=12 (ambiguo), se asume MES/DIA que es el formato real de esta hoja.
     const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
     if(m){
-      let dd = parseInt(m[1],10), mm = parseInt(m[2],10), yy = parseInt(m[3],10);
+      const a = parseInt(m[1],10), b = parseInt(m[2],10);
+      let yy = parseInt(m[3],10);
       if(yy < 100) yy += 2000;
+      let mm, dd;
+      if(a > 12 && b <= 12){ dd = a; mm = b; }
+      else { mm = a; dd = b; }
       if(mm>=1 && mm<=12 && dd>=1 && dd<=31){
         const d = new Date(yy, mm-1, dd);
         if(!isNaN(d.getTime())) return d;
