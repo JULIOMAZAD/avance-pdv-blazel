@@ -363,17 +363,13 @@ function excelDateToJSDate(v){
   }
   if(typeof v === 'string'){
     const s = v.trim();
-    // FIX: el CSV publicado por esta hoja exporta las fechas en formato
-    // estadounidense M/D/AAAA (mes primero), NO en formato peruano D/M/AAAA
-    // como asumía este código antes. Con la lectura vieja (día primero),
-    // invertidos (ej. "8/1/2026" = 1 de agosto se leía como 8 de enero),
-    // haciendo que esas filas se contaran en el mes equivocado sin dar
-    // ningún error visible. Se comprobó comparando con la columna "Fecha"
-    // (que sí tiene días >12, como "7/31/2026") y varias filas reales de
-    // agosto.
+    // Formato peruano DD/MM/AAAA o D/M/AAAA (el que usa el CSV de PUBLICAR
+    // del archivo real/original — confirmado comparando mes a mes contra un
+    // reporte de referencia del usuario; NO cambiar esto a M/D sin volver a
+    // verificar contra ese reporte).
     const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
     if(m){
-      let mm = parseInt(m[1],10), dd = parseInt(m[2],10), yy = parseInt(m[3],10);
+      let dd = parseInt(m[1],10), mm = parseInt(m[2],10), yy = parseInt(m[3],10);
       if(yy < 100) yy += 2000;
       if(mm>=1 && mm<=12 && dd>=1 && dd<=31){
         const d = new Date(yy, mm-1, dd);
