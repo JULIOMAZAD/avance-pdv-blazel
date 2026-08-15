@@ -1576,11 +1576,14 @@ function renderSameStore(){
 
   mkChart('chSameStore',{type:'bar',data:{labels,datasets:[
     {type:'line',label:'Mismas tiendas (12+ meses)',data:sameArr,borderColor:'#f5b041',backgroundColor:'#f5b041',tension:.25,pointRadius:4,pointBackgroundColor:'#f5b041',borderWidth:3,order:0,
-      datalabels:{display:true,color:'#f5b041',font:[{weight:'800',size:15},{weight:'700',size:11}],textAlign:'center',
+      // OJO: "font" como array ({..},{..}) NO se aplica linea-por-linea dentro de una misma
+      // etiqueta -- el plugin lo interpreta por INDICE DE BARRA (alterna barra si/barra no).
+      // Por eso debe ser un solo objeto fijo, igual para todas las barras y ambas lineas.
+      datalabels:{display:true,color:'#f5b041',font:{weight:'800',size:14},textAlign:'center',
         formatter:(v,ctx)=>{const p=madurasPctArr[ctx.dataIndex]; return p!=null? [fmt(Math.round(v)), p.toFixed(1)+'%'] : fmt(Math.round(v));},
         anchor:'end',align:'bottom',offset:6,clamp:true,clip:false,textStrokeColor:'rgba(0,0,0,0.65)',textStrokeWidth:3}},
     {label:'Total (todas las tiendas)',data:totalArr,backgroundColor:'#4aa3ff55',borderColor:'#4aa3ff',borderWidth:1,borderRadius:5,order:1,
-      datalabels:{color:'#eef2f7',font:[{weight:'700',size:15},{weight:'700',size:11}],textAlign:'center',
+      datalabels:{color:'#eef2f7',font:{weight:'700',size:14},textAlign:'center',
         formatter:(v,ctx)=>{const p=nuevasPctArr[ctx.dataIndex]; return p!=null? [fmt(Math.round(v)), p.toFixed(1)+'%'] : fmt(Math.round(v));}}}
   ]},options:{maintainAspectRatio:false,layout:{padding:{top:56}},plugins:{legend:{display:false},
     tooltip:{callbacks:{label:c=>c.dataset.label+': S/ '+fmt(c.raw)}}},
