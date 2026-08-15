@@ -363,15 +363,14 @@ function excelDateToJSDate(v){
   }
   if(typeof v === 'string'){
     const s = v.trim();
-    // IMPORTANTE: la pestaña "BASE" (fuente en vivo actual, gid=2054513345) guarda
-    // Fecha_de_Alta en formato AMERICANO M/D/AAAA (mes/día), confirmado porque hay
-    // fechas como "7/27/2026" donde 27 no puede ser mes. Esto es DISTINTO del
-    // formato de la pestaña "PUBLICAR" (D/M, peruano) que se usaba antes — si en
-    // el futuro se vuelve a apuntar a "PUBLICAR" o a otra fuente, hay que revisar
-    // de nuevo cuál formato usa esa fuente antes de tocar esto.
+    // IMPORTANTE: la fuente en vivo actual es la pestaña "PUBLICAR" (gid=10250883),
+    // que guarda Fecha_de_Alta en formato PERUANO D/M/AAAA (día/mes) — confirmado
+    // contra el reporte de referencia del usuario. La pestaña "BASE" usa el formato
+    // AMERICANO M/D contrario; si se vuelve a apuntar a "BASE" hay que revisar esto
+    // de nuevo antes de tocarlo.
     const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
     if(m){
-      let mm = parseInt(m[1],10), dd = parseInt(m[2],10), yy = parseInt(m[3],10);
+      let dd = parseInt(m[1],10), mm = parseInt(m[2],10), yy = parseInt(m[3],10);
       if(yy < 100) yy += 2000;
       if(mm>=1 && mm<=12 && dd>=1 && dd<=31){
         const d = new Date(yy, mm-1, dd);
@@ -3007,7 +3006,7 @@ const EQUIPOS_DATA = {"rows": [[2025, 1, "Santa Anita", "SIN MARCA", "Sin modelo
 })();
 
 // ===================== DATOS EN VIVO (Sheet publicado, sin datos personales) =====================
-const CSV_URL='https://docs.google.com/spreadsheets/d/e/2PACX-1vSS4j_H53oNWTH9xYZhE7gnIla0Q__gf0OB_RM5tj3QBL4I70jTCAEg86fCTkJeOH-Bd7_3rxgx-0MQ/pub?gid=2054513345&single=true&output=csv';
+const CSV_URL='https://docs.google.com/spreadsheets/d/e/2PACX-1vSS4j_H53oNWTH9xYZhE7gnIla0Q__gf0OB_RM5tj3QBL4I70jTCAEg86fCTkJeOH-Bd7_3rxgx-0MQ/pub?gid=10250883&single=true&output=csv';
 function _eqnum(v){
   var s=String(v==null?'':v).trim();
   if(!s || s==='-') return 0;
