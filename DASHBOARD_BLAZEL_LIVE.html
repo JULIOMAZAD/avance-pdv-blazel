@@ -1571,11 +1571,19 @@ function renderSameStore(){
     kpiHTML('Cargo Fijo total · '+labelUlt, 'S/ '+fmt(totalUlt), '') +
     kpiHTML('Cargo Fijo mismas tiendas · '+labelUlt, 'S/ '+fmt(sameUlt), '');
 
+  // % que aportan las tiendas maduras (mismas tiendas 12+ meses) y las nuevas, sobre el total de cada mes
+  const madurasPctArr = labels.map((_,i)=> totalArr[i]>0 ? (sameArr[i]/totalArr[i]*100) : null);
+  const nuevasPctArr = labels.map((_,i)=> totalArr[i]>0 ? ((totalArr[i]-sameArr[i])/totalArr[i]*100) : null);
+
   mkChart('chSameStore',{type:'bar',data:{labels,datasets:[
     {type:'line',label:'Mismas tiendas (12+ meses)',data:sameArr,borderColor:'#f5b041',backgroundColor:'#f5b041',tension:.25,pointRadius:4,pointBackgroundColor:'#f5b041',borderWidth:3,order:0,
-      datalabels:{display:true,color:'#f5b041',font:{weight:'800',size:13},formatter:v=>fmt(Math.round(v)),anchor:'end',align:'bottom',offset:6,clamp:true,clip:false,textStrokeColor:'rgba(0,0,0,0.65)',textStrokeWidth:3}},
-    {label:'Total (todas las tiendas)',data:totalArr,backgroundColor:'#4aa3ff55',borderColor:'#4aa3ff',borderWidth:1,borderRadius:5,order:1}
-  ]},options:{maintainAspectRatio:false,plugins:{legend:{display:true,position:'top',labels:{boxWidth:12,font:{size:10},color:'#8b97a8'}},
+      datalabels:{display:true,color:['#f5b041','#c9832e'],font:[{weight:'800',size:15},{weight:'700',size:11}],
+        formatter:(v,ctx)=>{const p=madurasPctArr[ctx.dataIndex]; return p!=null? [fmt(Math.round(v)), p.toFixed(1)+'% maduras'] : fmt(Math.round(v));},
+        anchor:'end',align:'bottom',offset:6,clamp:true,clip:false,textStrokeColor:'rgba(0,0,0,0.65)',textStrokeWidth:3}},
+    {label:'Total (todas las tiendas)',data:totalArr,backgroundColor:'#4aa3ff55',borderColor:'#4aa3ff',borderWidth:1,borderRadius:5,order:1,
+      datalabels:{color:['#eef2f7','#7fbfff'],font:[{weight:'700',size:15},{weight:'700',size:11}],
+        formatter:(v,ctx)=>{const p=nuevasPctArr[ctx.dataIndex]; return p!=null? [fmt(Math.round(v)), p.toFixed(1)+'% nuevas'] : fmt(Math.round(v));}}}
+  ]},options:{maintainAspectRatio:false,layout:{padding:{top:40}},plugins:{legend:{display:true,position:'top',labels:{boxWidth:12,font:{size:10},color:'#8b97a8'}},
     tooltip:{callbacks:{label:c=>c.dataset.label+': S/ '+fmt(c.raw)}}},scales:{y:{ticks:{callback:v=>'S/ '+fmt(v)}}}}});
 
   // tabla: aporte de Cargo Fijo por tienda, mes a mes desde enero del año en curso
