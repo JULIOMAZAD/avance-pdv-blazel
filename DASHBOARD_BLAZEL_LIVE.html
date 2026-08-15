@@ -1453,7 +1453,7 @@ function renderResumen(){
     {label:'Proyección',data:valsProy,backgroundColor:'#e6332944',borderColor:'#e63329',borderWidth:1,borderDash:[4,3],borderRadius:5,stack:'s',
       datalabels:{
         display:(ctx)=>valsProy[ctx.dataIndex]>0,
-        formatter:(v,ctx)=>'Proy: '+fmt(Math.round(vals[ctx.dataIndex]+v))
+        formatter:(v,ctx)=>fmt(Math.round(vals[ctx.dataIndex]+v))
       }},
     {type:'line',label:'Tendencia',data:valsTend,borderColor:'#7fa9d8',borderDash:[4,3],borderWidth:2,pointRadius:0,tension:0,fill:false}]},
     options:{maintainAspectRatio:false,plugins:{legend:{display:true,position:'top',labels:{boxWidth:12,font:{size:10},color:'#8b97a8'}},tooltip:{callbacks:{label:c=>c.dataset.label+': S/ '+fmt(c.raw)}}},scales:{y:{ticks:{callback:v=>'S/ '+fmt(v)}}}}});
