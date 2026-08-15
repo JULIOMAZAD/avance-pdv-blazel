@@ -1445,7 +1445,16 @@ function renderResumen(){
   document.getElementById('tCargoEvo').textContent='Evolución Cargo Fijo · '+tiendaLabel();
   mkChart('chEvo',{type:'bar',data:{labels,datasets:[
     {label:'Cargo Fijo',data:vals,backgroundColor:labels.map((_,i)=>i===labels.length-1?'#e63329':'#4aa3ff88'),borderRadius:5,stack:'s'},
-    {label:'Proyección',data:valsProy,backgroundColor:'#e6332944',borderColor:'#e63329',borderWidth:1,borderDash:[4,3],borderRadius:5,stack:'s'},
+    // El segmento "Proyección" apilado arriba muestra por defecto SU PROPIO valor (el
+    // incremento, ej. 139,148), lo que confunde porque no es el total proyectado. Aquí
+    // se sobreescribe su etiqueta para que muestre el TOTAL proyectado al cierre
+    // (Cargo Fijo real + este incremento, ej. 239,644), que es el número que la persona
+    // espera ver arriba de la barra del mes en curso.
+    {label:'Proyección',data:valsProy,backgroundColor:'#e6332944',borderColor:'#e63329',borderWidth:1,borderDash:[4,3],borderRadius:5,stack:'s',
+      datalabels:{
+        display:(ctx)=>valsProy[ctx.dataIndex]>0,
+        formatter:(v,ctx)=>'Proy: '+fmt(Math.round(vals[ctx.dataIndex]+v))
+      }},
     {type:'line',label:'Tendencia',data:valsTend,borderColor:'#7fa9d8',borderDash:[4,3],borderWidth:2,pointRadius:0,tension:0,fill:false}]},
     options:{maintainAspectRatio:false,plugins:{legend:{display:true,position:'top',labels:{boxWidth:12,font:{size:10},color:'#8b97a8'}},tooltip:{callbacks:{label:c=>c.dataset.label+': S/ '+fmt(c.raw)}}},scales:{y:{ticks:{callback:v=>'S/ '+fmt(v)}}}}});
 
@@ -3021,7 +3030,17 @@ function _eqnum(v){
   var n=parseFloat(s);
   return isNaN(n)?0:n;
 }
-function _stripPdv(p){p=String(p==null?'':p).trim();return p.replace(/^PDV - /,'').replace(/^Tienda - /,'');}
+// alias de tiendas que llegan con nombres distintos en el CSV en vivo pero son
+// la MISMA tienda física (ej. "Santa Anita" y "Santa Anita 1" se unifican en "Santa Anita")
+const PDV_ALIAS_LIVE = {
+  'santa anita 1': 'Santa Anita',
+  'santa anita1': 'Santa Anita',
+};
+function _stripPdv(p){
+  p=String(p==null?'':p).trim();
+  const s=p.replace(/^PDV - /,'').replace(/^Tienda - /,'').trim();
+  return PDV_ALIAS_LIVE[s.toLowerCase()] || s;
+}
 async function loadLive(){
   try{
     setUploadStatus('Cargando datos en vivo desde tu Sheet…','ok');
