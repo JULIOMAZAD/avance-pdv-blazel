@@ -476,7 +476,7 @@ function rResumen(ym){
   const _opeAvF=_opeF.reduce((s,d)=>s+d.ope,0), _opeBaseF=_opeF.reduce((s,d)=>s+d.cli,0);
   const pdvOpe = (esActual && cuotaPdvTotal()!=null) ? cuotaPdvTotal() : (_sinD ? (b?b.pdv_ope:null) : _opeBaseF);
   const pdvAv = esActual ? _opeAvF : (b?b.pdv_avance:null);
-  const pdvPct = pdvOpe ? (pdvAv||0)/pdvOpe : null;
+  const pdvPct = (pdvOpe && pdvAv!=null) ? pdvAv/pdvOpe : null;
   const pdvDif = (pdvOpe!=null&&pdvAv!=null) ? pdvAv-pdvOpe : null;
   const bp = rp.bloque;
   const sobraFalta = r.falta==null ? null : -r.falta;
@@ -486,7 +486,7 @@ function rResumen(ym){
 const debPct = dmActual ? dmActual.pctGeneral*100 : (_dt.cli ? 100*_dt.deb/_dt.cli : 0);
   const debBien = debPct<=10;
   const debCol = debBien?'var(--verde)':'var(--rojo)';
-  const debShow = esActual;
+  const debShow = esActual || !!dmActual;
 
   el.innerHTML = `
   <!-- Donas: cumplimiento cuota + PDV -->
@@ -515,22 +515,26 @@ const debPct = dmActual ? dmActual.pctGeneral*100 : (_dt.cli ? 100*_dt.deb/_dt.c
           <div class="s"><div class="sl">${pdvDif==null?'Dif.':pdvDif>=0?'Sobran':'Faltan'}</div><div class="sv num" style="color:${pdvDif==null?'inherit':pdvDif>=0?'var(--verde)':'var(--rojo)'}">${pdvDif==null?'—':(pdvDif>=0?'+':'−')+fN(Math.abs(pdvDif))}</div></div>
         </div>
         ${mesAntBlock('Nos piden '+(rp.m?MESN[rp.m]:''), bp?bp.pdv_ope:null, fN, vsChip(pdvOpe, bp?bp.pdv_ope:null, v=>fN(v)+' PDV'))}
+        ${(!esActual && pdvAv==null) ? `<div class="vs" style="background:#eee;color:var(--ink2)">Sin avance registrado para este mes</div>` : ''}
       </div>
     </div>
     <div class="card dona">
       <div class="dch"><canvas id="dnDebR"></canvas></div>
       <div class="info">
-        <div class="t">Desabasto · saldo &lt; S/7${debShow?' · actual':''}</div>
-        ${debShow?`<div class="big" style="color:${debCol}">${debPct.toFixed(2)}% <span style="font-size:15px;color:var(--ink2)">de 10% meta</span></div>
+        <div class="t">Desabasto · saldo &lt; S/7${esActual?' · actual':(dmActual?' · histórico':'')}</div>
+        ${debShow?(esActual?`<div class="big" style="color:${debCol}">${debPct.toFixed(2)}% <span style="font-size:15px;color:var(--ink2)">de 10% meta</span></div>
         <div class="stats">
           <div class="s"><div class="sl">En desabasto</div><div class="sv num" style="color:var(--rojo)">${_dt.deb.toLocaleString()}</div></div>
           <div class="s"><div class="sl">Evaluados</div><div class="sv num">${_dt.cli.toLocaleString()}</div></div>
           <div class="s"><div class="sl">Meta</div><div class="sv num">≤10%</div></div>
         </div>
         <div class="vs ${debBien?'up':'dn'}">${debBien?'Bajo control':'Sobre la meta'}</div>`
+        :`<div class="big" style="color:${debCol}">${debPct.toFixed(2)}% <span style="font-size:15px;color:var(--ink2)">de 10% meta</span></div>
+        <div class="stats"><div class="s"><div class="sl">Fuente</div><div class="sv" style="font-size:13px;color:var(--ink2)">registro mensual</div></div><div class="s"><div class="sl">Meta</div><div class="sv num">≤10%</div></div></div>
+        <div class="vs ${debBien?'up':'dn'}">${debBien?'Bajo control':'Sobre la meta'}</div>`)
         :`<div class="big" style="color:var(--ink2)">—</div>
         <div class="stats"><div class="s"><div class="sl">Histórico</div><div class="sv" style="font-size:13px;color:var(--ink2)">sin dato</div></div><div class="s"><div class="sl">Meta</div><div class="sv num">≤10%</div></div></div>
-        <div class="vs" style="background:#eee;color:var(--ink2)">Solo mes actual</div>`}
+        <div class="vs" style="background:#eee;color:var(--ink2)">Sin registro para este mes</div>`}
       </div>
     </div>
   </div>
@@ -1251,6 +1255,25 @@ function rDesabasto(ym){
 
 /* ========== Barra de filtro AÑO / MES / DISTRITO (estilo masivo) ========== */
 let anioGlob=null, mesesGlob=null, distsGlob=null;
+const LS_FILTROS = 'blazel_filtros_v1';
+function guardarFiltros(){
+  try{
+    localStorage.setItem(LS_FILTROS, JSON.stringify({
+      anio: anioGlob,
+      meses: mesesGlob ? [...mesesGlob] : null,
+      dists: distsGlob ? [...distsGlob] : null
+    }));
+  }catch(e){}
+}
+function restaurarFiltros(){
+  try{
+    const f = JSON.parse(localStorage.getItem(LS_FILTROS)||'null');
+    if(!f) return;
+    if(f.anio!=null) anioGlob = f.anio;
+    if(Array.isArray(f.meses)) mesesGlob = new Set(f.meses);
+    if(Array.isArray(f.dists)) distsGlob = new Set(f.dists);
+  }catch(e){}
+}
 const normD = s => (s||'').toString().trim().toUpperCase().replace(/\s+/g,' ');
 function _distritosLista(){
   const map=new Map();
@@ -1342,7 +1365,7 @@ function renderFbar(){
       <div class="msel dk" id="fbDist"><div class="btn"><span class="lbl">${distLabel()}</span> <span class="arr">▼</span></div>
         <div class="panel"><div class="top"><span class="selTodos">Todos</span><span class="selNada">Ninguno</span></div>
         ${dists.map(x=>`<label><input type="checkbox" data-d="${x.key}" ${distChk(x.key)?'checked':''}> ${x.name}</label>`).join('')}</div></div></div>`;
-  document.getElementById('fbAnio').onchange=e=>{ anioGlob=+e.target.value; mesesGlob=null; renderFbar(); renderAll(); };
+  document.getElementById('fbAnio').onchange=e=>{ anioGlob=+e.target.value; mesesGlob=null; renderFbar(); renderAll(); guardarFiltros(); };
   function wireMsel(id, attr, total, assign, labelFn){
     const cont=document.getElementById(id);
     const lbl=cont.querySelector('.lbl');
@@ -1353,6 +1376,7 @@ function renderFbar(){
       assign(set.size===total ? null : set);
       lbl.textContent=labelFn();
       renderAll();
+      guardarFiltros();
     }
     cont.querySelectorAll('input[type=checkbox]').forEach(chk=>chk.onchange=commit);
     cont.querySelector('.selTodos').onclick=e=>{ e.stopPropagation(); cont.querySelectorAll('input[type=checkbox]').forEach(c=>c.checked=true); commit(); };
@@ -1761,7 +1785,7 @@ function actualizarIndicador(){
   }
 }
 function resetData(){
-  try{ localStorage.removeItem(LS_KEY); localStorage.removeItem(LS_META); }catch(e){}
+  try{ localStorage.removeItem(LS_KEY); localStorage.removeItem(LS_META); localStorage.removeItem(LS_FILTROS); }catch(e){}
   DATA = RAW; usandoGuardado = false;
   document.getElementById('selMes').value = '';
   anioCuotaSel = null; anioPdvSel = null;
@@ -1781,6 +1805,7 @@ window.addEventListener('drop', e=>{
 });
 
 const API_URL_V2 = 'https://script.google.com/macros/s/AKfycbzXE6fw7sz0alHy6--UYYx7_EfYGOF7VcKQNl3MPT4BtDN95znswMGuo7Qid30QFsLzrw/exec';
+restaurarFiltros();
 tabs(); renderFbar(); renderAll(); cargarVivo(); cargarVolumenVivo(); cargarLiveV2();
 
 /* ===== Carga en vivo (driver) para Operativos/Desabasto/Canales/Cuotas/Asesores/Multimarca 2026+ ===== */
