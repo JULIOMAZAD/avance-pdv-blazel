@@ -1352,7 +1352,7 @@ function renderFbar(){
   const dists=_distritosLista();
   const mesChk = m => mesesGlob ? mesesGlob.has(m) : true;
   const distChk = k => distsGlob ? distsGlob.has(k) : true;
-  const mesLabel = () => !mesesGlob ? 'Todos' : (mesesGlob.size===0 ? 'Ninguno' : (mesesGlob.size===msAnio.length ? 'Todos' : mesesGlob.size+' meses'));
+  const mesLabel = () => !mesesGlob ? 'Todos' : (mesesGlob.size===0 ? 'Ninguno' : (mesesGlob.size===msAnio.length ? 'Todos' : (mesesGlob.size===1 ? MESN[+[...mesesGlob][0].split('-')[1]] : mesesGlob.size+' meses')));
   const distLabel = () => !distsGlob ? 'Todos' : (distsGlob.size===0 ? 'Ninguno' : (distsGlob.size===dists.length ? 'Todos' : distsGlob.size+' distritos'));
   fb.innerHTML = `
     <div class="fg"><span class="fl">Año</span>
