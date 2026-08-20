@@ -2635,7 +2635,9 @@ function drawSerieMesChart(canvasId, serie, axisFmt, tipLabel){
     {label:'Proyección',data:serie.valsProy,backgroundColor:cols.map(c=>c+'33'),borderColor:cols,borderWidth:1,borderDash:[4,3],borderRadius:4,stack:'s',
       datalabels:{display:(ctx)=>serie.valsProy[ctx.dataIndex]>0,formatter:(v,ctx)=>fmt(Math.round(serie.vals[ctx.dataIndex]+v)),font:{size:10}}}
   ]},options:{indexAxis:'y',maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>tipLabel+': '+axisFmt(c.raw)}}},
-    scales:{x:{ticks:{font:{size:9},color:'#8b97a8',callback:axisFmt},grid:{color:'#ffffff10'}},y:{ticks:{font:{size:10},color:'#c9d2e3'},grid:{display:false}}}}});
+    // headroom extra a la derecha para que el numero de las barras mas altas (cercanas al
+    // maximo del eje) no se corte contra el borde del grafico
+    scales:{x:{suggestedMax:Math.max(...serie.vals.map((v,i)=>v+(serie.valsProy[i]||0)),1)*1.22,ticks:{font:{size:9},color:'#8b97a8',callback:axisFmt},grid:{color:'#ffffff10'}},y:{ticks:{font:{size:10},color:'#c9d2e3'},grid:{display:false}}}}});
 }
 
 function renderCFyHFC(){
