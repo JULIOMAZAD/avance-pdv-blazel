@@ -251,6 +251,21 @@ function fillRankingTiendas(){
   sel.onchange=()=>{rkTienda=sel.value;renderRanking();};
   renderRanking();
 }
+function computeStreakBajo(nombre, mesActual){
+  const allMeses=[...new Set(DATA.map(r=>r.m))].sort((a,b)=>a-b);
+  let idx=allMeses.indexOf(mesActual);
+  if(idx===-1) return 0;
+  let streak=0;
+  for(let k=idx;k>=0;k--){
+    const mm=allMeses[k];
+    const recsM=DATA.filter(r=>r.m===mm&&r.n===nombre);
+    if(!recsM.length) break; // no hay datos ese mes (nuevo o no vendió) -> corta la racha
+    const rk=computeVendorRanking(recsM)[0];
+    if(!rk || rk.rankScore>=0.8) break;
+    streak++;
+  }
+  return streak;
+}
 function renderRanking(){
   const el=document.getElementById("rankingTable");
   if(!el) return;
@@ -260,7 +275,9 @@ function renderRanking(){
   const body=list.map((a,i)=>{
     const rowCls=i===0?"rk-first":(i===list.length-1&&list.length>1?"rk-last":"");
     const tag=getTag(estadoFromPct(a.rankScore));
-    return `<tr class="${rowCls}"><td style="text-align:left"><span class="rk-pos">${i+1}</span></td><td style="text-align:left">${cleanName(a.n)}</td><td>${fmt(a.avU)}</td><td>${fmt(a.obU)}</td><td>${fmtPct(a.unitsPct)}</td><td>${fmtPct(a.cfPct)}</td><td><span class="tag ${tag.cls}"><span class="dot ${tag.dot}"></span>${tag.lbl}</span></td></tr>`;
+    const streak=a.rankScore<0.8?computeStreakBajo(a.n,rkMes):0;
+    const streakBadge=streak>=2?`<span class="tag t-pun" style="margin-left:6px;padding:2px 9px;font-size:11px">🔻 ${streak}° mes bajo seguido</span>`:"";
+    return `<tr class="${rowCls}"><td style="text-align:left"><span class="rk-pos">${i+1}</span></td><td style="text-align:left">${cleanName(a.n)}${streakBadge}</td><td>${fmt(a.avU)}</td><td>${fmt(a.obU)}</td><td>${fmtPct(a.unitsPct)}</td><td>${fmtPct(a.cfPct)}</td><td><span class="tag ${tag.cls}"><span class="dot ${tag.dot}"></span>${tag.lbl}</span></td></tr>`;
   }).join("");
   el.innerHTML=`<div class="ases-head" style="margin-bottom:6px">👥 Ranking de ${cleanName(rkTienda)} <span style="font-weight:400;color:#888;font-size:12px">· ${list.length} asesores · usa el menor entre % unidades (tope 100% por producto) y % Cargo Fijo — hay que llegar a ambos</span></div>
   <div class="table-card"><div class="table-wrap"><table>
