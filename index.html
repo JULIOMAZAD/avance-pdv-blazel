@@ -1196,7 +1196,7 @@ function aParse(rows,mes,anio){
   return recs;
 }
 async function aFetchJSON(u){const r=await fetch(u);if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}
-const STORE_TO_TI={"Tienda - Mall Bellavista":"Mall Bellavista","Tienda - Mall del Sur 1":"Mall del Sur I","Tienda - Mall del Sur 2":"Mall del Sur II","Tienda - Mega Plaza":"Mega Plaza","Tienda - Plaza Norte":"Plaza Norte","Tienda - Primavera":"Primavera","Tienda - Rambla Brasil":"La Rambla","Tienda - Santa Anita 1":"Santa Anita 1","Tienda - Santa Anita 2":"Santa Anita 2"};
+const STORE_TO_TI={"Tienda - Mall Bellavista":"Mall Bellavista","Tienda - Mall del Sur 1":"Mall del Sur I","Tienda - Mall del Sur 2":"Mall del Sur II","Tienda - Mega Plaza":"Mega Plaza","Tienda - Plaza Norte":"Plaza Norte","Tienda - Primavera":"Primavera","Tienda - Rambla Brasil":"La Rambla","Tienda - Santa Anita 1":"Santa Anita","Tienda - Santa Anita 2":"Santa Anita 2"};
 const UNIT_CATS=["Alta Prepago","Portabilidad Prepago","Packs Prepago","Portabilidad Postpago","Altas Postpago","Packs Postpago","Líneas Adicionales Postpago","HFC","UGIS Inalámbricos","OLO","Accesorios","Portabilidad CF >=95.50"];
 let asesorCache={};
 async function getAsesorData(mesKey){
