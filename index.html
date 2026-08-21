@@ -207,13 +207,19 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
   <div class="main-wrap">
     <div class="top-bar">
       <div class="top-left"><h2>COORD. CAMPO — Avance de Campo</h2><div class="pdv">Avance por responsable y asesor</div></div>
-      <div class="top-actions"><button class="btn-vend" onclick="abrirSanFelipeAmparo()">🏪 San Felipe</button><button class="btn-vend" id="btnRecarDash" style="display:none" onclick="abrirRecargaAmparo()">⚡ Recarga</button><button class="btn-vend" onclick="abrirPersonal('recarScreen')">🗂️ Control Personal</button><button class="btn-vend" id="btnGPSAmparo" style="display:none" onclick="openEmbed('SEGUIMIENTO_GPS.html?u=amparo','📍 Seguimiento GPS','recarScreen')">📍 Seguimiento GPS</button><button class="btn-vend" onclick="openEmbed('PRE_ENTREGAS_PANEL.html?u=amparo','📦 Pre-entregas','recarScreen')">📦 Pre-entregas</button><button class="btn-out" onclick="doLogout()">Cerrar sesión</button></div>
+      <div class="top-actions"><button class="btn-vend" onclick="mostrarAvanceCampoAmparo()">📶 MMRECARGA</button><button class="btn-vend" onclick="abrirSanFelipeAmparo()">🏪 San Felipe</button><button class="btn-vend" id="btnRecarDash" style="display:none" onclick="abrirRecargaAmparo()">⚡ Recarga</button><button class="btn-vend" onclick="abrirPersonal('recarScreen')">🗂️ Control Personal</button><button class="btn-vend" id="btnGPSAmparo" style="display:none" onclick="openEmbed('SEGUIMIENTO_GPS.html?u=amparo','📍 Seguimiento GPS','recarScreen')">📍 Seguimiento GPS</button><button class="btn-vend" onclick="openEmbed('PRE_ENTREGAS_PANEL.html?u=amparo','📦 Pre-entregas','recarScreen')">📦 Pre-entregas</button><button class="btn-out" onclick="doLogout()">Cerrar sesión</button></div>
     </div>
-    <div class="mes-tabs" id="recarMesTabs"></div>
-    <div id="recarInfo" class="info-row"></div>
-    <div id="recarKpis" class="kpis"></div>
-    <div id="recarMsg"></div>
-    <div id="recarTable"></div>
+    <div id="recarWelcome" style="background:#fff;border-radius:14px;padding:3rem 1.5rem;text-align:center">
+      <div style="font-size:22px;font-weight:800;color:#cc0000;margin-bottom:10px;letter-spacing:.5px">BIENVENIDA AMPARO</div>
+      <div style="color:#666;font-size:14px">Elige una opción arriba para ver lo que necesitas consultar.</div>
+    </div>
+    <div id="recarContent" style="display:none">
+      <div class="mes-tabs" id="recarMesTabs"></div>
+      <div id="recarInfo" class="info-row"></div>
+      <div id="recarKpis" class="kpis"></div>
+      <div id="recarMsg"></div>
+      <div id="recarTable"></div>
+    </div>
   </div>
 </div>
 
@@ -397,8 +403,8 @@ function doLogin(){
     document.getElementById("btnRecarDash").style.display="";
     document.getElementById("btnGPSAmparo").style.display="";
     showScreen("recarScreen");
-    renderRecarMes();
-    loadRecar();
+    var _rw=document.getElementById("recarWelcome"); if(_rw) _rw.style.display="";
+    var _rc=document.getElementById("recarContent"); if(_rc) _rc.style.display="none";
     return;
   }
   if(t==="GRACIE"){
@@ -1131,7 +1137,7 @@ function kpiCard(lbl,val,sub,cls,tag){
 }
 
 function cleanName(n){ return String(n).replace(/Portabiilidad/gi,"Portabilidad").replace(/Portabilidaad/gi,"Portabilidad"); }
-function buildTableHtml(struct,totalRow,recalc){
+function buildTableHtml(struct,totalRow,recalc,hideSinCuota){
   const CATNAMES={prepago:"Prepago",postpago:"Postpago",residencial:"Residencial",otros:"Otros"};
   let html=`<div class="table-card"><div class="table-wrap"><table>
     <thead><tr>
@@ -1140,9 +1146,11 @@ function buildTableHtml(struct,totalRow,recalc){
       <th>Falta</th><th>Venta Diaria<br>Para Llegar</th>
       <th>Proyección Final</th><th>Estado</th>
     </tr></thead><tbody>`;
+  const sinCuota=(v)=>(v===""||v===undefined||v===null||v===" ");
   for(const cat of ["prepago","postpago","residencial","otros"]){
-    const prods=struct[cat];
-    if(!prods||!prods.length) continue;
+    let prods=struct[cat]||[];
+    if(hideSinCuota) prods=prods.filter(p=>!sinCuota(p.meta));
+    if(!prods.length) continue;
     html+=`<tr class="cat-row"><td colspan="8">${CATNAMES[cat]}</td></tr>`;
     for(const p of prods){
       const t=getTag(p.estado);
@@ -1262,6 +1270,12 @@ function renderAsesores(recs){
 
 let recarMes="junio";
 function renderRecarMes(){ document.getElementById("recarMesTabs").innerHTML=MESES.map(m=>`<button class="mes-tab${m.key===recarMes?' active':''}" onclick="selRecarMes('${m.key}')">${m.label}</button>`).join(""); }
+function mostrarAvanceCampoAmparo(){
+  var w=document.getElementById("recarWelcome"); if(w) w.style.display="none";
+  var c=document.getElementById("recarContent"); if(c) c.style.display="block";
+  renderRecarMes();
+  loadRecar();
+}
 function selRecarMes(m){recarMes=m;renderRecarMes();loadRecar();}
 let RECAR_TGT={info:"recarInfo",kpis:"recarKpis",table:"recarTable",combine:false};
 async function loadRecar(){
@@ -1366,7 +1380,7 @@ function renderStoreView(sel){
   if(!total) return;
   const team = (sel<0) ? teamKpis() : "";
   document.getElementById("storeKpis").innerHTML = gaugesRow(struct,total) + '<div class="kpis">' + storeKpiCards(total) + team + '</div>';
-  document.getElementById("tableSection").innerHTML=buildTableHtml(struct,total,true);
+  document.getElementById("tableSection").innerHTML=buildTableHtml(struct,total,true,curTienda==="Tienda - San Felipe");
   renderComisionTienda();
   const infoRow=document.getElementById("infoRow");
   if(infoRow){
