@@ -1146,7 +1146,7 @@ function buildTableHtml(struct,totalRow,recalc,hideSinCuota){
       <th>Falta</th><th>Venta Diaria<br>Para Llegar</th>
       <th>Proyección Final</th><th>Estado</th>
     </tr></thead><tbody>`;
-  const sinCuota=(v)=>(v===""||v===undefined||v===null||v===" ");
+  const sinCuota=(v)=>{ if(v===""||v===undefined||v===null||v===" ") return true; const s=String(v).trim(); return s===""||s==="-"||s==="--"||s==="—"; };
   for(const cat of ["prepago","postpago","residencial","otros"]){
     let prods=struct[cat]||[];
     if(hideSinCuota) prods=prods.filter(p=>!sinCuota(p.meta));
