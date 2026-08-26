@@ -334,7 +334,7 @@
         '<td style="padding:2px 4px;border-bottom:1px solid #ddd;">' + (b.p.correlativo || '(sin asignar)') + '</td>' +
         '<td style="padding:2px 4px;border-bottom:1px solid #ddd;">' + b.series.length + '</td>' +
         '<td style="padding:2px 4px;border-bottom:1px solid #ddd;font-size:8px;">' + b.inicio + ' — ' + b.fin + '</td>' +
-        '<td id="mBcCliente_' + b.idx + '" style="padding:1px 4px;border-bottom:1px solid #ddd;line-height:0;"></td>' +
+        '<td id="mBcCliente_' + b.idx + '" style="padding:4px 4px;border-bottom:1px solid #ddd;line-height:1.1;"></td>' +
       '</tr>';
     }).join('');
 
@@ -348,7 +348,7 @@
     bloques.forEach(function(b){
       if(b.series.length){
         dibujarBarcodesLote('mBcCliente_' + b.idx, b.series, {
-          barW: 1, barH: 18, fontSize: 7, margin: 0, displayValue: false, maxIndividuales: 6, gapExtra: 7, align: 'flex-end'
+          barW: 1, barH: 24, fontSize: 8, margin: 0, displayValue: true, maxIndividuales: 6, gapExtra: 12, align: 'flex-end'
         });
       }
     });
