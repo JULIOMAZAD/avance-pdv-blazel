@@ -257,6 +257,171 @@
     render();
   }
 
+  // ===== Reparto automático de un rango completo entre varios clientes =====
+  // Reusa el mismo endpoint asignar_series_get que el escaneo por cliente;
+  // solo reparte el rango grande en sub-lotes y los guarda uno por uno.
+
+  let repartoAbiertoPara = null;
+
+  function abrirReparto(vend){
+    repartoAbiertoPara = (repartoAbiertoPara === vend) ? null : vend;
+    render();
+  }
+
+  // Clientes de ese vendedor que todavía necesitan chips (PENDIENTE, o
+  // ASIGNADO pero incompleto), en el mismo orden en que hicieron el pedido
+  // (TODAS ya viene del servidor del más antiguo al más reciente).
+  function pendientesReparto(vend){
+    return TODAS.filter(function(x){ return x.vendedor === vend; }).map(function(p){
+      const asignadas = (p.seriesAsignadas || '').split(',').filter(function(s){ return s.trim(); }).length;
+      const restante = (Number(p.cantidad) || 0) - asignadas;
+      return { p: p, restante: restante };
+    }).filter(function(x){ return x.restante > 0; });
+  }
+
+  function renderPanelReparto(vend){
+    const pend = pendientesReparto(vend);
+    const totalNecesario = pend.reduce(function(sum, x){ return sum + x.restante; }, 0);
+    const detalleClientes = pend.map(function(x){
+      return '<div class="sub">' + (x.p.nombreCliente || '') + ' (DNI ' + x.p.dni + ') — necesita ' + x.restante + ' chip(s)</div>';
+    }).join('');
+
+    return '<div class="panel-scan abierto" style="margin-bottom:14px;">' +
+      '<div style="font-size:12px;font-weight:800;margin-bottom:6px;">🧮 Repartir un solo rango entre ' + pend.length + ' cliente(s) pendiente(s) — se necesitan ' + totalNecesario + ' chip(s) en total, en el orden en que pidieron</div>' +
+      detalleClientes +
+      '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;">' +
+        '<div>' +
+          '<div style="font-size:11px;color:var(--gris);margin-bottom:2px;">Primera serie del lote</div>' +
+          '<input type="text" id="repartoInicio_' + vend + '" placeholder="Primera serie" autocomplete="off" style="width:220px;padding:9px;border:1.5px solid var(--borde);border-radius:10px;" oninput="mostrarVistaPreviaReparto(\'' + vend + '\')">' +
+        '</div>' +
+        '<div>' +
+          '<div style="font-size:11px;color:var(--gris);margin-bottom:2px;">Última serie del lote</div>' +
+          '<input type="text" id="repartoFin_' + vend + '" placeholder="Última serie" autocomplete="off" style="width:220px;padding:9px;border:1.5px solid var(--borde);border-radius:10px;" oninput="mostrarVistaPreviaReparto(\'' + vend + '\')">' +
+        '</div>' +
+      '</div>' +
+      '<div id="repartoVistaPrevia_' + vend + '" style="display:none;background:#fff;border:1px dashed var(--rojo);border-radius:8px;padding:8px;margin-top:10px;font-size:12px;max-height:220px;overflow-y:auto;"></div>' +
+      '<div style="margin-top:10px;">' +
+        '<button class="btn-rojo" onclick="confirmarReparto(\'' + vend + '\')">✔ Confirmar reparto</button> ' +
+        '<button class="btn-secundario" onclick="abrirReparto(\'' + vend + '\')">Cancelar</button>' +
+      '</div>' +
+      '<div class="nota-scan" id="repartoNota_' + vend + '"></div>' +
+    '</div>';
+  }
+
+  // Simula el mismo reparto en orden que hará confirmarReparto, para mostrar
+  // antes de guardar qué le toca a cada cliente (y avisar si sobra o falta).
+  function simularReparto(series, pend){
+    let disponibles = series.slice();
+    return pend.map(function(x){
+      const tomar = disponibles.splice(0, x.restante);
+      return { p: x.p, restante: x.restante, tomar: tomar };
+    });
+  }
+
+  function mostrarVistaPreviaReparto(vend){
+    const inicioEl = document.getElementById('repartoInicio_' + vend);
+    const finEl = document.getElementById('repartoFin_' + vend);
+    const previa = document.getElementById('repartoVistaPrevia_' + vend);
+    const inicio = inicioEl.value.trim();
+    const fin = finEl.value.trim();
+    if(!inicio || !fin){ previa.style.display = 'none'; return; }
+
+    const r = calcularRango(inicio, fin);
+    if(!r.ok){
+      previa.style.display = 'block';
+      previa.style.color = 'var(--rojo-oscuro)';
+      previa.textContent = r.error || 'Revisa las series ingresadas.';
+      return;
+    }
+
+    const pend = pendientesReparto(vend);
+    const totalNecesario = pend.reduce(function(sum, x){ return sum + x.restante; }, 0);
+    const reparto = simularReparto(r.series, pend);
+
+    let resumen = 'El rango trae ' + r.series.length + ' chip(s). Se necesitan ' + totalNecesario + '.';
+    if(r.series.length === totalNecesario) resumen += ' ✓ Coincide exacto.';
+    else if(r.series.length > totalNecesario) resumen += ' Sobran ' + (r.series.length - totalNecesario) + ' chip(s) que quedarán sin asignar.';
+    else resumen += ' ⚠ Faltan ' + (totalNecesario - r.series.length) + ' chip(s) — los últimos clientes de la lista no completarán su pedido.';
+
+    const filas = reparto.map(function(x){
+      if(x.tomar.length === x.restante) return (x.p.nombreCliente || '') + ': ' + x.tomar.length + ' chip(s) — pedido completo';
+      if(x.tomar.length > 0) return (x.p.nombreCliente || '') + ': ⚠ ' + x.tomar.length + ' de ' + x.restante + ' — no alcanza para completar';
+      return (x.p.nombreCliente || '') + ': ⚠ 0 — no alcanzó ningún chip para este cliente';
+    });
+
+    previa.style.display = 'block';
+    previa.style.color = 'var(--tinta)';
+    previa.innerHTML = resumen + '<br><br>' + filas.join('<br>');
+  }
+
+  async function confirmarReparto(vend){
+    const inicioEl = document.getElementById('repartoInicio_' + vend);
+    const finEl = document.getElementById('repartoFin_' + vend);
+    const nota = document.getElementById('repartoNota_' + vend);
+    const inicio = inicioEl.value.trim();
+    const fin = finEl.value.trim();
+
+    const r = calcularRango(inicio, fin);
+    if(!r.ok || !fin){
+      nota.textContent = r.error || 'Ingresa la primera y la última serie del lote.';
+      return;
+    }
+
+    const pend = pendientesReparto(vend);
+    if(!pend.length){
+      nota.textContent = 'Este vendedor no tiene clientes pendientes de chips ahora mismo.';
+      return;
+    }
+
+    const reparto = simularReparto(r.series, pend);
+    let hechos = 0;
+
+    for(let i = 0; i < reparto.length; i++){
+      const x = reparto[i];
+      if(!x.tomar.length) continue; // a este cliente no le alcanzó nada; se queda como estaba
+
+      nota.textContent = 'Guardando ' + (x.p.nombreCliente || '') + ' (' + (i + 1) + ' de ' + reparto.length + ')…';
+      let resultado;
+      try{
+        const resp = await fetch(URL_SCRIPT + '?modo=asignar_series_get' +
+          '&preEntregaId=' + encodeURIComponent(x.p.id) +
+          '&series=' + encodeURIComponent(x.tomar.join(',')) +
+          '&asignadoPor=' + encodeURIComponent(usuarioActual || 'oficina') +
+          '&_=' + Date.now());
+        resultado = await resp.json();
+      }catch(e){
+        nota.textContent = '✕ Se cortó la conexión guardando ' + (x.p.nombreCliente || '') + '. Ya se guardaron ' + hechos + ' cliente(s) antes de este — revisa y continúa solo con los que falten.';
+        await cargarTodo();
+        return;
+      }
+
+      if(!resultado || !resultado.ok){
+        nota.textContent = '✕ Error guardando ' + (x.p.nombreCliente || '') + ': ' + (resultado && resultado.error ? resultado.error : 'desconocido') + '. Ya se guardaron ' + hechos + ' cliente(s) antes de este.';
+        await cargarTodo();
+        return;
+      }
+
+      const pLocal = TODAS.find(function(y){ return y.id === x.p.id; });
+      if(pLocal){
+        pLocal.estado = 'ASIGNADO';
+        const previas = (pLocal.seriesAsignadas || '').split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+        pLocal.seriesAsignadas = previas.concat(x.tomar).join(', ');
+        if(resultado.correlativo) pLocal.correlativo = resultado.correlativo;
+      }
+      hechos++;
+    }
+
+    repartoAbiertoPara = null;
+    render();
+    setTimeout(cargarTodo, 2500);
+
+    const usadas = reparto.reduce(function(sum, x){ return sum + x.tomar.length; }, 0);
+    const sobran = r.series.length - usadas;
+    if(sobran > 0){
+      alert('Reparto listo (' + hechos + ' cliente(s) actualizados). Sobraron ' + sobran + ' chip(s) del rango que no se usaron.');
+    }
+  }
+
   function cambiarFiltro(f){
     filtroActual = f;
     ['tabPend','tabAsig','tabEnt','tabTodo'].forEach(id => document.getElementById(id).classList.remove('activo'));
@@ -306,7 +471,14 @@
             '<div style="font-size:11px;color:var(--gris);margin-bottom:2px;">Serie suelta (no correlativa)</div>' +
             '<input type="text" id="unicaInput_' + p.id + '" placeholder="Ej. 895110113011183900" autocomplete="off" style="margin-bottom:6px;">' +
             '<button class="btn-rojo" style="width:100%;" onclick="agregarSerieUnica(\'' + p.id + '\')">➕ Agregar</button>' +
+            '<div style="font-size:10px;color:var(--gris);margin-top:4px;">Si escaneas un código distinto al ICCID, la primera vez te pedirá vincularlo.</div>' +
             '<div class="nota-scan" id="notaUnica_' + p.id + '"></div>' +
+            '<div id="vinculoBox_' + p.id + '" style="display:none;margin-top:8px;padding:8px;background:#FFF7F5;border:1px dashed var(--rojo);border-radius:8px;">' +
+              '<div id="vinculoTexto_' + p.id + '" style="font-size:11px;margin-bottom:4px;"></div>' +
+              '<input type="text" id="vinculoIccid_' + p.id + '" placeholder="ICCID completo de este mismo chip" autocomplete="off" style="margin-bottom:6px;">' +
+              '<button class="btn-rojo" style="width:100%;" onclick="confirmarVinculoCodigo(\'' + p.id + '\')">🔗 Vincular y agregar</button>' +
+              '<button class="btn-secundario" style="width:100%;margin-top:4px;" onclick="cancelarVinculoCodigo(\'' + p.id + '\')">Cancelar</button>' +
+            '</div>' +
           '</div>' +
 
         '</div>' +
@@ -392,13 +564,21 @@
         ? '<button class="btn-secundario" style="margin-left:10px;" onclick="abrirGre(\'' + vend + '\')">📋 Pedir GRE (' + pendientesGre.length + ' cliente(s))</button>'
         : '';
       const panelGre = greAbiertoPara === vend ? renderPanelGre(vend, pendientesGre) : '';
+
+      const pendReparto = pendientesReparto(vend);
+      const btnReparto = pendReparto.length > 1
+        ? '<button class="btn-secundario" style="margin-left:10px;" onclick="abrirReparto(\'' + vend + '\')">🧮 Repartir rango completo (' + pendReparto.length + ' cliente(s))</button>'
+        : '';
+      const panelReparto = repartoAbiertoPara === vend ? renderPanelReparto(vend) : '';
+
       return '<div class="grupo-vendedor">' +
         '<div class="titulo-vendedor">👤 ' + vend +
           ' <span class="badge-total">' + totalClientes + ' cliente(s)</span>' +
           ' <span class="badge-total">' + totalAsignado + ' de ' + totalPedido + ' chip(s) asignados</span>' +
           (pendCount ? ' <span class="badge-pend">' + pendCount + ' pendiente(s)</span>' : '') +
-          btnGre + '</div>' +
+          btnGre + btnReparto + '</div>' +
         panelGre +
+        panelReparto +
         items.map(renderItem).join('') +
       '</div>';
     }).join('');
@@ -516,7 +696,7 @@
     previa.textContent = 'Esto va a agregar ' + r.series.length + ' series: ' + r.series.join(', ');
   }
 
-  function agregarSerieUnica(id){
+  async function agregarSerieUnica(id){
     const inputEl = document.getElementById('unicaInput_' + id);
     const nota = document.getElementById('notaUnica_' + id);
     const valor = inputEl.value.trim();
@@ -524,10 +704,106 @@
       if(nota) nota.textContent = 'Escanea o escribe la serie primero.';
       return;
     }
-    agregarSerie(valor);
     inputEl.value = '';
+    await procesarCodigoUnico(id, valor);
     inputEl.focus();
-    if(nota) nota.textContent = '✓ Agregada.';
+  }
+
+  // ===== Segundo código de barras (alterno al ICCID) =====
+  // Si el código escaneado no parece un ICCID completo, se busca en la
+  // tabla de equivalencia CODIGOS_ALTERNOS (backend). Si nunca se vinculó,
+  // se le pide al usuario el ICCID real una sola vez para guardarlo — de
+  // ahí en adelante escanear ese código corto agrega el ICCID solo.
+  let codigoPendienteVinculo = null;
+
+  function pareceIccidCompleto(valor){
+    return /^\d{17,22}$/.test(valor);
+  }
+
+  async function procesarCodigoUnico(id, valorCrudo){
+    const valor = (valorCrudo || '').trim();
+    const nota = document.getElementById('notaUnica_' + id);
+    if(!valor) return;
+
+    if(pareceIccidCompleto(valor)){
+      agregarSerie(valor);
+      if(nota) nota.textContent = '✓ Agregada.';
+      return;
+    }
+
+    if(nota) nota.textContent = 'Verificando código…';
+    let resultado;
+    try{
+      const resp = await fetch(URL_SCRIPT + '?modo=buscar_codigo_get&codigo=' + encodeURIComponent(valor) + '&_=' + Date.now());
+      resultado = await resp.json();
+    }catch(e){
+      if(nota) nota.textContent = 'No se pudo verificar el código (sin conexión). Prueba escaneando el ICCID largo directamente.';
+      return;
+    }
+
+    if(resultado && resultado.ok && resultado.iccid){
+      agregarSerie(resultado.iccid);
+      if(nota) nota.textContent = '✓ Código reconocido → ICCID ' + resultado.iccid;
+      return;
+    }
+
+    mostrarVinculoPendiente(id, valor);
+  }
+
+  function mostrarVinculoPendiente(id, codigo){
+    codigoPendienteVinculo = codigo;
+    const box = document.getElementById('vinculoBox_' + id);
+    const texto = document.getElementById('vinculoTexto_' + id);
+    const nota = document.getElementById('notaUnica_' + id);
+    if(texto) texto.textContent = 'El código "' + codigo + '" no está vinculado a ningún ICCID todavía. Escanea o escribe el ICCID de este mismo chip para vincularlo:';
+    if(box) box.style.display = 'block';
+    if(nota) nota.textContent = '';
+  }
+
+  function cancelarVinculoCodigo(id){
+    codigoPendienteVinculo = null;
+    const box = document.getElementById('vinculoBox_' + id);
+    if(box) box.style.display = 'none';
+    const iccidEl = document.getElementById('vinculoIccid_' + id);
+    if(iccidEl) iccidEl.value = '';
+  }
+
+  async function confirmarVinculoCodigo(id){
+    const iccidEl = document.getElementById('vinculoIccid_' + id);
+    const nota = document.getElementById('notaUnica_' + id);
+    const iccid = (iccidEl.value || '').trim();
+    if(!pareceIccidCompleto(iccid)){
+      if(nota) nota.textContent = 'Ese ICCID no parece completo (debe ser solo números, entre 17 y 22 dígitos).';
+      return;
+    }
+    if(!codigoPendienteVinculo){
+      cancelarVinculoCodigo(id);
+      return;
+    }
+
+    if(nota) nota.textContent = 'Vinculando…';
+    let resultado;
+    try{
+      const resp = await fetch(URL_SCRIPT + '?modo=vincular_codigo_get' +
+        '&codigoCorto=' + encodeURIComponent(codigoPendienteVinculo) +
+        '&iccid=' + encodeURIComponent(iccid) +
+        '&vinculadoPor=' + encodeURIComponent(usuarioActual || 'oficina') +
+        '&_=' + Date.now());
+      resultado = await resp.json();
+    }catch(e){
+      if(nota) nota.textContent = 'No se pudo guardar el vínculo (sin conexión). Intenta de nuevo.';
+      return;
+    }
+
+    if(!resultado || !resultado.ok){
+      if(nota) nota.textContent = '✕ No se pudo vincular: ' + (resultado && resultado.error ? resultado.error : 'error desconocido');
+      return;
+    }
+
+    const codigoVinculado = codigoPendienteVinculo;
+    cancelarVinculoCodigo(id);
+    agregarSerie(iccid);
+    if(nota) nota.textContent = '✓ Vinculado (' + codigoVinculado + ' → ' + iccid + ') y agregado.';
   }
 
   function generarRango(id){
@@ -562,11 +838,14 @@
   function abrirScan(id){
     filaAbierta = id;
     seriesEnCurso = [];
+    codigoPendienteVinculo = null;
     render();
   }
 
   let lectorCamara = null;
   let camaraActivaPara = null;
+  let ultimoCodigoCamaraTexto = null;
+  let ultimoCodigoCamaraTs = 0;
 
   function alternarCamara(id){
     const box = document.getElementById('camaraBox_' + id);
@@ -589,8 +868,14 @@
       { facingMode: 'environment' },
       { fps: 10, qrbox: { width: 250, height: 120 } },
       function(textoDecodificado){
-        agregarSerie(textoDecodificado.trim());
-        // Pequeña vibración/beep visual: reinicia el input para seguir escaneando
+        const codigo = textoDecodificado.trim();
+        const ahora = Date.now();
+        // Evita relanzar la verificación/vínculo repetidas veces mientras la
+        // cámara sigue apuntando al mismo código (se llama muchas veces por segundo).
+        if(codigo === ultimoCodigoCamaraTexto && (ahora - ultimoCodigoCamaraTs) < 2500) return;
+        ultimoCodigoCamaraTexto = codigo;
+        ultimoCodigoCamaraTs = ahora;
+        procesarCodigoUnico(id, codigo);
       },
       function(){ /* de-lectura, ignorar (se llama constantemente mientras no detecta nada) */ }
     ).catch(function(err){
@@ -609,6 +894,7 @@
     }
     filaAbierta = null;
     seriesEnCurso = [];
+    codigoPendienteVinculo = null;
     render();
   }
 
