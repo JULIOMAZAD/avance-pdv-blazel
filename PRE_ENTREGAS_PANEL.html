@@ -85,6 +85,11 @@
   .acta-table td{padding:6px 8px;border:1px solid #000;}
   .sig{display:flex;gap:40px;margin-top:50px;}
   .sig div{flex:1;text-align:center;border-top:1px solid #000;padding-top:6px;font-size:12px;}
+  /* Manifiesto: versión compacta para que quepan muchos clientes por hoja */
+  #printAreaManifiesto .acta-h{padding-bottom:6px;margin-bottom:8px;}
+  #printAreaManifiesto .acta-datos-table{font-size:11px;margin-bottom:8px;}
+  #printAreaManifiesto .acta-datos-table td{padding:3px 8px;}
+  #printAreaManifiesto .acta-seccion-roja{margin-top:8px;padding:4px 10px;}
 </style>
 </head>
 <body>
@@ -171,7 +176,7 @@
   <div class="acta-seccion-roja">ANEXO — DETALLE DE SERIES / ICCID</div>
   <div style="display:flex;gap:16px;align-items:flex-start;margin-top:8px;">
     <div id="pQr" style="flex-shrink:0;"></div>
-    <div style="font-size:10px;color:#555;max-width:160px;">Escanea este código para ver el inicio, fin y cantidad de esta serie.</div>
+    <div style="font-size:10px;color:#555;max-width:160px;">Código de barras del primer chip (inicio) de esta serie — pásalo por la pistola para verificar. El detalle completo está en la tabla de abajo.</div>
   </div>
   <table class="acta-table" style="border:none;">
     <thead><tr><th style="border:none;border-bottom:1.5px solid #000;">Serie / ICCID</th></tr></thead>
@@ -196,19 +201,32 @@
     <tr><td>Vendedor / responsable</td><td id="mVendedor"></td></tr>
     <tr><td>Clientes atendidos</td><td id="mClientes"></td></tr>
     <tr><td>Total de chips a transportar</td><td id="mTotal"></td></tr>
+    <tr><td>Series a transportar</td><td id="mSeries"></td></tr>
   </table>
-  <div style="display:flex;gap:16px;align-items:flex-start;margin:12px 0;">
+  <div style="display:flex;gap:12px;align-items:flex-start;margin:6px 0;">
     <div id="mQrVendedor" style="flex-shrink:0;"></div>
-    <div style="font-size:10px;color:#555;max-width:200px;">Escanea este código para ver el vendedor, la fecha, la cantidad de clientes y el total de chips.</div>
+    <div style="font-size:9px;color:#555;max-width:220px;">Código de barras del primer chip (inicio) de todo el lote que lleva este vendedor — pásalo por la pistola para verificar el lote completo.</div>
   </div>
   <div class="acta-seccion-roja">DETALLE POR CLIENTE</div>
-  <div id="mClientesBody"></div>
+  <table style="width:100%;border-collapse:collapse;font-size:9px;margin-top:4px;">
+    <thead>
+      <tr>
+        <th style="text-align:left;border-bottom:1.5px solid #000;padding:3px 4px;">Cliente</th>
+        <th style="text-align:left;border-bottom:1.5px solid #000;padding:3px 4px;">DNI</th>
+        <th style="text-align:left;border-bottom:1.5px solid #000;padding:3px 4px;">N&deg; acta</th>
+        <th style="text-align:left;border-bottom:1.5px solid #000;padding:3px 4px;">Cant.</th>
+        <th style="text-align:left;border-bottom:1.5px solid #000;padding:3px 4px;">Serie (inicio &mdash; fin)</th>
+        <th style="text-align:left;border-bottom:1.5px solid #000;padding:3px 4px;">C&oacute;digo de barras (inicio)</th>
+      </tr>
+    </thead>
+    <tbody id="mClientesBody"></tbody>
+  </table>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
 <script>
   // Mismo Apps Script que la app de marcado / pre-entrega.
   const URL_SCRIPT = "https://script.google.com/macros/s/AKfycbw125n4ceKoQwUBq8zRHKeGzHue_EzZj8yd1zYt_xym0BUbiOgnr5rJFtLuapDJA3kfsA/exec";
@@ -268,13 +286,23 @@
     if(wrap && original) wrap.innerHTML = original.innerHTML;
   }
 
+  async function obtenerDniAsesor(nombre){
+    try{
+      const resp = await fetch(URL_SCRIPT + '?modo=dni_asesor&nombre=' + encodeURIComponent(nombre) + '&_=' + Date.now());
+      const json = await resp.json();
+      return (json && json.dni) ? json.dni : '';
+    }catch(e){ return ''; }
+  }
+
   async function generarManifiesto(vend){
     const pendientes = TODAS.filter(function(x){ return x.vendedor === vend && x.estado === 'ASIGNADO' && !x.greNumero; });
     if(!pendientes.length) return null;
 
+    const dniVendedor = await obtenerDniAsesor(vend);
+
     clonarLogoManifiesto();
     document.getElementById('mFecha').textContent = 'Fecha: ' + new Date().toLocaleDateString('es-PE');
-    document.getElementById('mVendedor').textContent = vend;
+    document.getElementById('mVendedor').textContent = vend + (dniVendedor ? ' — DNI ' + dniVendedor : '');
     document.getElementById('mClientes').textContent = pendientes.length;
 
     let totalChips = 0;
@@ -291,24 +319,34 @@
     });
 
     document.getElementById('mTotal').textContent = totalChips + ' chip(s)';
+
+    const todasLasSeriesVendedor = [];
+    bloques.forEach(function(b){ todasLasSeriesVendedor.push.apply(todasLasSeriesVendedor, b.series); });
+    todasLasSeriesVendedor.sort();
+    const inicioVendedor = todasLasSeriesVendedor[0] || '(sin series)';
+    const finVendedor = todasLasSeriesVendedor[todasLasSeriesVendedor.length - 1] || '(sin series)';
+    document.getElementById('mSeries').textContent = inicioVendedor + ' — ' + finVendedor;
+
     document.getElementById('mClientesBody').innerHTML = bloques.map(function(b){
-      return '<div style="border:1px solid #000;border-radius:6px;padding:10px;margin-bottom:12px;display:flex;gap:14px;align-items:center;">' +
-        '<div style="flex:1;">' +
-          '<div style="font-weight:800;font-size:12px;">' + (b.p.nombreCliente || '') + '</div>' +
-          '<div style="font-size:11px;">DNI ' + b.p.dni + '</div>' +
-          '<div style="font-size:11px;">N° acta: ' + (b.p.correlativo || '(sin asignar aún)') + '</div>' +
-          '<div style="font-size:11px;">Cantidad: ' + b.series.length + ' chip(s)</div>' +
-          '<div style="font-size:10px;color:#555;">Series: ' + b.inicio + ' — ' + b.fin + '</div>' +
-        '</div>' +
-        '<div id="mQrCliente_' + b.idx + '" style="flex-shrink:0;"></div>' +
-      '</div>';
+      return '<tr>' +
+        '<td style="padding:2px 4px;border-bottom:1px solid #ddd;font-weight:700;">' + (b.p.nombreCliente || '') + '</td>' +
+        '<td style="padding:2px 4px;border-bottom:1px solid #ddd;">' + b.p.dni + '</td>' +
+        '<td style="padding:2px 4px;border-bottom:1px solid #ddd;">' + (b.p.correlativo || '(sin asignar)') + '</td>' +
+        '<td style="padding:2px 4px;border-bottom:1px solid #ddd;">' + b.series.length + '</td>' +
+        '<td style="padding:2px 4px;border-bottom:1px solid #ddd;font-size:8px;">' + b.inicio + ' — ' + b.fin + '</td>' +
+        '<td id="mBcCliente_' + b.idx + '" style="padding:1px 4px;border-bottom:1px solid #ddd;line-height:0;"></td>' +
+      '</tr>';
     }).join('');
 
-    const textoQrVendedor = 'Vendedor: ' + vend + '\nFecha: ' + new Date().toLocaleDateString('es-PE') + '\nClientes: ' + pendientes.length + '\nTotal chips: ' + totalChips;
-    dibujarQr('mQrVendedor', textoQrVendedor, 110);
+    if(todasLasSeriesVendedor.length){
+      dibujarBarcode('mQrVendedor', inicioVendedor, { height: 30, width: 1.4, fontSize: 10, margin: 2 });
+    } else {
+      document.getElementById('mQrVendedor').innerHTML = '<div style="font-size:9px;color:#900;">(sin series asignadas)</div>';
+    }
     bloques.forEach(function(b){
-      const textoQrCliente = 'Cliente: ' + (b.p.nombreCliente || '') + '\nDNI: ' + b.p.dni + '\nInicio: ' + b.inicio + '\nFin: ' + b.fin + '\nCantidad: ' + b.series.length;
-      dibujarQr('mQrCliente_' + b.idx, textoQrCliente, 90);
+      if(b.series.length){
+        dibujarBarcode('mBcCliente_' + b.idx, b.inicio, { height: 20, width: 1, fontSize: 8, margin: 0, displayValue: false });
+      }
     });
 
     return { vend: vend, pendientes: pendientes };
@@ -1391,13 +1429,21 @@
     render();
   }
 
-  // Dibuja un código QR dentro del elemento indicado (lo vacía primero, por
-  // si ya tenía uno de una acta/manifiesto generado antes en esta sesión).
-  function dibujarQr(elementoOId, texto, tamano){
+  // Dibuja un código de barras (lineal, legible con pistola escáner) dentro
+  // del elemento indicado (lo vacía primero, por si ya tenía uno de una
+  // acta/manifiesto generado antes en esta sesión).
+  function dibujarBarcode(elementoOId, texto, opciones){
     const el = (typeof elementoOId === 'string') ? document.getElementById(elementoOId) : elementoOId;
     if(!el) return;
-    el.innerHTML = '';
-    new QRCode(el, { text: texto, width: tamano || 110, height: tamano || 110, correctLevel: QRCode.CorrectLevel.M });
+    el.innerHTML = '<svg></svg>';
+    const svg = el.querySelector('svg');
+    try{
+      window.JsBarcode(svg, String(texto || ''), Object.assign({
+        format: 'CODE128', width: 1.3, height: 34, displayValue: true, fontSize: 10, margin: 4
+      }, opciones || {}));
+    }catch(e){
+      el.innerHTML = '<div style="font-size:9px;color:#900;">(código no válido para barras)</div>';
+    }
   }
 
   async function llenarActa(id){
@@ -1429,8 +1475,11 @@
 
     const inicio = series[0] || '(sin series)';
     const fin = series[series.length - 1] || '(sin series)';
-    const textoQr = 'Cliente: ' + p.nombreCliente + '\nDNI: ' + p.dni + '\nInicio: ' + inicio + '\nFin: ' + fin + '\nCantidad: ' + series.length;
-    dibujarQr('pQr', textoQr, 110);
+    if(series.length){
+      dibujarBarcode('pQr', inicio, { height: 45, width: 1.5, fontSize: 12, margin: 4 });
+    } else {
+      document.getElementById('pQr').innerHTML = '<div style="font-size:9px;color:#900;">(sin series asignadas)</div>';
+    }
 
     return p;
   }
