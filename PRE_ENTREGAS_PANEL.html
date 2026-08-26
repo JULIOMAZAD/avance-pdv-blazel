@@ -262,9 +262,30 @@
   // solo reparte el rango grande en sub-lotes y los guarda uno por uno.
 
   let repartoAbiertoPara = null;
+  let seriesRepartoEnCurso = {}; // { [vendedor]: [codigos ICCID escaneados/escritos en Opción B] }
+  let camaraRepartoActivaPara = null;
+  let lectorCamaraReparto = null;
+  let ultimoCodigoCamaraRepartoTexto = null;
+  let ultimoCodigoCamaraRepartoTs = 0;
+  let codigoPendienteVinculoReparto = null; // { vend, codigo }
+
+  function seriesRepartoDe(vend){
+    if(!seriesRepartoEnCurso[vend]) seriesRepartoEnCurso[vend] = [];
+    return seriesRepartoEnCurso[vend];
+  }
 
   function abrirReparto(vend){
-    repartoAbiertoPara = (repartoAbiertoPara === vend) ? null : vend;
+    if(repartoAbiertoPara === vend){
+      if(camaraRepartoActivaPara === vend && lectorCamaraReparto){
+        lectorCamaraReparto.stop().then(function(){ lectorCamaraReparto.clear(); lectorCamaraReparto = null; }).catch(function(){ lectorCamaraReparto = null; });
+      }
+      camaraRepartoActivaPara = null;
+      repartoAbiertoPara = null;
+    }else{
+      repartoAbiertoPara = vend;
+      seriesRepartoEnCurso[vend] = [];
+      codigoPendienteVinculoReparto = null;
+    }
     render();
   }
 
@@ -285,20 +306,48 @@
     const detalleClientes = pend.map(function(x){
       return '<div class="sub">' + (x.p.nombreCliente || '') + ' (DNI ' + x.p.dni + ') — necesita ' + x.restante + ' chip(s)</div>';
     }).join('');
+    const lista = seriesRepartoDe(vend);
 
     return '<div class="panel-scan abierto" style="margin-bottom:14px;">' +
-      '<div style="font-size:12px;font-weight:800;margin-bottom:6px;">🧮 Repartir un solo rango entre ' + pend.length + ' cliente(s) pendiente(s) — se necesitan ' + totalNecesario + ' chip(s) en total, en el orden en que pidieron</div>' +
+      '<div style="font-size:12px;font-weight:800;margin-bottom:6px;">🧮 Repartir entre ' + pend.length + ' cliente(s) pendiente(s) — se necesitan ' + totalNecesario + ' chip(s) en total, en el orden en que pidieron</div>' +
       detalleClientes +
-      '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;">' +
-        '<div>' +
+      '<div style="font-size:11px;color:var(--gris);margin:10px 0 4px;">Usa UNA de las dos opciones de abajo (no hace falta llenar las dos):</div>' +
+      '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px;">' +
+
+        // Opción A: rango correlativo (primera + última serie)
+        '<div style="flex:1;min-width:220px;background:#FFF7F5;border:1.5px solid var(--rojo);border-radius:10px;padding:10px;">' +
+          '<div style="font-size:12px;font-weight:800;margin-bottom:6px;">🔢 OPCIÓN A: rango correlativo</div>' +
           '<div style="font-size:11px;color:var(--gris);margin-bottom:2px;">Primera serie del lote</div>' +
-          '<input type="text" id="repartoInicio_' + vend + '" placeholder="Primera serie" autocomplete="off" style="width:220px;padding:9px;border:1.5px solid var(--borde);border-radius:10px;" oninput="mostrarVistaPreviaReparto(\'' + vend + '\')">' +
-        '</div>' +
-        '<div>' +
+          '<input type="text" id="repartoInicio_' + vend + '" placeholder="Primera serie" autocomplete="off" style="margin-bottom:6px;" oninput="mostrarVistaPreviaReparto(\'' + vend + '\')">' +
           '<div style="font-size:11px;color:var(--gris);margin-bottom:2px;">Última serie del lote</div>' +
-          '<input type="text" id="repartoFin_' + vend + '" placeholder="Última serie" autocomplete="off" style="width:220px;padding:9px;border:1.5px solid var(--borde);border-radius:10px;" oninput="mostrarVistaPreviaReparto(\'' + vend + '\')">' +
+          '<input type="text" id="repartoFin_' + vend + '" placeholder="Última serie" autocomplete="off" style="margin-bottom:6px;" oninput="mostrarVistaPreviaReparto(\'' + vend + '\')">' +
         '</div>' +
+
+        // Opción B: escanear o escribir cada chip (no necesitan ser correlativos)
+        '<div style="flex:1;min-width:220px;background:#F1F1F4;border:1.5px solid var(--tinta);border-radius:10px;padding:10px;">' +
+          '<div style="font-size:12px;font-weight:800;margin-bottom:6px;">📷 OPCIÓN B: escanear o escribir cada chip</div>' +
+          '<button class="btn-secundario" style="width:100%;margin-bottom:6px;" id="btnCamaraReparto_' + vend + '" onclick="alternarCamaraReparto(\'' + vend + '\')">📷 Usar cámara del celular</button>' +
+          '<div id="camaraBoxReparto_' + vend + '" style="display:none;margin-bottom:8px;">' +
+            '<div id="lectorReparto_' + vend + '" style="width:100%;max-width:320px;border-radius:10px;overflow:hidden;"></div>' +
+          '</div>' +
+          '<div style="font-size:11px;color:var(--gris);margin-bottom:2px;">O escribe/pega uno o varios códigos</div>' +
+          '<input type="text" id="repartoManualInput_' + vend + '" placeholder="Ej. 895110113011183900" autocomplete="off" style="margin-bottom:6px;">' +
+          '<button class="btn-rojo" style="width:100%;" onclick="agregarManualReparto(\'' + vend + '\')">➕ Agregar</button>' +
+          '<div style="font-size:10px;color:var(--gris);margin-top:4px;">Si escaneas un código distinto al ICCID, la primera vez te pedirá vincularlo.</div>' +
+          '<div id="vinculoBoxReparto_' + vend + '" style="display:none;margin-top:8px;padding:8px;background:#fff;border:1px dashed var(--rojo);border-radius:8px;">' +
+            '<div id="vinculoTextoReparto_' + vend + '" style="font-size:11px;margin-bottom:4px;"></div>' +
+            '<input type="text" id="vinculoIccidReparto_' + vend + '" placeholder="ICCID completo de este mismo chip" autocomplete="off" style="margin-bottom:6px;">' +
+            '<button class="btn-rojo" style="width:100%;" onclick="confirmarVinculoCodigoReparto(\'' + vend + '\')">🔗 Vincular y agregar</button>' +
+            '<button class="btn-secundario" style="width:100%;margin-top:4px;" onclick="cancelarVinculoCodigoReparto(\'' + vend + '\')">Cancelar</button>' +
+          '</div>' +
+        '</div>' +
+
       '</div>' +
+      '<div class="contador-scan" style="margin-top:10px;">Chips agregados en Opción B: <b id="contadorReparto_' + vend + '">' + lista.length + '</b></div>' +
+      '<div class="lista-series" id="listaReparto_' + vend + '">' + lista.map(function(s, i){
+        return '<span class="serie-chip">' + s + ' <button onclick="quitarSerieReparto(\'' + vend + '\',' + i + ')">✕</button></span>';
+      }).join('') + '</div>' +
+      '<div class="nota-scan" id="repartoNotaScan_' + vend + '"></div>' +
       '<div id="repartoVistaPrevia_' + vend + '" style="display:none;background:#fff;border:1px dashed var(--rojo);border-radius:8px;padding:8px;margin-top:10px;font-size:12px;max-height:220px;overflow-y:auto;"></div>' +
       '<div style="margin-top:10px;">' +
         '<button class="btn-rojo" onclick="confirmarReparto(\'' + vend + '\')">✔ Confirmar reparto</button> ' +
@@ -355,16 +404,26 @@
   }
 
   async function confirmarReparto(vend){
-    const inicioEl = document.getElementById('repartoInicio_' + vend);
-    const finEl = document.getElementById('repartoFin_' + vend);
     const nota = document.getElementById('repartoNota_' + vend);
-    const inicio = inicioEl.value.trim();
-    const fin = finEl.value.trim();
+    const listaScan = seriesRepartoDe(vend);
 
-    const r = calcularRango(inicio, fin);
-    if(!r.ok || !fin){
-      nota.textContent = r.error || 'Ingresa la primera y la última serie del lote.';
-      return;
+    let series;
+    if(listaScan.length){
+      // Opción B: se usan los chips ya escaneados/escritos (no necesitan ser correlativos)
+      series = listaScan.slice();
+    }else{
+      // Opción A: rango correlativo escrito arriba
+      const inicioEl = document.getElementById('repartoInicio_' + vend);
+      const finEl = document.getElementById('repartoFin_' + vend);
+      const inicio = inicioEl.value.trim();
+      const fin = finEl.value.trim();
+
+      const r = calcularRango(inicio, fin);
+      if(!r.ok || !fin){
+        nota.textContent = r.error || 'Ingresa la primera y la última serie del lote, o usa la Opción B para escanear/escribir cada chip.';
+        return;
+      }
+      series = r.series;
     }
 
     const pend = pendientesReparto(vend);
@@ -373,7 +432,7 @@
       return;
     }
 
-    const reparto = simularReparto(r.series, pend);
+    const reparto = simularReparto(series, pend);
     let hechos = 0;
 
     for(let i = 0; i < reparto.length; i++){
@@ -411,15 +470,214 @@
       hechos++;
     }
 
+    seriesRepartoEnCurso[vend] = [];
     repartoAbiertoPara = null;
     render();
     setTimeout(cargarTodo, 2500);
 
     const usadas = reparto.reduce(function(sum, x){ return sum + x.tomar.length; }, 0);
-    const sobran = r.series.length - usadas;
+    const sobran = series.length - usadas;
     if(sobran > 0){
-      alert('Reparto listo (' + hechos + ' cliente(s) actualizados). Sobraron ' + sobran + ' chip(s) del rango que no se usaron.');
+      alert('Reparto listo (' + hechos + ' cliente(s) actualizados). Sobraron ' + sobran + ' chip(s) que no se usaron.');
     }
+  }
+
+  // ===== Opción B del reparto: escanear o escribir cada chip =====
+  // Reusa la misma lógica de reconocimiento de código alterno (Feature 2)
+  // que el escaneo por cliente, pero acumula en una lista por vendedor en
+  // vez de por cliente — luego simularReparto()/confirmarReparto() la reparten.
+
+  function alternarCamaraReparto(vend){
+    const box = document.getElementById('camaraBoxReparto_' + vend);
+    const btn = document.getElementById('btnCamaraReparto_' + vend);
+    if(camaraRepartoActivaPara === vend){
+      if(lectorCamaraReparto){
+        lectorCamaraReparto.stop().then(function(){ lectorCamaraReparto.clear(); lectorCamaraReparto = null; }).catch(function(){ lectorCamaraReparto = null; });
+      }
+      camaraRepartoActivaPara = null;
+      box.style.display = 'none';
+      btn.textContent = '📷 Usar cámara del celular';
+      return;
+    }
+    box.style.display = 'block';
+    btn.textContent = '✕ Apagar cámara';
+    camaraRepartoActivaPara = vend;
+    lectorCamaraReparto = new Html5Qrcode('lectorReparto_' + vend);
+    lectorCamaraReparto.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: { width: 250, height: 120 } },
+      function(textoDecodificado){
+        const codigo = textoDecodificado.trim();
+        const ahora = Date.now();
+        if(codigo === ultimoCodigoCamaraRepartoTexto && (ahora - ultimoCodigoCamaraRepartoTs) < 2500) return;
+        ultimoCodigoCamaraRepartoTexto = codigo;
+        ultimoCodigoCamaraRepartoTs = ahora;
+        procesarCodigoReparto(vend, codigo);
+      },
+      function(){ /* de-lectura, ignorar */ }
+    ).catch(function(err){
+      const nota = document.getElementById('repartoNotaScan_' + vend);
+      if(nota) nota.textContent = 'No se pudo abrir la cámara: ' + err;
+      box.style.display = 'none';
+      btn.textContent = '📷 Usar cámara del celular';
+      camaraRepartoActivaPara = null;
+    });
+  }
+
+  async function agregarManualReparto(vend){
+    const inputEl = document.getElementById('repartoManualInput_' + vend);
+    const valor = inputEl.value.trim();
+    if(!valor) return;
+    inputEl.value = '';
+    // permite pegar varios códigos separados por coma, espacio o salto de línea
+    const partes = valor.split(/[\s,;]+/).filter(Boolean);
+    for(let i = 0; i < partes.length; i++){
+      await procesarCodigoReparto(vend, partes[i]);
+    }
+    inputEl.focus();
+  }
+
+  async function procesarCodigoReparto(vend, valorCrudo){
+    const valor = (valorCrudo || '').trim();
+    const nota = document.getElementById('repartoNotaScan_' + vend);
+    if(!valor) return;
+
+    if(pareceIccidCompleto(valor)){
+      agregarSerieReparto(vend, valor);
+      return;
+    }
+
+    if(nota) nota.textContent = 'Verificando código…';
+    let resultado;
+    try{
+      const resp = await fetch(URL_SCRIPT + '?modo=buscar_codigo_get&codigo=' + encodeURIComponent(valor) + '&_=' + Date.now());
+      resultado = await resp.json();
+    }catch(e){
+      if(nota) nota.textContent = 'No se pudo verificar el código (sin conexión). Prueba escaneando el ICCID largo directamente.';
+      return;
+    }
+
+    if(resultado && resultado.ok && resultado.iccid){
+      agregarSerieReparto(vend, resultado.iccid);
+      if(nota) nota.textContent = '✓ Código reconocido → ICCID ' + resultado.iccid;
+      return;
+    }
+
+    mostrarVinculoPendienteReparto(vend, valor);
+  }
+
+  function agregarSerieReparto(vend, serie){
+    if(!serie) return;
+    const lista = seriesRepartoDe(vend);
+    const up = serie.toUpperCase();
+    if(lista.map(function(s){ return s.toUpperCase(); }).indexOf(up) !== -1){
+      const nota = document.getElementById('repartoNotaScan_' + vend);
+      if(nota) nota.textContent = '⚠ Ese chip ya lo agregaste en este lote.';
+      return;
+    }
+    lista.push(serie);
+    const nota = document.getElementById('repartoNotaScan_' + vend);
+    if(nota) nota.textContent = '';
+    renderListaReparto(vend);
+  }
+
+  function quitarSerieReparto(vend, idx){
+    seriesRepartoDe(vend).splice(idx, 1);
+    renderListaReparto(vend);
+  }
+
+  function renderListaReparto(vend){
+    const cont = document.getElementById('listaReparto_' + vend);
+    const contador = document.getElementById('contadorReparto_' + vend);
+    if(!cont) return;
+    const lista = seriesRepartoDe(vend);
+    cont.innerHTML = lista.map(function(s, i){
+      return '<span class="serie-chip">' + s + ' <button onclick="quitarSerieReparto(\'' + vend + '\',' + i + ')">✕</button></span>';
+    }).join('');
+    if(contador) contador.textContent = lista.length;
+    actualizarVistaPreviaRepartoScan(vend);
+  }
+
+  function actualizarVistaPreviaRepartoScan(vend){
+    const previa = document.getElementById('repartoVistaPrevia_' + vend);
+    if(!previa) return;
+    const lista = seriesRepartoDe(vend);
+    if(!lista.length){ previa.style.display = 'none'; return; }
+
+    const pend = pendientesReparto(vend);
+    const totalNecesario = pend.reduce(function(sum, x){ return sum + x.restante; }, 0);
+    const reparto = simularReparto(lista, pend);
+
+    let resumen = 'Llevas ' + lista.length + ' chip(s) agregado(s). Se necesitan ' + totalNecesario + '.';
+    if(lista.length === totalNecesario) resumen += ' ✓ Coincide exacto.';
+    else if(lista.length > totalNecesario) resumen += ' Sobran ' + (lista.length - totalNecesario) + ' chip(s) que quedarán sin asignar.';
+    else resumen += ' Faltan ' + (totalNecesario - lista.length) + ' chip(s) todavía.';
+
+    const filas = reparto.map(function(x){
+      if(x.tomar.length === x.restante) return (x.p.nombreCliente || '') + ': ' + x.tomar.length + ' chip(s) — pedido completo';
+      if(x.tomar.length > 0) return (x.p.nombreCliente || '') + ': ⚠ ' + x.tomar.length + ' de ' + x.restante + ' — no alcanza para completar';
+      return (x.p.nombreCliente || '') + ': ⚠ 0 — no alcanzó ningún chip para este cliente';
+    });
+
+    previa.style.display = 'block';
+    previa.style.color = 'var(--tinta)';
+    previa.innerHTML = resumen + '<br><br>' + filas.join('<br>');
+  }
+
+  function mostrarVinculoPendienteReparto(vend, codigo){
+    codigoPendienteVinculoReparto = { vend: vend, codigo: codigo };
+    const box = document.getElementById('vinculoBoxReparto_' + vend);
+    const texto = document.getElementById('vinculoTextoReparto_' + vend);
+    const nota = document.getElementById('repartoNotaScan_' + vend);
+    if(texto) texto.textContent = 'El código "' + codigo + '" no está vinculado a ningún ICCID todavía. Escanea o escribe el ICCID de este mismo chip para vincularlo:';
+    if(box) box.style.display = 'block';
+    if(nota) nota.textContent = '';
+  }
+
+  function cancelarVinculoCodigoReparto(vend){
+    codigoPendienteVinculoReparto = null;
+    const box = document.getElementById('vinculoBoxReparto_' + vend);
+    if(box) box.style.display = 'none';
+    const iccidEl = document.getElementById('vinculoIccidReparto_' + vend);
+    if(iccidEl) iccidEl.value = '';
+  }
+
+  async function confirmarVinculoCodigoReparto(vend){
+    const iccidEl = document.getElementById('vinculoIccidReparto_' + vend);
+    const nota = document.getElementById('repartoNotaScan_' + vend);
+    const iccid = (iccidEl.value || '').trim();
+    if(!pareceIccidCompleto(iccid)){
+      if(nota) nota.textContent = 'Ese ICCID no parece completo (debe ser solo números, entre 17 y 22 dígitos).';
+      return;
+    }
+    if(!codigoPendienteVinculoReparto){
+      cancelarVinculoCodigoReparto(vend);
+      return;
+    }
+
+    if(nota) nota.textContent = 'Vinculando…';
+    let resultado;
+    try{
+      const resp = await fetch(URL_SCRIPT + '?modo=vincular_codigo_get' +
+        '&codigoCorto=' + encodeURIComponent(codigoPendienteVinculoReparto.codigo) +
+        '&iccid=' + encodeURIComponent(iccid) +
+        '&vinculadoPor=' + encodeURIComponent(usuarioActual || 'oficina') +
+        '&_=' + Date.now());
+      resultado = await resp.json();
+    }catch(e){
+      if(nota) nota.textContent = 'No se pudo guardar el vínculo (sin conexión). Intenta de nuevo.';
+      return;
+    }
+
+    if(!resultado || !resultado.ok){
+      if(nota) nota.textContent = '✕ No se pudo vincular: ' + (resultado && resultado.error ? resultado.error : 'error desconocido');
+      return;
+    }
+
+    const codigoVinculado = codigoPendienteVinculoReparto.codigo;
+    cancelarVinculoCodigoReparto(vend);
+    agregarSerieReparto(vend, iccid);
+    if(nota) nota.textContent = '✓ Vinculado (' + codigoVinculado + ' → ' + iccid + ') y agregado.';
   }
 
   function cambiarFiltro(f){
