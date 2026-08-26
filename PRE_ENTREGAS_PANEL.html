@@ -339,7 +339,7 @@
     }).join('');
 
     dibujarBarcodesLote('mQrVendedor', todasLasSeriesVendedor, {
-      barW: 1.4, barH: 30, fontSize: 10, margin: 2, maxIndividuales: 0,
+      barW: 1.4, barH: 30, fontSize: 10, margin: 2, maxIndividuales: 0, gapExtra: 18,
       notaId: 'mQrVendedorNota',
       notaUnica: 'Código de barras del único chip de este lote — pásalo por la pistola para verificar.',
       notaCorrelativa: 'Lote correlativo: códigos de barras de inicio y fin de todo el lote — pásalos por la pistola para verificar el rango completo.',
@@ -348,7 +348,7 @@
     bloques.forEach(function(b){
       if(b.series.length){
         dibujarBarcodesLote('mBcCliente_' + b.idx, b.series, {
-          barW: 1, barH: 18, fontSize: 7, margin: 0, displayValue: false, maxIndividuales: 6
+          barW: 1, barH: 18, fontSize: 7, margin: 0, displayValue: false, maxIndividuales: 6, gapExtra: 7
         });
       }
     });
@@ -1480,7 +1480,7 @@
   function dibujarBarcodesLote(contenedorId, series, opciones){
     const cfg = Object.assign({
       barW: 1.3, barH: 30, fontSize: 9, margin: 2, displayValue: true,
-      maxIndividuales: 999, notaId: null,
+      maxIndividuales: 999, notaId: null, gapExtra: 14,
       notaUnica: '', notaCorrelativa: '', notaIndividual: '', notaFallback: ''
     }, opciones || {});
     const cont = document.getElementById(contenedorId);
@@ -1488,7 +1488,8 @@
     cont.innerHTML = '';
     cont.style.display = 'flex';
     cont.style.flexWrap = 'wrap';
-    cont.style.gap = '4px';
+    cont.style.gap = '0px';
+    cont.style.alignItems = 'stretch';
 
     const notaEl = cfg.notaId ? document.getElementById(cfg.notaId) : null;
 
@@ -1513,8 +1514,13 @@
       nota = cfg.notaFallback;
     }
 
-    aMostrar.forEach(function(s){
+    aMostrar.forEach(function(s, i){
       const div = document.createElement('div');
+      if(i > 0){
+        div.style.marginLeft = cfg.gapExtra + 'px';
+        div.style.paddingLeft = cfg.gapExtra + 'px';
+        div.style.borderLeft = '1.5px dashed #999';
+      }
       cont.appendChild(div);
       dibujarBarcode(div, s, { width: cfg.barW, height: cfg.barH, fontSize: cfg.fontSize, margin: cfg.margin, displayValue: cfg.displayValue });
     });
@@ -1564,7 +1570,7 @@
     }
 
     dibujarBarcodesLote('pQr', series, {
-      barW: 1.5, barH: 45, fontSize: 12, margin: 4, maxIndividuales: 1,
+      barW: 1.5, barH: 45, fontSize: 12, margin: 4, maxIndividuales: 1, gapExtra: 20,
       notaId: 'pQrNota',
       notaUnica: 'Código de barras de este chip — pásalo por la pistola para verificar.',
       notaCorrelativa: 'Serie correlativa: códigos de barras de inicio y fin de este lote — pásalos por la pistola para verificar el rango completo.',
