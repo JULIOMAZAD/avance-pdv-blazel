@@ -169,6 +169,10 @@
     <tr><td>Biométrico(s) que usa</td><td id="pBiometricos"></td></tr>
   </table>
   <div class="acta-seccion-roja">ANEXO — DETALLE DE SERIES / ICCID</div>
+  <div style="display:flex;gap:16px;align-items:flex-start;margin-top:8px;">
+    <div id="pQr" style="flex-shrink:0;"></div>
+    <div style="font-size:10px;color:#555;max-width:160px;">Escanea este código para ver el inicio, fin y cantidad de esta serie.</div>
+  </div>
   <table class="acta-table" style="border:none;">
     <thead><tr><th style="border:none;border-bottom:1.5px solid #000;">Serie / ICCID</th></tr></thead>
     <tbody id="pSeriesBody"></tbody>
@@ -180,9 +184,31 @@
   </div>
 </div>
 
+<div id="printAreaManifiesto" style="display:none;">
+  <div class="acta-h">
+    <div id="mLogoWrap" style="display:flex;align-items:center;gap:10px;"></div>
+    <div style="text-align:right;border:1.5px solid #000;border-radius:6px;padding:6px 12px;">
+      <div class="acta-title" style="font-size:14px;">MANIFIESTO DE REPARTO</div>
+      <div class="acta-meta" id="mFecha"></div>
+    </div>
+  </div>
+  <table class="acta-datos-table">
+    <tr><td>Vendedor / responsable</td><td id="mVendedor"></td></tr>
+    <tr><td>Clientes atendidos</td><td id="mClientes"></td></tr>
+    <tr><td>Total de chips a transportar</td><td id="mTotal"></td></tr>
+  </table>
+  <div style="display:flex;gap:16px;align-items:flex-start;margin:12px 0;">
+    <div id="mQrVendedor" style="flex-shrink:0;"></div>
+    <div style="font-size:10px;color:#555;max-width:200px;">Escanea este código para ver el vendedor, la fecha, la cantidad de clientes y el total de chips.</div>
+  </div>
+  <div class="acta-seccion-roja">DETALLE POR CLIENTE</div>
+  <div id="mClientesBody"></div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
   // Mismo Apps Script que la app de marcado / pre-entrega.
   const URL_SCRIPT = "https://script.google.com/macros/s/AKfycbw125n4ceKoQwUBq8zRHKeGzHue_EzZj8yd1zYt_xym0BUbiOgnr5rJFtLuapDJA3kfsA/exec";
@@ -224,10 +250,125 @@
     return '<div class="panel-scan abierto" style="margin-bottom:14px;">' +
       '<textarea id="greTexto_' + vend + '" readonly style="width:100%;min-height:200px;padding:10px;border:1.5px solid var(--borde);border-radius:10px;font-family:monospace;font-size:12px;margin-bottom:10px;">' + mensaje + '</textarea>' +
       '<button class="btn-secundario" onclick="copiarGre(\'' + vend + '\')">📋 Copiar mensaje</button> ' +
+      '<button class="btn-secundario" onclick="descargarManifiesto(\'' + vend + '\')">📄 Descargar PDF</button> ' +
       '<input type="text" id="greNumero_' + vend + '" placeholder="N° de GRE que te dio almacén" style="width:220px;padding:9px;border:1.5px solid var(--borde);border-radius:10px;margin-left:8px;">' +
       '<button class="btn-rojo" onclick="guardarGreRecibida(\'' + vend + '\', ' + JSON.stringify(ids) + ')">✔ Marcar GRE recibida</button>' +
       '<div class="nota-scan" id="greNota_' + vend + '"></div>' +
     '</div>';
+  }
+
+  // ===== PDF del manifiesto (todos los clientes pendientes de GRE de un vendedor) =====
+  // Copia el logo/encabezado del acta normal (sin repetir el base64 en el HTML)
+  // y arma un documento con un QR por vendedor y uno por cliente, cada uno con
+  // el inicio, fin y cantidad de su serie — para escanear y ver el resumen.
+
+  function clonarLogoManifiesto(){
+    const wrap = document.getElementById('mLogoWrap');
+    const original = document.querySelector('#printArea .acta-h > div:first-child');
+    if(wrap && original) wrap.innerHTML = original.innerHTML;
+  }
+
+  async function generarManifiesto(vend){
+    const pendientes = TODAS.filter(function(x){ return x.vendedor === vend && x.estado === 'ASIGNADO' && !x.greNumero; });
+    if(!pendientes.length) return null;
+
+    clonarLogoManifiesto();
+    document.getElementById('mFecha').textContent = 'Fecha: ' + new Date().toLocaleDateString('es-PE');
+    document.getElementById('mVendedor').textContent = vend;
+    document.getElementById('mClientes').textContent = pendientes.length;
+
+    let totalChips = 0;
+    const bloques = pendientes.map(function(p, idx){
+      const series = (p.seriesAsignadas || '').split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+      totalChips += series.length;
+      return {
+        p: p,
+        series: series,
+        inicio: series[0] || '(sin series)',
+        fin: series[series.length - 1] || '(sin series)',
+        idx: idx
+      };
+    });
+
+    document.getElementById('mTotal').textContent = totalChips + ' chip(s)';
+    document.getElementById('mClientesBody').innerHTML = bloques.map(function(b){
+      return '<div style="border:1px solid #000;border-radius:6px;padding:10px;margin-bottom:12px;display:flex;gap:14px;align-items:center;">' +
+        '<div style="flex:1;">' +
+          '<div style="font-weight:800;font-size:12px;">' + (b.p.nombreCliente || '') + '</div>' +
+          '<div style="font-size:11px;">DNI ' + b.p.dni + '</div>' +
+          '<div style="font-size:11px;">N° acta: ' + (b.p.correlativo || '(sin asignar aún)') + '</div>' +
+          '<div style="font-size:11px;">Cantidad: ' + b.series.length + ' chip(s)</div>' +
+          '<div style="font-size:10px;color:#555;">Series: ' + b.inicio + ' — ' + b.fin + '</div>' +
+        '</div>' +
+        '<div id="mQrCliente_' + b.idx + '" style="flex-shrink:0;"></div>' +
+      '</div>';
+    }).join('');
+
+    const textoQrVendedor = 'Vendedor: ' + vend + '\nFecha: ' + new Date().toLocaleDateString('es-PE') + '\nClientes: ' + pendientes.length + '\nTotal chips: ' + totalChips;
+    dibujarQr('mQrVendedor', textoQrVendedor, 110);
+    bloques.forEach(function(b){
+      const textoQrCliente = 'Cliente: ' + (b.p.nombreCliente || '') + '\nDNI: ' + b.p.dni + '\nInicio: ' + b.inicio + '\nFin: ' + b.fin + '\nCantidad: ' + b.series.length;
+      dibujarQr('mQrCliente_' + b.idx, textoQrCliente, 90);
+    });
+
+    return { vend: vend, pendientes: pendientes };
+  }
+
+  async function generarPdfManifiesto(vend){
+    const info = await generarManifiesto(vend);
+    if(!info) return null;
+
+    const area = document.getElementById('printAreaManifiesto');
+    area.style.display = 'block';
+    area.style.width = '760px';
+    const anchoReal = area.scrollWidth;
+    const altoReal = area.scrollHeight;
+
+    const canvas = await html2canvas(area, {
+      scale: 1.5,
+      backgroundColor: '#ffffff',
+      width: anchoReal,
+      height: altoReal,
+      windowWidth: anchoReal,
+      windowHeight: altoReal
+    });
+    area.style.display = 'none';
+    area.style.width = '';
+
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ unit: 'pt', format: 'a4' });
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const margen = 28;
+    const anchoUtil = pageW - margen * 2;
+    const escala = anchoUtil / canvas.width;
+    const altoUtilPx = (pageH - margen * 2) / escala; // px del canvas que caben en una página
+
+    // El manifiesto puede tener muchos clientes y no caber en una sola hoja;
+    // se corta el canvas en trozos del alto de una página y se va paginando.
+    let renderizado = 0;
+    let primera = true;
+    while(renderizado < canvas.height){
+      const alturaTrozo = Math.min(altoUtilPx, canvas.height - renderizado);
+      const trozo = document.createElement('canvas');
+      trozo.width = canvas.width;
+      trozo.height = alturaTrozo;
+      trozo.getContext('2d').drawImage(canvas, 0, renderizado, canvas.width, alturaTrozo, 0, 0, canvas.width, alturaTrozo);
+      const imgData = trozo.toDataURL('image/jpeg', 0.85);
+      if(!primera) pdf.addPage();
+      pdf.addImage(imgData, 'JPEG', margen, margen, anchoUtil, alturaTrozo * escala);
+      renderizado += alturaTrozo;
+      primera = false;
+    }
+
+    const nombreArchivo = 'Manifiesto_' + vend.replace(/[^a-zA-Z0-9]/g, '_') + '_' + new Date().toISOString().slice(0, 10) + '.pdf';
+    return { pdf: pdf, nombreArchivo: nombreArchivo };
+  }
+
+  async function descargarManifiesto(vend){
+    const res = await generarPdfManifiesto(vend);
+    if(!res){ alert('Este vendedor no tiene clientes pendientes de GRE ahora mismo.'); return; }
+    res.pdf.save(res.nombreArchivo);
   }
 
   function copiarGre(vend){
@@ -1250,6 +1391,15 @@
     render();
   }
 
+  // Dibuja un código QR dentro del elemento indicado (lo vacía primero, por
+  // si ya tenía uno de una acta/manifiesto generado antes en esta sesión).
+  function dibujarQr(elementoOId, texto, tamano){
+    const el = (typeof elementoOId === 'string') ? document.getElementById(elementoOId) : elementoOId;
+    if(!el) return;
+    el.innerHTML = '';
+    new QRCode(el, { text: texto, width: tamano || 110, height: tamano || 110, correctLevel: QRCode.CorrectLevel.M });
+  }
+
   async function llenarActa(id){
     const p = TODAS.find(x => x.id === id);
     if(!p) return null;
@@ -1276,6 +1426,12 @@
     document.getElementById('pSeriesBody').innerHTML = series.map(function(s){
       return '<tr><td style="border:none;border-bottom:1px solid #ddd;">' + s + '</td></tr>';
     }).join('');
+
+    const inicio = series[0] || '(sin series)';
+    const fin = series[series.length - 1] || '(sin series)';
+    const textoQr = 'Cliente: ' + p.nombreCliente + '\nDNI: ' + p.dni + '\nInicio: ' + inicio + '\nFin: ' + fin + '\nCantidad: ' + series.length;
+    dibujarQr('pQr', textoQr, 110);
+
     return p;
   }
 
