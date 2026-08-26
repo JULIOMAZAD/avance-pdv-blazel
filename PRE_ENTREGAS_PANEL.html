@@ -348,7 +348,7 @@
     bloques.forEach(function(b){
       if(b.series.length){
         dibujarBarcodesLote('mBcCliente_' + b.idx, b.series, {
-          barW: 1, barH: 18, fontSize: 7, margin: 0, displayValue: false, maxIndividuales: 6, gapExtra: 7
+          barW: 1, barH: 18, fontSize: 7, margin: 0, displayValue: false, maxIndividuales: 6, gapExtra: 7, align: 'flex-end'
         });
       }
     });
@@ -1480,7 +1480,7 @@
   function dibujarBarcodesLote(contenedorId, series, opciones){
     const cfg = Object.assign({
       barW: 1.3, barH: 30, fontSize: 9, margin: 2, displayValue: true,
-      maxIndividuales: 999, notaId: null, gapExtra: 14,
+      maxIndividuales: 999, notaId: null, gapExtra: 14, align: 'flex-start',
       notaUnica: '', notaCorrelativa: '', notaIndividual: '', notaFallback: ''
     }, opciones || {});
     const cont = document.getElementById(contenedorId);
@@ -1490,6 +1490,7 @@
     cont.style.flexWrap = 'wrap';
     cont.style.gap = '0px';
     cont.style.alignItems = 'stretch';
+    cont.style.justifyContent = cfg.align;
 
     const notaEl = cfg.notaId ? document.getElementById(cfg.notaId) : null;
 
