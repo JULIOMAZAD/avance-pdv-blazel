@@ -174,12 +174,12 @@
     <tr><td>Biométrico(s) que usa</td><td id="pBiometricos"></td></tr>
   </table>
   <div class="acta-seccion-roja">ANEXO — DETALLE DE SERIES / ICCID</div>
-  <div style="display:flex;gap:16px;align-items:flex-start;margin-top:8px;">
+  <div style="display:flex;gap:16px;align-items:flex-start;margin-top:8px;flex-wrap:wrap;">
     <div id="pQr" style="flex-shrink:0;"></div>
-    <div style="font-size:10px;color:#555;max-width:160px;">Código de barras del primer chip (inicio) de esta serie — pásalo por la pistola para verificar. El detalle completo está en la tabla de abajo.</div>
+    <div id="pQrNota" style="font-size:10px;color:#555;max-width:220px;"></div>
   </div>
   <table class="acta-table" style="border:none;">
-    <thead><tr><th style="border:none;border-bottom:1.5px solid #000;">Serie / ICCID</th></tr></thead>
+    <thead id="pSeriesHead"><tr><th style="border:none;border-bottom:1.5px solid #000;">Serie / ICCID</th></tr></thead>
     <tbody id="pSeriesBody"></tbody>
   </table>
   <div class="acta-seccion-roja">FIRMAS</div>
@@ -203,9 +203,9 @@
     <tr><td>Total de chips a transportar</td><td id="mTotal"></td></tr>
     <tr><td>Series a transportar</td><td id="mSeries"></td></tr>
   </table>
-  <div style="display:flex;gap:12px;align-items:flex-start;margin:6px 0;">
+  <div style="display:flex;gap:12px;align-items:flex-start;margin:6px 0;flex-wrap:wrap;">
     <div id="mQrVendedor" style="flex-shrink:0;"></div>
-    <div style="font-size:9px;color:#555;max-width:220px;">Código de barras del primer chip (inicio) de todo el lote que lleva este vendedor — pásalo por la pistola para verificar el lote completo.</div>
+    <div id="mQrVendedorNota" style="font-size:9px;color:#555;max-width:220px;"></div>
   </div>
   <div class="acta-seccion-roja">DETALLE POR CLIENTE</div>
   <table style="width:100%;border-collapse:collapse;font-size:9px;margin-top:4px;">
@@ -216,7 +216,7 @@
         <th style="text-align:left;border-bottom:1.5px solid #000;padding:3px 4px;">N&deg; acta</th>
         <th style="text-align:left;border-bottom:1.5px solid #000;padding:3px 4px;">Cant.</th>
         <th style="text-align:left;border-bottom:1.5px solid #000;padding:3px 4px;">Serie (inicio &mdash; fin)</th>
-        <th style="text-align:left;border-bottom:1.5px solid #000;padding:3px 4px;">C&oacute;digo de barras (inicio)</th>
+        <th style="text-align:left;border-bottom:1.5px solid #000;padding:3px 4px;">C&oacute;digo(s) de barras</th>
       </tr>
     </thead>
     <tbody id="mClientesBody"></tbody>
@@ -338,14 +338,18 @@
       '</tr>';
     }).join('');
 
-    if(todasLasSeriesVendedor.length){
-      dibujarBarcode('mQrVendedor', inicioVendedor, { height: 30, width: 1.4, fontSize: 10, margin: 2 });
-    } else {
-      document.getElementById('mQrVendedor').innerHTML = '<div style="font-size:9px;color:#900;">(sin series asignadas)</div>';
-    }
+    dibujarBarcodesLote('mQrVendedor', todasLasSeriesVendedor, {
+      barW: 1.4, barH: 30, fontSize: 10, margin: 2, maxIndividuales: 0,
+      notaId: 'mQrVendedorNota',
+      notaUnica: 'Código de barras del único chip de este lote — pásalo por la pistola para verificar.',
+      notaCorrelativa: 'Lote correlativo: códigos de barras de inicio y fin de todo el lote — pásalos por la pistola para verificar el rango completo.',
+      notaFallback: 'Lote no correlativo: se muestran inicio y fin del rango total. El detalle chip por chip está en la tabla de abajo, por cada cliente.'
+    });
     bloques.forEach(function(b){
       if(b.series.length){
-        dibujarBarcode('mBcCliente_' + b.idx, b.inicio, { height: 20, width: 1, fontSize: 8, margin: 0, displayValue: false });
+        dibujarBarcodesLote('mBcCliente_' + b.idx, b.series, {
+          barW: 1, barH: 18, fontSize: 7, margin: 0, displayValue: false, maxIndividuales: 6
+        });
       }
     });
 
@@ -1446,6 +1450,78 @@
     }
   }
 
+  // Determina si un conjunto de series es "correlativa" (secuencia numérica
+  // perfecta y sin huecos, sin importar el orden en que vengan). 0 ó 1
+  // series siempre cuentan como correlativas.
+  function esSerieCorrelativa(series){
+    if(!series || series.length <= 1) return true;
+    const largo = series[0].length;
+    for(let i = 0; i < series.length; i++){
+      if(!/^\d+$/.test(series[i]) || series[i].length !== largo) return false;
+    }
+    const ordenadas = series.slice().sort();
+    try{
+      for(let i = 1; i < ordenadas.length; i++){
+        if(BigInt(ordenadas[i]) - BigInt(ordenadas[i - 1]) !== 1n) return false;
+      }
+    }catch(e){ return false; }
+    return true;
+  }
+
+  // Dibuja el o los códigos de barras de un lote de series dentro de
+  // "contenedorId", decidiendo automáticamente cuántos mostrar:
+  //  - 1 sola serie  -> 1 código de barras.
+  //  - serie correlativa (sin huecos) -> 2 códigos (inicio y fin del rango).
+  //  - serie NO correlativa -> 1 código por cada serie individual, hasta el
+  //    tope "maxIndividuales"; si son más, se muestran solo inicio y fin
+  //    (igual que una correlativa) y se avisa en la nota.
+  // Si se pasa "notaId", se actualiza ese elemento con el texto explicando
+  // qué se está mostrando.
+  function dibujarBarcodesLote(contenedorId, series, opciones){
+    const cfg = Object.assign({
+      barW: 1.3, barH: 30, fontSize: 9, margin: 2, displayValue: true,
+      maxIndividuales: 999, notaId: null,
+      notaUnica: '', notaCorrelativa: '', notaIndividual: '', notaFallback: ''
+    }, opciones || {});
+    const cont = document.getElementById(contenedorId);
+    if(!cont) return;
+    cont.innerHTML = '';
+    cont.style.display = 'flex';
+    cont.style.flexWrap = 'wrap';
+    cont.style.gap = '4px';
+
+    const notaEl = cfg.notaId ? document.getElementById(cfg.notaId) : null;
+
+    if(!series || !series.length){
+      cont.innerHTML = '<div style="font-size:9px;color:#900;">(sin series asignadas)</div>';
+      if(notaEl) notaEl.textContent = '';
+      return;
+    }
+
+    let aMostrar, nota;
+    if(series.length === 1){
+      aMostrar = [series[0]];
+      nota = cfg.notaUnica;
+    } else if(esSerieCorrelativa(series)){
+      aMostrar = [series[0], series[series.length - 1]];
+      nota = cfg.notaCorrelativa;
+    } else if(series.length <= cfg.maxIndividuales){
+      aMostrar = series;
+      nota = cfg.notaIndividual;
+    } else {
+      aMostrar = [series[0], series[series.length - 1]];
+      nota = cfg.notaFallback;
+    }
+
+    aMostrar.forEach(function(s){
+      const div = document.createElement('div');
+      cont.appendChild(div);
+      dibujarBarcode(div, s, { width: cfg.barW, height: cfg.barH, fontSize: cfg.fontSize, margin: cfg.margin, displayValue: cfg.displayValue });
+    });
+
+    if(notaEl) notaEl.textContent = nota;
+  }
+
   async function llenarActa(id){
     const p = TODAS.find(x => x.id === id);
     if(!p) return null;
@@ -1469,17 +1545,31 @@
     document.getElementById('pBiometricos').textContent = biometricos || 'No registra';
     document.getElementById('pPuntoLlegada').textContent = (direccion || '(sin dirección registrada)') + (distrito ? ' - ' + distrito : '');
     document.getElementById('pCant').textContent = series.length;
-    document.getElementById('pSeriesBody').innerHTML = series.map(function(s){
-      return '<tr><td style="border:none;border-bottom:1px solid #ddd;">' + s + '</td></tr>';
-    }).join('');
 
-    const inicio = series[0] || '(sin series)';
-    const fin = series[series.length - 1] || '(sin series)';
-    if(series.length){
-      dibujarBarcode('pQr', inicio, { height: 45, width: 1.5, fontSize: 12, margin: 4 });
+    const correlativaActa = esSerieCorrelativa(series);
+    if(series.length && !correlativaActa){
+      document.getElementById('pSeriesHead').innerHTML = '<tr><th style="border:none;border-bottom:1.5px solid #000;">Serie / ICCID</th><th style="border:none;border-bottom:1.5px solid #000;">Código de barras</th></tr>';
+      document.getElementById('pSeriesBody').innerHTML = series.map(function(s, i){
+        return '<tr><td style="border:none;border-bottom:1px solid #ddd;">' + s + '</td>' +
+          '<td id="pBcSerie_' + i + '" style="border:none;border-bottom:1px solid #ddd;line-height:0;padding:1px 4px;"></td></tr>';
+      }).join('');
+      series.forEach(function(s, i){
+        dibujarBarcode('pBcSerie_' + i, s, { height: 20, width: 1, fontSize: 7, margin: 0, displayValue: false });
+      });
     } else {
-      document.getElementById('pQr').innerHTML = '<div style="font-size:9px;color:#900;">(sin series asignadas)</div>';
+      document.getElementById('pSeriesHead').innerHTML = '<tr><th style="border:none;border-bottom:1.5px solid #000;">Serie / ICCID</th></tr>';
+      document.getElementById('pSeriesBody').innerHTML = series.map(function(s){
+        return '<tr><td style="border:none;border-bottom:1px solid #ddd;">' + s + '</td></tr>';
+      }).join('');
     }
+
+    dibujarBarcodesLote('pQr', series, {
+      barW: 1.5, barH: 45, fontSize: 12, margin: 4, maxIndividuales: 1,
+      notaId: 'pQrNota',
+      notaUnica: 'Código de barras de este chip — pásalo por la pistola para verificar.',
+      notaCorrelativa: 'Serie correlativa: códigos de barras de inicio y fin de este lote — pásalos por la pistola para verificar el rango completo.',
+      notaFallback: 'Serie no correlativa: se muestran inicio y fin. Cada chip tiene además su propio código de barras en la tabla de abajo.'
+    });
 
     return p;
   }
