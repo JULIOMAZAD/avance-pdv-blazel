@@ -196,7 +196,7 @@
 </head>
 <body>
 
-  <div class="marca"><span class="b">JMD-GERENCIA</span><span class="l">•GPS</span></div>
+  <div class="marca" id="marcaTitulo" onclick="tocarTitulo()"><span class="b">JMD-GERENCIA</span><span class="l">•GPS</span></div>
   <div class="subtitulo">Registro de campo</div>
   <div class="reloj" id="reloj">--:--:--</div>
 
@@ -332,6 +332,38 @@
     const el = document.getElementById('estadoSesion');
     el.className = 'estado ' + tipo;
     el.textContent = mensaje;
+  }
+
+  // ---- Acceso oculto de administrador: libera el nombre bloqueado en este
+  // celular. Toca 5 veces seguidas el título "JMD-GERENCIA" y pide un PIN.
+  // Solo funciona con el PIN de Julio, Amparo o Gracie. No es un hueco de
+  // seguridad: para abrir la sesión de cualquier asesor siempre se sigue
+  // pidiendo su PIN correcto, verificado en el servidor.
+  const PINES_ADMIN = ['1980', '3883', '5779']; // Julio, Amparo, Gracie
+  let toquesTitulo = 0;
+  let toquesTituloTimer = null;
+
+  function tocarTitulo(){
+    toquesTitulo++;
+    clearTimeout(toquesTituloTimer);
+    toquesTituloTimer = setTimeout(function(){ toquesTitulo = 0; }, 3000);
+    if(toquesTitulo >= 5){
+      toquesTitulo = 0;
+      clearTimeout(toquesTituloTimer);
+      cambiarNombreDispositivo();
+    }
+  }
+
+  function cambiarNombreDispositivo(){
+    const pin = prompt('Acceso de administrador. Ingresa tu PIN:');
+    if(pin === null) return;
+    if(!PINES_ADMIN.includes(pin.trim())){
+      alert('PIN incorrecto.');
+      return;
+    }
+    localStorage.removeItem('bz_nombreBloqueado');
+    alert('Listo. Este celular ya no tiene ningún nombre guardado — puedes elegir a cualquier asesor.');
+    location.reload();
   }
 
   function mostrarBloqueado(nombre, mensaje){
