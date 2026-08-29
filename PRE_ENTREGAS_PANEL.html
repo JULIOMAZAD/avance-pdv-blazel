@@ -949,6 +949,9 @@
         '<button class="btn-secundario" onclick="compartirActa(\'' + p.id + '\')">📲 Enviar por WhatsApp</button>' +
         '<button class="btn-rojo" onclick="marcarEntregado(\'' + p.id + '\')">✔ Marcar entregado</button>';
     }
+    // Solo administradores (Julio, Amparo, Gracie) conocen el PIN que pide
+    // eliminarPedido(); por eso el botón puede estar siempre visible aquí.
+    acciones += '<button style="background:#fff;color:#900;border:1.5px solid #900;border-radius:8px;padding:8px 14px;font-weight:700;cursor:pointer;" onclick="eliminarPedido(\'' + p.id + '\')">🗑 Eliminar pedido (solo admin)</button>';
 
     return '<div class="item">' +
       '<div class="top">' +
@@ -1428,6 +1431,32 @@
     }
     const p = TODAS.find(x => x.id === id);
     if(p) p.estado = 'ENTREGADO';
+    render();
+  }
+
+  // Borra un pedido de pre-entrega por completo (por ejemplo, cuando alguien
+  // se equivocó al ingresarlo, como poner 50000 chips en vez de 30). Solo
+  // funciona con el PIN de administrador (Julio, Amparo o Gracie); el
+  // servidor vuelve a validar ese PIN antes de borrar nada.
+  async function eliminarPedido(id){
+    const p = TODAS.find(x => x.id === id);
+    if(!p) return;
+    const pin = prompt('Acceso de administrador. Ingresa tu PIN para eliminar este pedido:');
+    if(pin === null) return;
+    if(!confirm('¿Seguro que quieres ELIMINAR por completo el pedido de ' + (p.nombreCliente || '') + ' (' + p.cantidad + ' chip(s))? Esto no se puede deshacer.')) return;
+    try{
+      const resp = await fetch(URL_SCRIPT + '?modo=eliminar_pedido_get&preEntregaId=' + encodeURIComponent(id) + '&adminPin=' + encodeURIComponent(pin.trim()) + '&_=' + Date.now());
+      const resultado = await resp.json();
+      if(!resultado || !resultado.ok){
+        alert('No se pudo eliminar: ' + (resultado && resultado.error ? resultado.error : 'error desconocido'));
+        return;
+      }
+    }catch(e){
+      alert('No se pudo conectar. Revisa tu internet e intenta de nuevo.');
+      return;
+    }
+    const idx = TODAS.findIndex(x => x.id === id);
+    if(idx !== -1) TODAS.splice(idx, 1);
     render();
   }
 
