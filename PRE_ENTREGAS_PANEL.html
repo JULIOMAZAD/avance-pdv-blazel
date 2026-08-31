@@ -1013,12 +1013,18 @@
         : '';
       const panelReparto = repartoAbiertoPara === vend ? renderPanelReparto(vend) : '';
 
+      const vendId = vend.replace(/[^a-zA-Z0-9]/g, '_');
+      const clientesConActa = itemsVendedorTodos.filter(function(x){ return x.estado === 'ASIGNADO' || x.estado === 'ENTREGADO'; });
+      const btnTodosPdf = clientesConActa.length
+        ? '<button class="btn-secundario" style="margin-left:10px;" id="btnTodosPdf_' + vendId + '" onclick="descargarTodasActas(\'' + vend.replace(/'/g, "\\'") + '\')">📦 Descargar todos los PDF (' + clientesConActa.length + ')</button>'
+        : '';
+
       return '<div class="grupo-vendedor">' +
         '<div class="titulo-vendedor">👤 ' + vend +
           ' <span class="badge-total">' + totalClientes + ' cliente(s)</span>' +
           ' <span class="badge-total">' + totalAsignado + ' de ' + totalPedido + ' chip(s) asignados</span>' +
           (pendCount ? ' <span class="badge-pend">' + pendCount + ' pendiente(s)</span>' : '') +
-          btnGre + btnReparto + '</div>' +
+          btnGre + btnReparto + btnTodosPdf + '</div>' +
         panelGre +
         panelReparto +
         items.map(renderItem).join('') +
@@ -1656,6 +1662,41 @@
     const res = await generarPdfActa(id);
     if(!res) return;
     res.pdf.save(res.nombreArchivo);
+  }
+
+  // Descarga la acta de CADA cliente de un vendedor como un PDF por
+  // separado (no las junta en un solo archivo) — así cada acta se puede
+  // repartir/enviar de forma individual. No reemplaza el botón
+  // "Descargar PDF" de cada tarjeta, es un atajo para bajarlas todas de un
+  // tirón. El navegador puede pedir permiso para "descargar varios
+  // archivos" la primera vez — hay que aceptar para que bajen todas.
+  async function descargarTodasActas(vend){
+    const clientes = TODAS.filter(function(x){ return x.vendedor === vend && (x.estado === 'ASIGNADO' || x.estado === 'ENTREGADO'); });
+    if(!clientes.length){
+      alert('Este vendedor todavía no tiene actas listas para descargar (necesitan series asignadas).');
+      return;
+    }
+
+    const vendId = vend.replace(/[^a-zA-Z0-9]/g, '_');
+    const btn = document.getElementById('btnTodosPdf_' + vendId);
+    const textoOriginal = btn ? btn.textContent : '';
+    if(btn){ btn.disabled = true; }
+
+    try{
+      for(let i = 0; i < clientes.length; i++){
+        if(btn) btn.textContent = '⏳ Descargando ' + (i + 1) + ' de ' + clientes.length + '...';
+
+        const res = await generarPdfActa(clientes[i].id);
+        if(!res) continue;
+        res.pdf.save(res.nombreArchivo);
+
+        // Pequeña pausa entre descarga y descarga: evita que el navegador
+        // las junte/bloquee por venir demasiado seguidas.
+        await new Promise(function(r){ setTimeout(r, 400); });
+      }
+    } finally {
+      if(btn){ btn.disabled = false; btn.textContent = textoOriginal; }
+    }
   }
 
   async function compartirActa(id){
