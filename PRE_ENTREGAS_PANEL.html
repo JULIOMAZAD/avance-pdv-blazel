@@ -130,9 +130,15 @@
     <div class="tab activo" id="tabTodo" onclick="cambiarFiltro('TODOS')">Todos</div>
   </div>
 
-  <div style="margin-bottom:14px;">
+  <div style="margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
     <button class="recargar" onclick="cargarTodo()">🔄 Actualizar</button>
-    <span class="nota-scan" id="ultimaActualizacion" style="color:var(--gris);margin-left:10px;"></span>
+    <span class="nota-scan" id="ultimaActualizacion" style="color:var(--gris);margin-left:0;"></span>
+  </div>
+
+  <div style="margin-bottom:14px;position:relative;max-width:360px;">
+    <input type="text" id="filtroVendedor" placeholder="🔎 Buscar por nombre del vendedor…" oninput="filtrarPorVendedor(this.value)"
+      style="width:100%;box-sizing:border-box;padding:10px 34px 10px 12px;border:1.5px solid #ccc;border-radius:10px;font-size:14px;">
+    <span id="btnLimpiarFiltroVendedor" onclick="filtrarPorVendedor('')" style="display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--gris);font-weight:700;">✕</span>
   </div>
 
   <div id="contenedorLista"><div class="estado-carga">Cargando…</div></div>
@@ -235,6 +241,14 @@
 
   let TODAS = [];
   let filtroActual = 'TODOS';
+  let filtroVendedorTexto = '';
+
+  function filtrarPorVendedor(texto){
+    filtroVendedorTexto = (texto || '').trim();
+    const btnLimpiar = document.getElementById('btnLimpiarFiltroVendedor');
+    if(btnLimpiar) btnLimpiar.style.display = filtroVendedorTexto ? 'block' : 'none';
+    render();
+  }
   let filaAbierta = null;
   let seriesEnCurso = [];
   let greAbiertoPara = null;
@@ -645,7 +659,7 @@
       if(pLocal){
         pLocal.estado = 'ASIGNADO';
         const previas = (pLocal.seriesAsignadas || '').split(',').map(function(s){ return s.trim(); }).filter(Boolean);
-        pLocal.seriesAsignadas = previas.concat(x.tomar).join(', ');
+        pLocal.seriesAsignadas = quitarSeriesDuplicadas(previas.concat(x.tomar).join(', '));
         if(resultado.correlativo) pLocal.correlativo = resultado.correlativo;
       }
       hechos++;
@@ -870,12 +884,29 @@
     render();
   }
 
+  // Quita series repetidas (comparando sin espacios y sin importar
+  // mayúsculas/minúsculas) manteniendo el orden de la primera aparición.
+  function quitarSeriesDuplicadas(seriesTexto){
+    if(!seriesTexto) return seriesTexto;
+    const vistos = {};
+    const limpio = [];
+    String(seriesTexto).split(',').map(function(s){ return s.trim(); }).filter(Boolean).forEach(function(s){
+      const up = s.toUpperCase();
+      if(!vistos[up]){ vistos[up] = true; limpio.push(s); }
+    });
+    return limpio.join(', ');
+  }
+
   async function cargarTodo(){
     document.getElementById('contenedorLista').innerHTML = '<div class="estado-carga">Cargando…</div>';
     try{
       const resp = await fetch(URL_SCRIPT + '?modo=preentregas&_=' + Date.now());
       const data = await resp.json();
       TODAS = (data && data.preentregas) || [];
+      // Por seguridad, si algún pedido quedó con series repetidas guardadas
+      // (por un doble guardado antiguo), se limpian aquí antes de mostrarlas
+      // o imprimirlas — nunca se muestra ni se exporta una serie dos veces.
+      TODAS.forEach(function(p){ p.seriesAsignadas = quitarSeriesDuplicadas(p.seriesAsignadas); });
       document.getElementById('ultimaActualizacion').textContent = 'Actualizado ' + new Date().toLocaleTimeString('es-PE');
       render();
     }catch(err){
@@ -975,11 +1006,17 @@
     document.getElementById('kpiAsignados').textContent = asignados;
     document.getElementById('kpiTotal').textContent = TODAS.length;
 
-    const lista = filtroActual === 'TODOS' ? TODAS : TODAS.filter(p => p.estado === filtroActual);
+    let lista = filtroActual === 'TODOS' ? TODAS : TODAS.filter(p => p.estado === filtroActual);
+    if(filtroVendedorTexto){
+      const buscado = filtroVendedorTexto.toUpperCase();
+      lista = lista.filter(function(p){ return (p.vendedor || '').toUpperCase().indexOf(buscado) !== -1; });
+    }
     const cont = document.getElementById('contenedorLista');
 
     if(!lista.length){
-      cont.innerHTML = '<div class="estado-carga">No hay pedidos en esta vista.</div>';
+      cont.innerHTML = '<div class="estado-carga">' +
+        (filtroVendedorTexto ? 'No hay ningún vendedor que coincida con "' + filtroVendedorTexto + '".' : 'No hay pedidos en esta vista.') +
+        '</div>';
       return;
     }
 
@@ -1407,7 +1444,7 @@
     if(p){
       p.estado = 'ASIGNADO';
       const previas = (p.seriesAsignadas || '').split(',').map(function(s){ return s.trim(); }).filter(Boolean);
-      p.seriesAsignadas = previas.concat(seriesEnCurso).join(', ');
+      p.seriesAsignadas = quitarSeriesDuplicadas(previas.concat(seriesEnCurso).join(', '));
       if(resultado.correlativo) p.correlativo = resultado.correlativo;
     }
     if(lectorCamara){
