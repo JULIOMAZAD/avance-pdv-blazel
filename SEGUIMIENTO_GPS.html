@@ -28,6 +28,12 @@
     font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
     color:var(--gris);margin-bottom:14px;
   }
+  .descripcion-control{font-size:12.5px;color:var(--gris);line-height:1.45;margin:-8px 0 14px;}
+  .descripcion-control strong{color:var(--tinta);}
+  button.recargar.secundario{
+    background:#fff;color:var(--tinta);border:1.5px solid var(--borde);
+  }
+  button.recargar.secundario:hover{background:var(--gris-claro);opacity:1;}
   .campo{display:flex;flex-direction:column;gap:5px;margin-bottom:12px;}
   .campo-fila{display:flex;gap:10px;align-items:flex-end;margin-bottom:12px;}
   .campo-fila .campo{margin-bottom:0;flex:1;}
@@ -120,7 +126,8 @@
     </div>
 
     <div class="tarjeta-control" id="tarjetaControlHora">
-      <label>Rango de control (medio día) para esta fecha</label>
+      <label>Horario de la marcación intermedia</label>
+      <p class="descripcion-control">El horario normal es <strong>11:00 am – 2:00 pm</strong> y se aplica solo. Cámbialo aquí únicamente si HOY necesitas un horario distinto para esta marcación.</p>
       <div class="campo-fila">
         <div class="campo">
           <span class="microlabel">Desde</span>
@@ -140,7 +147,8 @@
         </div>
       </div>
       <div class="acciones">
-        <button class="recargar" onclick="guardarHoraControl()">⏱ Guardar rango</button>
+        <button class="recargar" onclick="guardarHoraControl()">⏱ Guardar para esta fecha</button>
+        <button class="recargar secundario" onclick="restablecerHoraNormal()" style="margin-top:8px;">↺ Volver al horario normal (11:00 am – 2:00 pm)</button>
         <div class="nota-estado" id="horaControlEstado"></div>
       </div>
     </div>
@@ -204,8 +212,18 @@
     document.getElementById('tarjetaControlHora').style.display = 'none';
   }
 
-  let horaControlDesdeSeg = null;
-  let horaControlHastaSeg = null;
+  // Horario normal de la marcación intermedia: se usa siempre que no haya
+  // un horario distinto guardado para la fecha elegida.
+  const RANGO_NORMAL_DESDE = '11:00';
+  const RANGO_NORMAL_HASTA = '14:00';
+
+  function segundosDesdeHHMM(hhmm){
+    const [h, m] = hhmm.split(':').map(Number);
+    return h*3600 + m*60;
+  }
+
+  let horaControlDesdeSeg = segundosDesdeHHMM(RANGO_NORMAL_DESDE);
+  let horaControlHastaSeg = segundosDesdeHHMM(RANGO_NORMAL_HASTA);
 
   // Llena los 4 menús de hora/minuto (00-23 y 00/15/30/45).
   function llenarSelectoresHora(){
@@ -218,6 +236,8 @@
     ['horaControlDesdeM','horaControlHastaM'].forEach(id => {
       document.getElementById(id).innerHTML = minutos.map(m => '<option value="'+m+'">'+m+'</option>').join('');
     });
+    ponerHoraSelect('horaControlDesdeH','horaControlDesdeM', RANGO_NORMAL_DESDE);
+    ponerHoraSelect('horaControlHastaH','horaControlHastaM', RANGO_NORMAL_HASTA);
   }
   llenarSelectoresHora();
 
@@ -264,6 +284,12 @@
     } catch (err) {
       estado.textContent = 'No se pudo guardar, intenta de nuevo.';
     }
+  }
+
+  function restablecerHoraNormal(){
+    ponerHoraSelect('horaControlDesdeH','horaControlDesdeM', RANGO_NORMAL_DESDE);
+    ponerHoraSelect('horaControlHastaH','horaControlHastaM', RANGO_NORMAL_HASTA);
+    guardarHoraControl();
   }
 
   async function darDeBaja(){
@@ -424,12 +450,17 @@
           ponerHoraSelect('horaControlDesdeH','horaControlDesdeM', dataInact.horaDesde);
           ponerHoraSelect('horaControlHastaH','horaControlHastaM', dataInact.horaHasta);
         } else {
-          horaControlDesdeSeg = null;
-          horaControlHastaSeg = null;
+          // Sin horario guardado para esta fecha: se usa el horario normal.
+          horaControlDesdeSeg = segundosDesdeHHMM(RANGO_NORMAL_DESDE);
+          horaControlHastaSeg = segundosDesdeHHMM(RANGO_NORMAL_HASTA);
+          ponerHoraSelect('horaControlDesdeH','horaControlDesdeM', RANGO_NORMAL_DESDE);
+          ponerHoraSelect('horaControlHastaH','horaControlHastaM', RANGO_NORMAL_HASTA);
         }
       } catch (errInact) {
         // Si no se puede leer a tiempo (CORS, red, demora, etc.), seguimos
-        // con la lista que ya teníamos en memoria en vez de trabar el panel.
+        // con el horario normal en vez de trabar el panel.
+        horaControlDesdeSeg = segundosDesdeHHMM(RANGO_NORMAL_DESDE);
+        horaControlHastaSeg = segundosDesdeHHMM(RANGO_NORMAL_HASTA);
       }
 
       // ---- Ubicar columna del día en DATOS ----
@@ -588,13 +619,19 @@
         }
       }
       totalVisibles++;
+      const m = marcasPorNombre[nombre] || {};
       const codigo = codigoPorNombre[nombre] || '';
-      const estado = estadoDesdeCodigo(codigo);
+      // Si el celular ya registró su ENTRADA hoy, eso vale más que el
+      // código manual de la hoja DATOS (que a veces se llena más tarde
+      // o se olvida) — se marca Asistió automáticamente. El código manual
+      // solo se usa cuando no hay marca de GPS ese día (para Faltó/Descanso).
+      const estado = (m.entrada !== undefined && m.entrada !== null)
+        ? {clase:'ok', texto:'✔ Asistió'}
+        : estadoDesdeCodigo(codigo);
       if (estado.clase === 'ok') asistio++;
       else if (estado.clase === 'falta') falto++;
       else if (estado.clase === 'descanso') descanso++;
 
-      const m = marcasPorNombre[nombre] || {};
       const mapaEntrada = enlaceMapa(m.latEntrada, m.lngEntrada) || '—';
       const mapaSalida = enlaceMapa(m.latSalida, m.lngSalida) || '—';
       const mapaMediodia = enlaceMapa(m.latMediodia, m.lngMediodia) || '—';
