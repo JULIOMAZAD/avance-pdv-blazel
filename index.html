@@ -110,25 +110,11 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
         <h1>Avance por Punto de Venta</h1>
         <p>Ingresa con las credenciales de tu tienda</p>
       </div>
-      <div class="fg">
+      <div class="fg" style="position:relative">
         <label>Punto de Venta</label>
-        <select id="tiendaSel">
-          <option value="">-- Seleccionar tienda --</option>
-          <option value="Tienda - Mall Bellavista">Tienda - Mall Bellavista</option>
-          <option value="Tienda - Mall del Sur 1">Tienda - Mall del Sur 1</option>
-          <option value="Tienda - Mall del Sur 2">Tienda - Mall del Sur 2</option>
-          <option value="Tienda - Mega Plaza">Tienda - Mega Plaza</option>
-          <option value="Tienda - Plaza Norte">Tienda - Plaza Norte</option>
-          <option value="Tienda - Primavera">Tienda - Primavera</option>
-          <option value="Tienda - Rambla Brasil">Tienda - Rambla Brasil</option>
-          <option value="Tienda - Santa Anita 1">Tienda - Santa Anita</option>
-          <option value="Tienda - Santa Anita 2">Tienda - Santa Anita 2</option>
-          <option value="Call Center">Call Center</option>
-          <option value="GERENCIA">🔑 COORD. TIENDAS</option>
-          <option value="AMPARO">🔑 COORD. CAMPO</option>
-          <option value="GRACIE">🔑 SUPER CAMPO</option>
-          <option value="COMERCIAL">🔑 COMERCIAL</option>
-        </select>
+        <input type="text" id="tiendaInput" placeholder="Escribe el nombre de tu tienda" autocomplete="off" oninput="filtrarTiendas()" onfocus="filtrarTiendas()"/>
+        <input type="hidden" id="tiendaVal" value=""/>
+        <div id="tiendaSuggest" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:20;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 6px 16px rgba(0,0,0,.12);max-height:220px;overflow-y:auto"></div>
       </div>
       <div class="fg">
         <label>Contraseña</label>
@@ -207,19 +193,13 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
   <div class="main-wrap">
     <div class="top-bar">
       <div class="top-left"><h2>COORD. CAMPO — Avance de Campo</h2><div class="pdv">Avance por responsable y asesor</div></div>
-      <div class="top-actions"><button class="btn-vend" onclick="mostrarAvanceCampoAmparo()">📶 MMRECARGA</button><button class="btn-vend" onclick="abrirSanFelipeAmparo()">🏪 San Felipe</button><button class="btn-vend" id="btnRecarDash" style="display:none" onclick="abrirRecargaAmparo()">⚡ Recarga</button><button class="btn-vend" onclick="abrirPersonal('recarScreen')">🗂️ Control Personal</button><button class="btn-vend" id="btnGPSAmparo" style="display:none" onclick="openEmbed('SEGUIMIENTO_GPS.html?u=amparo','📍 Seguimiento GPS','recarScreen')">📍 Seguimiento GPS</button><button class="btn-vend" onclick="openEmbed('PRE_ENTREGAS_PANEL.html?u=amparo','📦 Pre-entregas','recarScreen')">📦 Pre-entregas</button><button class="btn-out" onclick="doLogout()">Cerrar sesión</button></div>
+      <div class="top-actions"><button class="btn-vend" onclick="abrirSanFelipeAmparo()">🏪 San Felipe</button><button class="btn-vend" id="btnRecarDash" style="display:none" onclick="abrirRecargaAmparo()">⚡ Recarga</button><button class="btn-vend" onclick="abrirPersonal('recarScreen')">🗂️ Control Personal</button><button class="btn-vend" id="btnGPSAmparo" style="display:none" onclick="openEmbed('SEGUIMIENTO_GPS.html?u=amparo','📍 Seguimiento GPS','recarScreen')">📍 Seguimiento GPS</button><button class="btn-vend" onclick="openEmbed('PRE_ENTREGAS_PANEL.html?u=amparo','📦 Pre-entregas','recarScreen')">📦 Pre-entregas</button><button class="btn-out" onclick="doLogout()">Cerrar sesión</button></div>
     </div>
-    <div id="recarWelcome" style="background:#fff;border-radius:14px;padding:3rem 1.5rem;text-align:center">
-      <div style="font-size:22px;font-weight:800;color:#cc0000;margin-bottom:10px;letter-spacing:.5px">BIENVENIDA AMPARO</div>
-      <div style="color:#666;font-size:14px">Elige una opción arriba para ver lo que necesitas consultar.</div>
-    </div>
-    <div id="recarContent" style="display:none">
-      <div class="mes-tabs" id="recarMesTabs"></div>
-      <div id="recarInfo" class="info-row"></div>
-      <div id="recarKpis" class="kpis"></div>
-      <div id="recarMsg"></div>
-      <div id="recarTable"></div>
-    </div>
+    <div class="mes-tabs" id="recarMesTabs"></div>
+    <div id="recarInfo" class="info-row"></div>
+    <div id="recarKpis" class="kpis"></div>
+    <div id="recarMsg"></div>
+    <div id="recarTable"></div>
   </div>
 </div>
 
@@ -241,10 +221,6 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
         <button class="btn-vend" onclick="openEmbed('PRE_ENTREGAS_PANEL.html?u=gracie','📦 Pre-entregas','gracieScreen')">📦 Pre-entregas</button>
         <button class="btn-out" onclick="doLogout()">Cerrar sesión</button>
       </div>
-    </div>
-    <div style="background:#fff;border-radius:14px;padding:3rem 1.5rem;text-align:center">
-      <div style="font-size:22px;font-weight:800;color:#cc0000;margin-bottom:10px;letter-spacing:.5px">BIENVENIDA GRACIE</div>
-      <div style="color:#666;font-size:14px">Elige una opción arriba para ver lo que necesitas consultar.</div>
     </div>
   </div>
 </div>
@@ -276,6 +252,45 @@ const PWD={
   "GRACIE":"gracie",
   "COMERCIAL":"jmaza"
 };
+// Opciones de login para el autocompletar: no se listan todas de una,
+// solo aparecen las que coinciden con lo que la persona va escribiendo.
+const LOGIN_OPTIONS=[
+  {key:"Tienda - Mall Bellavista",label:"Tienda - Mall Bellavista"},
+  {key:"Tienda - Mall del Sur 1",label:"Tienda - Mall del Sur 1"},
+  {key:"Tienda - Mall del Sur 2",label:"Tienda - Mall del Sur 2"},
+  {key:"Tienda - Mega Plaza",label:"Tienda - Mega Plaza"},
+  {key:"Tienda - Plaza Norte",label:"Tienda - Plaza Norte"},
+  {key:"Tienda - Primavera",label:"Tienda - Primavera"},
+  {key:"Tienda - Rambla Brasil",label:"Tienda - Rambla Brasil"},
+  {key:"Tienda - Santa Anita 1",label:"Tienda - Santa Anita"},
+  {key:"Tienda - Santa Anita 2",label:"Tienda - Santa Anita 2"},
+  {key:"Call Center",label:"Call Center"},
+  {key:"GERENCIA",label:"🔑 COORD. TIENDAS"},
+  {key:"AMPARO",label:"🔑 COORD. CAMPO"},
+  {key:"GRACIE",label:"🔑 SUPER CAMPO"},
+  {key:"COMERCIAL",label:"🔑 COMERCIAL"}
+];
+function filtrarTiendas(){
+  const q=(document.getElementById("tiendaInput").value||"").trim().toLowerCase();
+  const box=document.getElementById("tiendaSuggest");
+  document.getElementById("tiendaVal").value=""; // cambiar el texto invalida la selección previa
+  if(!q){ box.style.display="none"; box.innerHTML=""; return; }
+  const norm=s=>s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+  const qn=norm(q);
+  const match=LOGIN_OPTIONS.filter(o=>norm(o.label).includes(qn));
+  if(!match.length){ box.style.display="none"; box.innerHTML=""; return; }
+  box.innerHTML=match.map(o=>`<div style="padding:10px 14px;cursor:pointer;border-bottom:1px solid #f0f0f0" onmousedown="elegirTienda('${o.key.replace(/'/g,"\\'")}','${o.label.replace(/'/g,"\\'")}')">${o.label}</div>`).join("");
+  box.style.display="block";
+}
+function elegirTienda(key,label){
+  document.getElementById("tiendaInput").value=label;
+  document.getElementById("tiendaVal").value=key;
+  document.getElementById("tiendaSuggest").style.display="none";
+}
+document.addEventListener("click",e=>{
+  const box=document.getElementById("tiendaSuggest");
+  if(box && !e.target.closest("#tiendaSuggest") && e.target.id!=="tiendaInput") box.style.display="none";
+});
 
 const SHEET_NAME={
   "Tienda - Mall Bellavista":"mall bellavista",
@@ -372,7 +387,7 @@ let curTienda="", curMes="junio", cache={};
 let gerenteMode=false, comercialMode=false, gerMes="junio", gerMode="all", gerSel=new Set();
 
 function doLogin(){
-  const t=document.getElementById("tiendaSel").value;
+  const t=document.getElementById("tiendaVal").value;
   const p=document.getElementById("passIn").value;
   const e=document.getElementById("loginErr");
   if(!t||PWD[t]!==p){e.style.display="block";return;}
@@ -407,8 +422,8 @@ function doLogin(){
     document.getElementById("btnRecarDash").style.display="";
     document.getElementById("btnGPSAmparo").style.display="";
     showScreen("recarScreen");
-    var _rw=document.getElementById("recarWelcome"); if(_rw) _rw.style.display="";
-    var _rc=document.getElementById("recarContent"); if(_rc) _rc.style.display="none";
+    renderRecarMes();
+    loadRecar();
     return;
   }
   if(t==="GRACIE"){
@@ -457,7 +472,8 @@ function doLogout(){
   ["btnMasivo","btnRecarga","btnRecarDash","btnGPS","btnGPSAmparo","btnPreEntregas","btnVolverCampo"].forEach(function(id){ var b=document.getElementById(id); if(b) b.style.display="none"; });
   var _gh=document.querySelector("#gerScreen h2"); if(_gh) _gh.textContent="COORD. TIENDAS — Consolidado";
   document.getElementById("passIn").value="";
-  document.getElementById("tiendaSel").value="";
+  document.getElementById("tiendaInput").value="";
+  document.getElementById("tiendaVal").value="";
   showScreen("loginScreen");
   document.getElementById("tableSection").innerHTML="";
   document.getElementById("infoRow").innerHTML="";
@@ -1141,7 +1157,7 @@ function kpiCard(lbl,val,sub,cls,tag){
 }
 
 function cleanName(n){ return String(n).replace(/Portabiilidad/gi,"Portabilidad").replace(/Portabilidaad/gi,"Portabilidad"); }
-function buildTableHtml(struct,totalRow,recalc,hideSinCuota){
+function buildTableHtml(struct,totalRow,recalc){
   const CATNAMES={prepago:"Prepago",postpago:"Postpago",residencial:"Residencial",otros:"Otros"};
   let html=`<div class="table-card"><div class="table-wrap"><table>
     <thead><tr>
@@ -1150,11 +1166,9 @@ function buildTableHtml(struct,totalRow,recalc,hideSinCuota){
       <th>Falta</th><th>Venta Diaria<br>Para Llegar</th>
       <th>Proyección Final</th><th>Estado</th>
     </tr></thead><tbody>`;
-  const sinCuota=(v)=>{ if(v===""||v===undefined||v===null||v===" ") return true; const s=String(v).trim(); return s===""||s==="-"||s==="--"||s==="—"; };
   for(const cat of ["prepago","postpago","residencial","otros"]){
-    let prods=struct[cat]||[];
-    if(hideSinCuota) prods=prods.filter(p=>!sinCuota(p.meta));
-    if(!prods.length) continue;
+    const prods=struct[cat];
+    if(!prods||!prods.length) continue;
     html+=`<tr class="cat-row"><td colspan="8">${CATNAMES[cat]}</td></tr>`;
     for(const p of prods){
       const t=getTag(p.estado);
@@ -1274,12 +1288,6 @@ function renderAsesores(recs){
 
 let recarMes="junio";
 function renderRecarMes(){ document.getElementById("recarMesTabs").innerHTML=MESES.map(m=>`<button class="mes-tab${m.key===recarMes?' active':''}" onclick="selRecarMes('${m.key}')">${m.label}</button>`).join(""); }
-function mostrarAvanceCampoAmparo(){
-  var w=document.getElementById("recarWelcome"); if(w) w.style.display="none";
-  var c=document.getElementById("recarContent"); if(c) c.style.display="block";
-  renderRecarMes();
-  loadRecar();
-}
 function selRecarMes(m){recarMes=m;renderRecarMes();loadRecar();}
 let RECAR_TGT={info:"recarInfo",kpis:"recarKpis",table:"recarTable",combine:false};
 async function loadRecar(){
@@ -1384,7 +1392,7 @@ function renderStoreView(sel){
   if(!total) return;
   const team = (sel<0) ? teamKpis() : "";
   document.getElementById("storeKpis").innerHTML = gaugesRow(struct,total) + '<div class="kpis">' + storeKpiCards(total) + team + '</div>';
-  document.getElementById("tableSection").innerHTML=buildTableHtml(struct,total,true,curTienda==="Tienda - San Felipe");
+  document.getElementById("tableSection").innerHTML=buildTableHtml(struct,total,true);
   renderComisionTienda();
   const infoRow=document.getElementById("infoRow");
   if(infoRow){
