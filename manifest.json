@@ -1,0 +1,12 @@
+{
+  "name": "Centro de Mando",
+  "short_name": "Centro de Mando",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#1a1a2e",
+  "theme_color": "#1a1a2e",
+  "icons": [
+    { "src": "icon-192.jpg", "sizes": "192x192", "type": "image/jpeg" }
+  ]
+}
