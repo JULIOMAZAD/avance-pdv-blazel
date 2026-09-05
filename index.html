@@ -365,7 +365,7 @@ async function cargarMeses(){
         const j=await r.json();
         if(j && !j.error && Array.isArray(j.data) && j.data.length>3){
           const mesResp=extractMesFromRows(j.data);          // el mes REAL que devolvió la hoja
-          if(mesResp && mesResp===m.toUpperCase()) found.push(m); // solo si coincide con lo pedido
+          const ALT_MES={SETIEMBRE:"SEPTIEMBRE"};const mesEsperado=m.toUpperCase();if(mesResp && (mesResp===mesEsperado || ALT_MES[mesResp]===mesEsperado)) found.push(m); // acepta Setiembre/Septiembre
         }
       }catch(e){}
     }));
