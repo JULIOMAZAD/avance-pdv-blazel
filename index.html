@@ -584,6 +584,7 @@ function parseRows(rows){
     }
   }
   const CATS=["prepago","postpago","residencial","otros"];
+  const esTPC = String(pdvLabel).trim().toUpperCase().indexOf("TPC")===0;
   const struct={prepago:[],postpago:[],residencial:[],otros:[]};
   let curCat="prepago", totalRow=null;
   let nameCol=2, metaCol=3, avCol=4, pctCol=5, faltaCol=6, vdCol=7, pfCol=8, estadoCol=9;
@@ -606,8 +607,7 @@ function parseRows(rows){
       continue;
     }
     if(nl.includes("coordinador")||nl.includes("jefe")||nl.includes("gerente")) continue;
-    if(typeof r[metaCol]!=="number"&&typeof r[avCol]!=="number") continue;
-    struct[curCat].push({name,meta:r[metaCol],av:r[avCol],pct:r[pctCol],falta:r[faltaCol],vd:r[vdCol],pf:r[pfCol],estado:String(r[estadoCol]||"")});
+if(typeof r[metaCol]!=="number" || (esTPC && r[metaCol]===0)) continue;    struct[curCat].push({name,meta:r[metaCol],av:r[avCol],pct:r[pctCol],falta:r[faltaCol],vd:r[vdCol],pf:r[pfCol],estado:String(r[estadoCol]||"")});
   }
   return{struct,avance,mes,dias,pdvLabel,totalRow};
 }
