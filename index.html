@@ -79,6 +79,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
 .tchip.all{border-color:#1a1a2e;color:#1a1a2e}
 .tchip.all.on{background:#1a1a2e;border-color:#1a1a2e;color:#fff}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:1rem}
+  body.hide-kpis .kpis{display:none!important}
 .kpis-compact{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,220px));gap:10px;margin-bottom:1rem}
 .kpi{background:#fff;border-radius:14px;padding:1rem 1.25rem;border-left:4px solid #cc0000}
 .kpi .lbl{font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px}
@@ -135,6 +136,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
       </div>
       <div class="top-actions">
         <button class="btn-vend" id="btnVolverCampo" style="display:none" onclick="showScreen('recarScreen')">⚑ Volver a Campo</button>
+        <button class="btn-vend" id="btnHideKpis" onclick="toggleHideKpis()">🙈 Ocultar cifras</button>button>
         <button class="btn-out" onclick="doLogout()">Cerrar sesión</button>
       </div>
     </div>
@@ -172,6 +174,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
         <button class="btn-vend" onclick="abrirPersonal('gerScreen')">🗂️ Control Personal</button>
         <button class="btn-vend" id="btnGPS" style="display:none" onclick="openEmbed('SEGUIMIENTO_GPS.html?u=jmaza','📍 Seguimiento GPS','gerScreen')">📍 Seguimiento GPS</button>
         <button class="btn-vend" id="btnPreEntregas" style="display:none" onclick="openEmbed('PRE_ENTREGAS_PANEL.html?u=jmaza','📦 Pre-entregas','gerScreen')">📦 Pre-entregas</button>
+        <button class="btn-vend" id="btnHideKpisGer" onclick="toggleHideKpis()">🙈 Ocultar cifras</button>button>
         <button class="btn-out" onclick="doLogout()">Cerrar sesión</button>
       </div>
     </div>
@@ -467,8 +470,14 @@ function abrirPersonal(ret){
   const url = u ? ("CONTROL_DE_PERSONAL.html?auto="+u+"&key="+AUTO_KEY) : "CONTROL_DE_PERSONAL.html";
   openEmbed(url,"🗂️ Control de Personal",ret||"gerScreen");
 }
-function doLogout(){
+function toggleHideKpis(){
+      var on = document.body.classList.toggle("hide-kpis");
+      var lbl = on ? "👁️ Mostrar cifras" : "🙈 Ocultar cifras";
+      ["btnHideKpis","btnHideKpisGer"].forEach(function(id){ var b=document.getElementById(id); if(b) b.textContent=lbl; });
+  }
+  function doLogout(){
   curTienda="";gerenteMode=false;comercialMode=false;curLoginType="";gerMode="all";gerSel.clear();
+  document.body.classList.remove("hide-kpis");["btnHideKpis","btnHideKpisGer"].forEach(function(id){ var b=document.getElementById(id); if(b) b.textContent="🙈 Ocultar cifras"; });
   ["btnMasivo","btnRecarga","btnRecarDash","btnGPS","btnGPSAmparo","btnPreEntregas","btnVolverCampo"].forEach(function(id){ var b=document.getElementById(id); if(b) b.style.display="none"; });
   var _gh=document.querySelector("#gerScreen h2"); if(_gh) _gh.textContent="COORD. TIENDAS — Consolidado";
   document.getElementById("passIn").value="";
