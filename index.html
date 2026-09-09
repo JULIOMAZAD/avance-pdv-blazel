@@ -33,8 +33,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;ba
 .top-actions{display:flex;gap:8px;flex-wrap:wrap}
 .btn-out{padding:8px 16px;background:#fff;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;color:#444}
 .btn-out:hover{border-color:#cc0000;color:#cc0000}
-.btn-vend{padding:8px 16px;background:#1a1a2e;border:1.5px solid #1a1a2e;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;color:#fff}
+.btn-vend{padding:8px 16px;background:#1a1a2e;border:1.5px solid #1a1a2e;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;color:#fff;display:inline-flex;align-items:center}
 .btn-vend:hover{background:#2d3561}
+.bico{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:7px;margin-right:7px;font-size:12px;line-height:1;flex-shrink:0}
+.btn-logout{padding:8px 16px;background:#FCE9E8;border:1.5px solid #D81F26;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;color:#D81F26}
+.btn-logout:hover{background:#D81F26;color:#fff}
 .mes-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1rem}
 .mes-tab{padding:6px 16px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid #e0e0e0;background:#fff;color:#555}
 .mes-tab.active{border-color:#cc0000;background:#cc0000;color:#fff}
@@ -140,9 +143,9 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
         <div class="pdv" id="dispTienda"></div>
       </div>
       <div class="top-actions">
-        <button class="btn-vend" id="btnVolverCampo" style="display:none" onclick="showScreen('recarScreen')">⚑ Volver a Campo</button>
-        <button class="btn-vend" id="btnHideKpis" onclick="toggleHideKpis()">🙈 Ocultar cifras</button>
-        <button class="btn-out" onclick="doLogout()">Cerrar sesión</button>
+        <button class="btn-vend" id="btnVolverCampo" style="display:none" onclick="showScreen('recarScreen')"><span class="bico" style="background:#6B7077">⚑</span>Volver a Campo</button>
+        <button class="btn-vend" id="btnHideKpis" onclick="toggleHideKpis()"><span class="bico" style="background:#6B7077">🙈</span>Ocultar cifras</button>
+        <button class="btn-logout" onclick="doLogout()">⏻ Cerrar sesión</button>
       </div>
     </div>
     <div class="mes-tabs" id="mesTabs"></div>
@@ -173,15 +176,15 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
         <div class="pdv">Toca "Todas" para el global, o marca una o varias tiendas para sumarlas · <strong>v42</strong></div>
       </div>
       <div class="top-actions">
-        <button class="btn-vend" onclick="abrirVendedor()">📊 Ver por vendedor</button>
-        <button class="btn-vend" id="btnMasivo" style="display:none" onclick="abrirMasivo()">📡 Masivo</button>
-        <button class="btn-vend" id="btnRecarga" style="display:none" onclick="abrirRecargaDash()">⚡ Recarga</button>
-        <button class="btn-vend" id="btnMultimarca" style="display:none" onclick="abrirMultimarcaDash()">🔀 Multimarca</button>
-        <button class="btn-vend" onclick="abrirPersonal('gerScreen')">🗂️ Control Personal</button>
-        <button class="btn-vend" id="btnGPS" style="display:none" onclick="openEmbed('SEGUIMIENTO_GPS.html?u=jmaza','📍 Seguimiento GPS','gerScreen')">📍 Seguimiento GPS</button>
-        <button class="btn-vend" id="btnPreEntregas" style="display:none" onclick="openEmbed('PRE_ENTREGAS_PANEL.html?u=jmaza','📦 Pre-entregas','gerScreen')">📦 Pre-entregas</button>
-        <button class="btn-vend" id="btnHideKpisGer" onclick="toggleHideKpis()">🙈 Ocultar cifras</button>
-        <button class="btn-out" onclick="doLogout()">Cerrar sesión</button>
+        <button class="btn-vend" onclick="abrirVendedor()"><span class="bico" style="background:#3B82F6">📊</span>Ver por vendedor</button>
+        <button class="btn-vend" id="btnMasivo" style="display:none" onclick="abrirMasivo()"><span class="bico" style="background:#8E44AD">📡</span>Masivo</button>
+        <button class="btn-vend" id="btnRecarga" style="display:none" onclick="abrirRecargaDash()"><span class="bico" style="background:#E6A817">⚡</span>Recarga</button>
+        <button class="btn-vend" id="btnMultimarca" style="display:none" onclick="abrirMultimarcaDash()"><span class="bico" style="background:#13A05F">🏷️</span>Multimarca</button>
+        <button class="btn-vend" onclick="abrirPersonal('gerScreen')"><span class="bico" style="background:#3B4252">🗂️</span>Control Personal</button>
+        <button class="btn-vend" id="btnGPS" style="display:none" onclick="openEmbed('SEGUIMIENTO_GPS.html?u=jmaza','📍 Seguimiento GPS','gerScreen')"><span class="bico" style="background:#0E7C7B">📍</span>Seguimiento GPS</button>
+        <button class="btn-vend" id="btnPreEntregas" style="display:none" onclick="openEmbed('PRE_ENTREGAS_PANEL.html?u=jmaza','📦 Pre-entregas','gerScreen')"><span class="bico" style="background:#C77D17">📦</span>Pre-entregas</button>
+        <button class="btn-vend" id="btnHideKpisGer" onclick="toggleHideKpis()"><span class="bico" style="background:#6B7077">🙈</span>Ocultar cifras</button>
+        <button class="btn-logout" onclick="doLogout()">⏻ Cerrar sesión</button>
       </div>
     </div>
     <div class="mes-tabs" id="gerMesTabs"></div>
@@ -202,7 +205,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
   <div class="main-wrap">
     <div class="top-bar">
       <div class="top-left"><h2>COORD. CAMPO — Avance de Campo</h2><div class="pdv">Avance por responsable y asesor</div></div>
-      <div class="top-actions"><button class="btn-vend" onclick="abrirSanFelipeAmparo()">🏪 San Felipe</button><button class="btn-vend" id="btnRecarDash" style="display:none" onclick="abrirRecargaAmparo()">⚡ Recarga</button><button class="btn-vend" onclick="abrirPersonal('recarScreen')">🗂️ Control Personal</button><button class="btn-vend" id="btnGPSAmparo" style="display:none" onclick="openEmbed('SEGUIMIENTO_GPS.html?u=amparo','📍 Seguimiento GPS','recarScreen')">📍 Seguimiento GPS</button><button class="btn-vend" onclick="openEmbed('PRE_ENTREGAS_PANEL.html?u=amparo','📦 Pre-entregas','recarScreen')">📦 Pre-entregas</button><button class="btn-out" onclick="doLogout()">Cerrar sesión</button></div>
+      <div class="top-actions"><button class="btn-vend" onclick="abrirSanFelipeAmparo()"><span class="bico" style="background:#1F8A55">🏪</span>San Felipe</button><button class="btn-vend" id="btnRecarDash" style="display:none" onclick="abrirRecargaAmparo()"><span class="bico" style="background:#E6A817">⚡</span>Recarga</button><button class="btn-vend" onclick="abrirPersonal('recarScreen')"><span class="bico" style="background:#3B4252">🗂️</span>Control Personal</button><button class="btn-vend" id="btnGPSAmparo" style="display:none" onclick="openEmbed('SEGUIMIENTO_GPS.html?u=amparo','📍 Seguimiento GPS','recarScreen')"><span class="bico" style="background:#0E7C7B">📍</span>Seguimiento GPS</button><button class="btn-vend" onclick="openEmbed('PRE_ENTREGAS_PANEL.html?u=amparo','📦 Pre-entregas','recarScreen')"><span class="bico" style="background:#C77D17">📦</span>Pre-entregas</button><button class="btn-logout" onclick="doLogout()">⏻ Cerrar sesión</button></div>
     </div>
     <div class="mes-tabs" id="recarMesTabs"></div>
     <div id="recarInfo" class="info-row"></div>
@@ -225,10 +228,10 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
     <div class="top-bar">
       <div class="top-left"><h2>SUPER CAMPO</h2><div class="pdv">Recarga y seguimiento de asistencia</div></div>
       <div class="top-actions">
-        <button class="btn-vend" onclick="openEmbed('DASHBOARD_MULTIMARCA_BLAZEL.html?embed=1&u=gracie','🔀 Multimarca','gracieScreen')">🔀 Multimarca</button>
-        <button class="btn-vend" onclick="openEmbed('SEGUIMIENTO_GPS.html?u=gracie','📍 Seguimiento GPS','gracieScreen')">📍 Seguimiento GPS</button>
-        <button class="btn-vend" onclick="openEmbed('PRE_ENTREGAS_PANEL.html?u=gracie','📦 Pre-entregas','gracieScreen')">📦 Pre-entregas</button>
-        <button class="btn-out" onclick="doLogout()">Cerrar sesión</button>
+        <button class="btn-vend" onclick="openEmbed('DASHBOARD_MULTIMARCA_BLAZEL.html?embed=1&u=gracie','🔀 Multimarca','gracieScreen')"><span class="bico" style="background:#13A05F">🏷️</span>Multimarca</button>
+        <button class="btn-vend" onclick="openEmbed('SEGUIMIENTO_GPS.html?u=gracie','📍 Seguimiento GPS','gracieScreen')"><span class="bico" style="background:#0E7C7B">📍</span>Seguimiento GPS</button>
+        <button class="btn-vend" onclick="openEmbed('PRE_ENTREGAS_PANEL.html?u=gracie','📦 Pre-entregas','gracieScreen')"><span class="bico" style="background:#C77D17">📦</span>Pre-entregas</button>
+        <button class="btn-logout" onclick="doLogout()">⏻ Cerrar sesión</button>
       </div>
     </div>
   </div>
@@ -480,12 +483,13 @@ function abrirPersonal(ret){
 }
 function toggleHideKpis(){
       var on = document.body.classList.toggle("hide-kpis");
-      var lbl = on ? "👁️ Mostrar cifras" : "🙈 Ocultar cifras";
-      ["btnHideKpis","btnHideKpisGer"].forEach(function(id){ var b=document.getElementById(id); if(b) b.textContent=lbl; });
+      var ico = on ? "👁️" : "🙈";
+      var txt = on ? "Mostrar cifras" : "Ocultar cifras";
+      ["btnHideKpis","btnHideKpisGer"].forEach(function(id){ var b=document.getElementById(id); if(b) b.innerHTML='<span class="bico" style="background:#6B7077">'+ico+'</span>'+txt; });
   }
   function doLogout(){
   curTienda="";gerenteMode=false;comercialMode=false;curLoginType="";gerMode="all";gerSel.clear();
-  document.body.classList.remove("hide-kpis");["btnHideKpis","btnHideKpisGer"].forEach(function(id){ var b=document.getElementById(id); if(b) b.textContent="🙈 Ocultar cifras"; });
+  document.body.classList.remove("hide-kpis");["btnHideKpis","btnHideKpisGer"].forEach(function(id){ var b=document.getElementById(id); if(b) b.innerHTML='<span class="bico" style="background:#6B7077">🙈</span>Ocultar cifras'; });
   ["btnMasivo","btnRecarga","btnMultimarca","btnRecarDash","btnGPS","btnGPSAmparo","btnPreEntregas","btnVolverCampo"].forEach(function(id){ var b=document.getElementById(id); if(b) b.style.display="none"; });
   var _gh=document.querySelector("#gerScreen h2"); if(_gh) _gh.textContent="COORD. TIENDAS — Consolidado";
   document.getElementById("passIn").value="";
