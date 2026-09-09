@@ -108,6 +108,11 @@ tr.tot td{font-weight:700;background:#FAFAFB;border-top:2px solid var(--line)}
 #dropZone .box{border:2px dashed #4A5568;border-radius:16px;padding:60px 80px;text-align:center}
 #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--negro);color:#fff;padding:12px 22px;border-radius:10px;font-size:13px;display:none;z-index:101;box-shadow:0 8px 24px rgba(0,0,0,.3)}
 .note{font-size:12px;color:var(--ink2);margin:8px 2px}
+.vcbody{display:none;overflow:hidden}
+.vcbody.on{display:block}
+.vHead{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;cursor:pointer}
+.vHead:hover .vChev{color:var(--rojo)}
+.vChev{color:var(--ink2);font-size:18px;transition:.15s}
 #loginOverlay{position:fixed;inset:0;background:#0E0F13;z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px}
 #loginOverlay .lcard{width:100%;max-width:380px;background:#1A1C22;border:1px solid #2E323C;border-radius:16px;padding:30px 28px}
 #loginOverlay .lbrand{display:flex;align-items:center;gap:10px;justify-content:center;margin-bottom:22px}
@@ -150,6 +155,7 @@ tr.tot td{font-weight:700;background:#FAFAFB;border-top:2px solid var(--line)}
   <button data-t="historico">Histórico</button>
   <button data-t="comparativo">Comparativo</button>
   <button data-t="diaadia">Día a día</button>
+  <button data-t="vendedor">Por Vendedor</button>
 </nav>
 
 <main>
@@ -157,6 +163,7 @@ tr.tot td{font-weight:700;background:#FAFAFB;border-top:2px solid var(--line)}
   <section class="tab" id="tab-historico"></section>
   <section class="tab" id="tab-comparativo"></section>
   <section class="tab" id="tab-diaadia"></section>
+  <section class="tab" id="tab-vendedor"></section>
 </main>
 
 <div id="dropZone"><div class="box"><div class="big">Suelta aquí tu Excel</div><div>CONTROL_MULTIMARCA_BLAZEL.xlsx — el tablero se recalcula al instante</div></div></div>
@@ -216,6 +223,8 @@ const fS2 = n => n==null ? '—' : 'S/ ' + n.toLocaleString('es-PE',{minimumFrac
 const fN = n => n==null ? '—' : n.toLocaleString('es-PE',{maximumFractionDigits:0});
 const fP = n => n==null ? '—' : (n*100).toLocaleString('es-PE',{maximumFractionDigits:1}) + '%';
 const fK = n => n==null ? '' : n>=1000 ? (n/1000).toLocaleString('es-PE',{maximumFractionDigits:1})+'k' : fN(n);
+const MES_ABREV = {ENERO:'ENE',FEBRERO:'FEB',MARZO:'MAR',ABRIL:'ABR',MAYO:'MAY',JUNIO:'JUN',JULIO:'JUL',AGOSTO:'AGO',SEPTIEMBRE:'SET',SETIEMBRE:'SET',OCTUBRE:'OCT',NOVIEMBRE:'NOV',DICIEMBRE:'DIC'};
+const abrevMes = nombre => { if(!nombre) return ''; const m = String(nombre).trim().toUpperCase().match(/^([A-ZÑ]+)/); return m ? (MES_ABREV[m[1]]||m[1].slice(0,3)) : ''; };
 const ICO = {
   rayo:'<svg viewBox="0 0 24 24"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z"/></svg>'
 };
@@ -619,20 +628,28 @@ function rDiaADia(){
   const t = dd.puntos.reduce((s,p)=>({
     pre_ant:s.pre_ant+p.pre_ant, pre_act:s.pre_act+p.pre_act,
     post_ant:s.post_ant+p.post_ant, post_act:s.post_act+p.post_act,
-    tot_ant:s.tot_ant+p.tot_ant, tot_act:s.tot_act+p.tot_act
-  }), {pre_ant:0,pre_act:0,post_ant:0,post_act:0,tot_ant:0,tot_act:0});
-  const kpi = (lbl,ant,act,chipCls)=>{
+    tot_ant:s.tot_ant+p.tot_ant, tot_act:s.tot_act+p.tot_act,
+    cap_pre_ant: s.cap_pre_ant + (p.pre_ant>0?1:0), cap_pre_act: s.cap_pre_act + (p.pre_act>0?1:0),
+    cap_post_ant: s.cap_post_ant + (p.post_ant>0?1:0), cap_post_act: s.cap_post_act + (p.post_act>0?1:0)
+  }), {pre_ant:0,pre_act:0,post_ant:0,post_act:0,tot_ant:0,tot_act:0,cap_pre_ant:0,cap_pre_act:0,cap_post_ant:0,cap_post_act:0});
+  const abAnt = abrevMes(dd.mesAnterior), abAct = abrevMes(dd.mesActual);
+  const kpi = (lbl,ant,act,chipCls,ico)=>{
     const dif = act-ant; const p = ant? dif/ant : null;
-    return `<div class="card kpi"><div class="chip ${chipCls}">${ICO.rayo}</div><div>
+    return `<div class="card kpi"><div class="chip ${chipCls}">${ico||ICO.rayo}</div><div>
       <div class="lbl">${lbl}</div>
       <div class="val num">${fN(act)} <small>vs ${fN(ant)}</small></div>
       <div class="vs ${dif===0?'eq':dif>0?'up':'dn'}" style="${dif===0?'':dif>0?'background:var(--verde-bg);color:var(--verde)':'background:var(--rojo-bg);color:var(--rojo)'}">${dif>0?'+':''}${fN(dif)}${p!=null?' ('+fP(p)+')':''}</div>
     </div></div>`;
   };
-  const kpis = kpi('Prepago', t.pre_ant, t.pre_act, 'ch-rojo') + kpi('Postpago', t.post_ant, t.post_act, 'ch-negro') + kpi('Total', t.tot_ant, t.tot_act, 'ch-verde');
+  const kpis = kpi('Prepago', t.pre_ant, t.pre_act, 'ch-rojo')
+    + kpi('Postpago', t.post_ant, t.post_act, 'ch-negro')
+    + kpi('Total', t.tot_ant, t.tot_act, 'ch-verde')
+    + kpi('Capilaridad Prepago', t.cap_pre_ant, t.cap_pre_act, 'ch-rojo')
+    + kpi('Capilaridad Postpago', t.cap_post_ant, t.cap_post_act, 'ch-negro');
   el.innerHTML = `
   <h2>Comparativo día a día <span class="tag">${dd.mesActual||''}${dd.diaCorte?' (al día '+dd.diaCorte+')':''}${dd.mesAnterior?' vs '+dd.mesAnterior+' (mismo día)':''}</span></h2>
   <div class="grid kpis" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">${kpis}</div>
+  <p class="note">Capilaridad = cantidad de puntos con venta mayor a 0 en el periodo (no el volumen, sino cuántos puntos distintos vendieron).</p>
   <div class="card" style="margin:14px 0">
     <label style="font-weight:600;display:block;margin-bottom:6px">Buscar por DNI, nombre, distrito o vendedor</label>
     <input id="ddBuscar" type="text" placeholder="Escribe para filtrar…" autocomplete="off"
@@ -655,9 +672,84 @@ function rDiaADia(){
     const top = lista.slice(0,200);
     res.innerHTML = `<div class="twrap"><table class="cmpTable">
       <thead><tr><th rowspan="2" style="text-align:left">Punto</th><th class="grpHead g-pre" colspan="3">Prepago</th><th class="grpHead g-post" colspan="3">Postpago</th><th class="grpHead g-tot" colspan="3">Total</th></tr>
-      <tr><th class="b-start">Ant.</th><th>Act.</th><th>Dif</th><th class="b-start">Ant.</th><th>Act.</th><th>Dif</th><th class="b-start">Ant.</th><th>Act.</th><th>Dif</th></tr></thead>
+      <tr><th class="b-start">${abAnt||'Ant.'}</th><th>${abAct||'Act.'}</th><th>Dif</th><th class="b-start">${abAnt||'Ant.'}</th><th>${abAct||'Act.'}</th><th>Dif</th><th class="b-start">${abAnt||'Ant.'}</th><th>${abAct||'Act.'}</th><th>Dif</th></tr></thead>
       <tbody>${top.map(filaP).join('')}</tbody></table></div>
       ${lista.length>200?`<p class="note">Mostrando 200 de ${fN(lista.length)}. Afina la búsqueda.</p>`:'<p class="note">Se muestran los puntos con movimiento (o todos si buscas algo). Ordenado por total actual.</p>'}`;
+  };
+  inp.oninput = e=> pintar(e.target.value);
+  pintar('');
+}
+
+/* ================= ACTIVACIÓN POR VENDEDOR ================= */
+function rPorVendedor(){
+  const el = document.getElementById('tab-vendedor');
+  const dd = DATA.diaadia;
+  if(!dd || !dd.puntos || !dd.puntos.length){
+    el.innerHTML = `<h2>Activación por vendedor</h2><div class="card">No se encontró la hoja <b>COMPARATIVO_DIA_A_DIA</b> en el archivo cargado.</div>`;
+    return;
+  }
+  const abAnt = abrevMes(dd.mesAnterior), abAct = abrevMes(dd.mesActual);
+  const byVend = new Map();
+  dd.puntos.forEach(p=>{
+    const v = (p.vendedor||'').trim() || '(Sin vendedor asignado)';
+    if(!byVend.has(v)) byVend.set(v, {vendedor:v, pre_ant:0,pre_act:0,post_ant:0,post_act:0,tot_ant:0,tot_act:0, puntos:[]});
+    const b = byVend.get(v);
+    b.pre_ant+=p.pre_ant; b.pre_act+=p.pre_act; b.post_ant+=p.post_ant; b.post_act+=p.post_act; b.tot_ant+=p.tot_ant; b.tot_act+=p.tot_act;
+    b.puntos.push(p);
+  });
+  const vends = [...byVend.values()];
+  vends.forEach(v=>{ v.dif = v.tot_act - v.tot_ant; v.falta = Math.max(0, v.tot_ant - v.tot_act); });
+
+  el.innerHTML = `
+  <h2>Activación por vendedor <span class="tag">${dd.mesActual||''}${dd.diaCorte?' (al día '+dd.diaCorte+')':''}${dd.mesAnterior?' vs '+dd.mesAnterior+' (mismo día)':''}</span></h2>
+  <div class="card" style="margin-bottom:14px">
+    <label style="font-weight:600;display:block;margin-bottom:6px">Buscar vendedor</label>
+    <input id="vBuscar" type="text" placeholder="Escribe para filtrar…" autocomplete="off"
+      style="width:100%;max-width:440px;padding:11px 14px;border:1px solid #2c2e38;border-radius:10px;background:#1b1c22;color:#e8e8ea;font-size:15px;outline:none">
+  </div>
+  <div id="vRes"></div>`;
+
+  const inp = document.getElementById('vBuscar'), res = document.getElementById('vRes');
+  const arrow = v => v>0?`<span class="pill pv">+${fN(v)}</span>`: v<0?`<span class="pill pr">${fN(v)}</span>`:`<span class="pill pn">=</span>`;
+  const filaCliente = p => `<tr><td>${p.nombre||'—'}<div style="color:var(--ink2);font-size:11px">DNI ${p.dni} · ${p.distrito||''}</div></td>
+    <td class="num">${fN(p.pre_ant)}</td><td class="num">${fN(p.pre_act)}</td><td class="num">${arrow(p.pre_dif)}</td>
+    <td class="num">${fN(p.post_ant)}</td><td class="num">${fN(p.post_act)}</td><td class="num">${arrow(p.post_dif)}</td>
+    <td class="num"><b>${fN(p.tot_ant)}</b></td><td class="num"><b>${fN(p.tot_act)}</b></td><td class="num">${arrow(p.tot_dif)}</td></tr>`;
+
+  const bloqueVendedor = (v,i) => {
+    const idc = 'vc'+i;
+    const estado = v.falta>0
+      ? `<span class="pill pr">Le faltan ${fN(v.falta)} para igualar ${dd.mesAnterior||'el mes anterior'}</span>`
+      : `<span class="pill pv">✓ Igualó o superó ${dd.mesAnterior||'el mes anterior'}</span>`;
+    return `<div class="card" style="margin-bottom:12px">
+      <div class="vHead" onclick="document.getElementById('${idc}').classList.toggle('on');document.getElementById('${idc}chev').textContent=document.getElementById('${idc}').classList.contains('on')?'▴':'▾'">
+        <div>
+          <div style="font-family:'Barlow Condensed';font-weight:700;font-size:19px">${v.vendedor}</div>
+          <div style="color:var(--ink2);font-size:12px">${v.puntos.length} cliente${v.puntos.length===1?'':'s'} a su nombre</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+          <div class="num" style="text-align:right"><div style="font-size:11px;color:var(--ink2);text-transform:uppercase;letter-spacing:.5px">${abAnt} → ${abAct}</div>
+            <div style="font-weight:700;font-size:16px">${fN(v.tot_ant)} → ${fN(v.tot_act)}</div></div>
+          ${estado}
+          <span class="vChev" id="${idc}chev">▾</span>
+        </div>
+      </div>
+      <div id="${idc}" class="vcbody">
+        <div class="twrap" style="margin-top:12px"><table class="cmpTable">
+          <thead><tr><th rowspan="2" style="text-align:left">Cliente</th><th class="grpHead g-pre" colspan="3">Prepago</th><th class="grpHead g-post" colspan="3">Postpago</th><th class="grpHead g-tot" colspan="3">Total</th></tr>
+          <tr><th class="b-start">${abAnt}</th><th>${abAct}</th><th>Dif</th><th class="b-start">${abAnt}</th><th>${abAct}</th><th>Dif</th><th class="b-start">${abAnt}</th><th>${abAct}</th><th>Dif</th></tr></thead>
+          <tbody>${v.puntos.slice().sort((a,b)=>b.tot_act-a.tot_act).map(filaCliente).join('')}</tbody></table></div>
+      </div>
+    </div>`;
+  };
+
+  const pintar = q=>{
+    q=(q||'').trim().toUpperCase();
+    let lista = vends;
+    if(q){ lista = lista.filter(v=> v.vendedor.toUpperCase().includes(q)); }
+    lista = lista.slice().sort((a,b)=> b.falta-a.falta || b.tot_act-a.tot_act);
+    if(!lista.length){ res.innerHTML = `<div class="card">Sin resultados.</div>`; return; }
+    res.innerHTML = lista.map(bloqueVendedor).join('') + `<p class="note">Ordenado por lo que le falta a cada vendedor para igualar ${dd.mesAnterior||'el mes anterior'}. Toca un vendedor para ver sus clientes.</p>`;
   };
   inp.oninput = e=> pintar(e.target.value);
   pintar('');
@@ -673,7 +765,7 @@ function setGlobals(){
 }
 function renderAll(){
   setGlobals();
-  rMultimarca(); rHistorico(); rComparativo(); rDiaADia();
+  rMultimarca(); rHistorico(); rComparativo(); rDiaADia(); rPorVendedor();
   requestAnimationFrame(()=>Object.values(charts).forEach(c=>{try{c.resize();c.draw();}catch(e){}}));
 }
 
