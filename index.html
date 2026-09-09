@@ -204,7 +204,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
 <div id="recarScreen" class="screen">
   <div class="main-wrap">
     <div class="top-bar">
-      <div class="top-left"><h2>COORD. CAMPO — Avance de Campo</h2><div class="pdv">Avance por responsable y asesor</div></div>
+      <div class="top-left"><h2>COORD. CAMPO — Avance de Campo</h2><div class="pdv">BIENVENIDA AMPARO · Avance por responsable y asesor</div></div>
       <div class="top-actions"><button class="btn-vend" onclick="abrirSanFelipeAmparo()"><span class="bico" style="background:#1F8A55">🏪</span>San Felipe</button><button class="btn-vend" id="btnRecarDash" style="display:none" onclick="abrirRecargaAmparo()"><span class="bico" style="background:#E6A817">⚡</span>Recarga</button><button class="btn-vend" onclick="abrirPersonal('recarScreen')"><span class="bico" style="background:#3B4252">🗂️</span>Control Personal</button><button class="btn-vend" id="btnGPSAmparo" style="display:none" onclick="openEmbed('SEGUIMIENTO_GPS.html?u=amparo','📍 Seguimiento GPS','recarScreen')"><span class="bico" style="background:#0E7C7B">📍</span>Seguimiento GPS</button><button class="btn-vend" onclick="openEmbed('PRE_ENTREGAS_PANEL.html?u=amparo','📦 Pre-entregas','recarScreen')"><span class="bico" style="background:#C77D17">📦</span>Pre-entregas</button><button class="btn-logout" onclick="doLogout()">⏻ Cerrar sesión</button></div>
     </div>
     <div class="mes-tabs" id="recarMesTabs"></div>
@@ -226,7 +226,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
 <div id="gracieScreen" class="screen">
   <div class="main-wrap">
     <div class="top-bar">
-      <div class="top-left"><h2>SUPER CAMPO</h2><div class="pdv">Recarga y seguimiento de asistencia</div></div>
+      <div class="top-left"><h2>SUPER CAMPO</h2><div class="pdv">BIENVENIDA GRACIE · Recarga y seguimiento de asistencia</div></div>
       <div class="top-actions">
         <button class="btn-vend" onclick="openEmbed('DASHBOARD_MULTIMARCA_BLAZEL.html?embed=1&u=gracie','🔀 Multimarca','gracieScreen')"><span class="bico" style="background:#13A05F">🏷️</span>Multimarca</button>
         <button class="btn-vend" onclick="openEmbed('SEGUIMIENTO_GPS.html?u=gracie','📍 Seguimiento GPS','gracieScreen')"><span class="bico" style="background:#0E7C7B">📍</span>Seguimiento GPS</button>
@@ -436,7 +436,7 @@ function doLogin(){
     document.getElementById("btnGPSAmparo").style.display="";
     showScreen("recarScreen");
     renderRecarMes();
-    loadRecar();
+    document.getElementById("recarMsg").innerHTML='<div class="load-err" style="border-left-color:#3B82F6;background:#EEF4FE;color:#1B1B1F">Elige un mes arriba para ver el avance.</div>';
     return;
   }
   if(t==="GRACIE"){
