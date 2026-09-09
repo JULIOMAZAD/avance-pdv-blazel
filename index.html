@@ -176,6 +176,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
         <button class="btn-vend" onclick="abrirVendedor()">📊 Ver por vendedor</button>
         <button class="btn-vend" id="btnMasivo" style="display:none" onclick="abrirMasivo()">📡 Masivo</button>
         <button class="btn-vend" id="btnRecarga" style="display:none" onclick="abrirRecargaDash()">⚡ Recarga</button>
+        <button class="btn-vend" id="btnMultimarca" style="display:none" onclick="abrirMultimarcaDash()">🔀 Multimarca</button>
         <button class="btn-vend" onclick="abrirPersonal('gerScreen')">🗂️ Control Personal</button>
         <button class="btn-vend" id="btnGPS" style="display:none" onclick="openEmbed('SEGUIMIENTO_GPS.html?u=jmaza','📍 Seguimiento GPS','gerScreen')">📍 Seguimiento GPS</button>
         <button class="btn-vend" id="btnPreEntregas" style="display:none" onclick="openEmbed('PRE_ENTREGAS_PANEL.html?u=jmaza','📦 Pre-entregas','gerScreen')">📦 Pre-entregas</button>
@@ -224,7 +225,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
     <div class="top-bar">
       <div class="top-left"><h2>SUPER CAMPO</h2><div class="pdv">Recarga y seguimiento de asistencia</div></div>
       <div class="top-actions">
-        <button class="btn-vend" onclick="openEmbed('DASHBOARD_RECARGAS_BLAZEL.html?embed=1&u=gracie','⚡ Recarga','gracieScreen')">⚡ Recarga</button>
+        <button class="btn-vend" onclick="openEmbed('DASHBOARD_MULTIMARCA_BLAZEL.html?embed=1&u=gracie','🔀 Multimarca','gracieScreen')">🔀 Multimarca</button>
         <button class="btn-vend" onclick="openEmbed('SEGUIMIENTO_GPS.html?u=gracie','📍 Seguimiento GPS','gracieScreen')">📍 Seguimiento GPS</button>
         <button class="btn-vend" onclick="openEmbed('PRE_ENTREGAS_PANEL.html?u=gracie','📦 Pre-entregas','gracieScreen')">📦 Pre-entregas</button>
         <button class="btn-out" onclick="doLogout()">Cerrar sesión</button>
@@ -406,6 +407,7 @@ function doLogin(){
     gerenteMode=true; comercialMode=true;
     document.getElementById("btnMasivo").style.display="";
     document.getElementById("btnRecarga").style.display="";
+    document.getElementById("btnMultimarca").style.display="";
     document.getElementById("btnGPS").style.display="";
     document.getElementById("btnPreEntregas").style.display="";
     var _gh=document.querySelector("#gerScreen h2"); if(_gh) _gh.textContent="COMERCIAL — Consolidado";
@@ -459,6 +461,7 @@ function openEmbed(url,title,ret){
 function salirEmbed(){ showScreen(embedReturn); }
 function abrirMasivo(){ openEmbed("DASHBOARD_BLAZEL_LIVE.html?embed=1","📡 Masivo · Centro de Mando","gerScreen"); }
 function abrirRecargaDash(){ openEmbed("DASHBOARD_RECARGAS_BLAZEL.html?embed=1&u=jmaza","⚡ Recarga","gerScreen"); }
+function abrirMultimarcaDash(){ openEmbed("DASHBOARD_MULTIMARCA_BLAZEL.html?embed=1&u=jmaza","🔀 Multimarca","gerScreen"); }
 function abrirRecargaAmparo(){ openEmbed("DASHBOARD_RECARGAS_BLAZEL.html?embed=1&u=amparo","⚡ Recarga","recarScreen"); }
 function abrirSanFelipeAmparo(){
   gerenteMode=false;
@@ -483,7 +486,7 @@ function toggleHideKpis(){
   function doLogout(){
   curTienda="";gerenteMode=false;comercialMode=false;curLoginType="";gerMode="all";gerSel.clear();
   document.body.classList.remove("hide-kpis");["btnHideKpis","btnHideKpisGer"].forEach(function(id){ var b=document.getElementById(id); if(b) b.textContent="🙈 Ocultar cifras"; });
-  ["btnMasivo","btnRecarga","btnRecarDash","btnGPS","btnGPSAmparo","btnPreEntregas","btnVolverCampo"].forEach(function(id){ var b=document.getElementById(id); if(b) b.style.display="none"; });
+  ["btnMasivo","btnRecarga","btnMultimarca","btnRecarDash","btnGPS","btnGPSAmparo","btnPreEntregas","btnVolverCampo"].forEach(function(id){ var b=document.getElementById(id); if(b) b.style.display="none"; });
   var _gh=document.querySelector("#gerScreen h2"); if(_gh) _gh.textContent="COORD. TIENDAS — Consolidado";
   document.getElementById("passIn").value="";
   document.getElementById("tiendaInput").value="";

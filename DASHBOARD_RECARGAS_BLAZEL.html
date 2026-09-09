@@ -216,9 +216,6 @@ tr.cur td{background:#FDF1F1}
   <button data-t="canales">Canales</button>
   <button data-t="evolutivo">Evolutivo</button>
   <button data-t="asesores">Asesores</button>
-  <button data-t="multimarca">Multimarca</button>
-  <button data-t="historico">Histórico</button>
-  <button data-t="comparativo">Comparativo</button>
 </nav>
 
 <main>
@@ -230,9 +227,6 @@ tr.cur td{background:#FDF1F1}
   <section class="tab" id="tab-canales"></section>
   <section class="tab" id="tab-evolutivo"></section>
   <section class="tab" id="tab-asesores"></section>
-  <section class="tab" id="tab-multimarca"></section>
-  <section class="tab" id="tab-historico"></section>
-  <section class="tab" id="tab-comparativo"></section>
 </main>
 
 <div id="dropZone"><div class="box"><div class="big">Suelta aquí tu Excel</div><div>COMPARATIVO_DIARIO_RECARGA…xlsx — el tablero se recalcula al instante</div></div></div>
@@ -374,7 +368,6 @@ function tabs(){
     document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
     bt.classList.add('on');
     document.getElementById('tab-'+bt.dataset.t).classList.add('on');
-    if(bt.dataset.t==='historico'){ try{ rHistorico(); }catch(e){} }
     requestAnimationFrame(()=>Object.values(charts).forEach(c=>{try{c.resize();c.draw();}catch(e){}}));
   });
 }
@@ -853,197 +846,6 @@ function rEvolutivo(){
   mkChart('chHist',{type:'line',data:{labels:MESN.slice(1).map(m=>m.slice(0,3).toUpperCase()),datasets:anios2.map((a,i)=>({label:String(a),data:Array.from({length:12},(_,mi)=>{const c=DATA.cuotas.find(x=>x.y===a&&x.m===mi+1);return c?c.cierre:null;}),borderColor:colores[i%colores.length],borderWidth:a===anios2[anios2.length-1]?3:1.5,tension:.3,pointRadius:2}))},options:{maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},spanGaps:true,scales:{y:{ticks:{callback:v=>'S/'+(v/1000)+'k'}}}}});
 }
 
-/* ================= MULTIMARCA ================= */
-function rMultimarca(ym){
-  const el = document.getElementById('tab-multimarca');
-  let mm = null;
-  if(DATA.multimarcaBloques && DATA.multimarcaBloques.length){
-    const mNum = ym ? +ym.split('-')[1] : null;
-    mm = DATA.multimarcaBloques.find(b=>b.m===mNum) || DATA.multimarcaBloques[DATA.multimarcaBloques.length-1];
-  } else {
-    mm = DATA.multimarca;
-  }
-  if(!mm || (!mm.indicadores.length && !mm.distritos.length)){
-    el.innerHTML = `<h2>Multimarca</h2><div class="card">No se encontró la hoja MULTIMARCA en el archivo cargado. Agrégala al Excel y vuelve a actualizar.</div>`;
-    return;
-  }
-  const tit = mm.titulo || 'Canal Multimarca';
-  // OJO: en la hoja, la columna ACTIVACION del bloque resumen viene igual a la CUOTA (es la meta);
-  // el avance REAL son las columnas AVA por distrito (que se llenan a mano). Sumamos esas para el avance.
-  const sumaAva = {
-    'Activacion Prepago': mm.distritos.reduce((s,d)=>s+(d.ava_pre||0),0),
-    'Capilaridad Prepago': mm.distritos.reduce((s,d)=>s+(d.ava_cap_pre||0),0),
-    'Activacion Postpago': mm.distritos.reduce((s,d)=>s+(d.ava_chip_post||0),0),
-    'Capilaridad Postpago': mm.distritos.reduce((s,d)=>s+(d.ava_cap_post||0),0)
-  };
-  const avanceDe = nombre => {
-    // empareja "Activacion Prepago" / "Capilaridad Postpago" etc.
-    const k = Object.keys(sumaAva).find(x=>x.toUpperCase()===nombre.toUpperCase());
-    return k ? sumaAva[k] : 0;
-  };
-  const hayAvance = mm.distritos.some(d=>d.ava_pre!=null||d.ava_cap_pre!=null||d.ava_chip_post!=null||d.ava_cap_post!=null);
-  // KPIs de indicadores: cuota (meta) vs avance real (AVA)
-  const chips = ['ch-rojo','ch-negro','ch-rojo','ch-negro'];
-  const kpis = mm.indicadores.map((x,i)=>{
-    const meta = x.cuota;
-    const av = avanceDe(x.n);
-    const p = meta ? av/meta : null;
-    return `<div class="card kpi"><div class="chip ${chips[i%4]}">${ICO.rayo}</div><div>
-      <div class="lbl">${x.n}</div>
-      <div class="val num">${fN(av)} <small>/ ${fN(meta)}</small></div>
-      <div class="vs ${p==null?'eq':p>=1?'up':'dn'}" style="${p==null?'':p>=1?'background:var(--verde-bg);color:var(--verde)':'background:var(--rojo-bg);color:var(--rojo)'}">${p==null?'—':fP(p)} de la meta</div>
-    </div></div>`;
-  }).join('');
-  // Tabla por distrito: prepago y postpago (chips + capilaridad), con avance si existe
-  const cell = (cuota,ava,cls) => {
-    const p = (ava && cuota) ? ava/cuota : null;
-    const pct = p!=null ? Math.min(p,1)*100 : 0;
-    const color = p==null ? 'var(--grisC)' : p>=1 ? 'var(--verde)' : p>=0.85 ? 'var(--ambar)' : 'var(--rojo)';
-    const numHTML = ava
-      ? `<span class="mNum num">${fN(ava)}</span><span class="mSub">de ${fN(cuota)} · ${fP(p)}</span>`
-      : `<span class="mNum num" style="color:var(--ink2)">${fN(cuota)}</span><span class="mSub">meta</span>`;
-    return `<td class="${cls||''}"><div class="mCell">${numHTML}<div class="mTrack"><div class="mFill" style="width:${pct}%;background:${color}"></div></div></div></td>`;
-  };
-  const filaDist = d => `<tr><td>${d.d}</td><td>${d.resp||''}</td>
-      ${cell(d.chips_pre,d.ava_pre,'b-start')}${cell(d.cap_pre,d.ava_cap_pre)}
-      ${cell(d.chips_post,d.ava_chip_post,'b-start')}${cell(d.cap_post,d.ava_cap_post)}</tr>`;
-  const t = mm.total;
-  const totFila = t ? `<tr class="tot"><td>TOTAL</td><td></td>
-    ${cell(t.chips_pre,t.ava_pre,'b-start')}${cell(t.cap_pre,t.ava_cap_pre)}
-    ${cell(t.chips_post,t.ava_chip_post,'b-start')}${cell(t.cap_post,t.ava_cap_post)}</tr>` : '';
-  const diaAvHtml = (USUARIO_REC==='jmaza')
-    ? `<input id="inpDiaAvMM" type="number" min="1" max="31" placeholder="día" value="${window._diaAvanceMM||''}"
-         style="width:64px;padding:6px 8px;border:1px solid #3A3A42;border-radius:6px;background:#1b1c22;color:#e8e8ea">
-       <button id="btnDiaAvMM" style="background:#D81F26;color:#fff;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;margin-left:6px">Guardar</button>
-       <span id="diaAvMsg" style="margin-left:8px;font-size:12px;color:var(--ink2)"></span>`
-    : `<span style="color:var(--ink2)">${window._diaAvanceMM?('Día '+window._diaAvanceMM):'—'}</span>`;
-  el.innerHTML = `
-  <h2>${tit} <span class="tag">meta vs avance del canal multimarca</span></h2>
-  <div class="card" style="margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-    <b>Día de avance:</b> ${diaAvHtml}
-  </div>
-  ${!hayAvance?'<div class="card" style="border-left:4px solid var(--ambar);margin-bottom:14px"><b>Avance aún en 0.</b> Las columnas AVA (avance) de la hoja MULTIMARCA están vacías. Llénalas conforme avancen las activaciones y el % se calculará solo. Por ahora las cifras grandes son la <b>meta</b>.</div>':''}
-  <div class="grid kpis">${kpis}</div>
-  <div class="chartbox"><div class="ch"><canvas id="chMM"></canvas></div></div>
-  <h2 style="margin-top:22px">Por distrito <span class="tag">chips y capilaridad · prepago y postpago</span></h2>
-  <div class="twrap"><table class="distTable">
-    <thead>
-      <tr><th rowspan="2">Distrito</th><th rowspan="2">Responsable</th>
-        <th colspan="2" class="grpHead g-pre">Prepago</th>
-        <th colspan="2" class="grpHead g-post">Postpago</th></tr>
-      <tr><th class="b-start">Chips</th><th>Capilaridad</th><th class="b-start">Chips</th><th>Capilaridad</th></tr>
-    </thead>
-    <tbody>${mm.distritos.map(filaDist).join('')}${totFila}</tbody>
-  </table></div>
-  <p class="note">${hayAvance?'Cada celda muestra avance / meta y su %.':'Las columnas muestran la <b>meta</b>. Cuando llenes las columnas AVA (avance) en la hoja MULTIMARCA, aparecerá el avance y el % automáticamente.'}</p>`;
-  if(USUARIO_REC==='jmaza'){
-    const btnDA = document.getElementById('btnDiaAvMM');
-    if(btnDA) btnDA.onclick = async ()=>{
-      const v = document.getElementById('inpDiaAvMM').value;
-      const msg = document.getElementById('diaAvMsg');
-      if(!v || v<1 || v>31){ if(msg) msg.textContent='Pon un día válido (1-31)'; return; }
-      if(msg) msg.textContent='Guardando…';
-      try{
-        await fetch(API_URL_V2, { method:'POST', body: JSON.stringify({accion:'diaAvanceMM', valor:v}) });
-        window._diaAvanceMM = v;
-        if(msg) msg.textContent='✓ Guardado';
-        try{ toast('Día de avance guardado'); }catch(e){}
-      }catch(e){ if(msg) msg.textContent='No se pudo guardar'; }
-    };
-  }
-  // gráfico: meta (gris) vs avance real (rojo) de los 4 indicadores
-  mkChart('chMM',{type:'bar',data:{labels:mm.indicadores.map(x=>x.n),datasets:[
-    {label:'Meta',data:mm.indicadores.map(x=>x.cuota),backgroundColor:'#D9DCE1',borderRadius:5,labelColor:'#6B7077'},
-    {label:'Avance',data:mm.indicadores.map(x=>avanceDe(x.n)),backgroundColor:'#D81F26',borderRadius:5,labelColor:'#1B1B1F'}
-  ]},options:{maintainAspectRatio:false,animation:false,layout:{padding:{top:18}},
-    plugins:{legend:{position:'bottom'},barLabels:{on:true,fmt:'n'}},scales:{y:{grace:'10%'}}}});
-}
-
-/* ================= HISTÓRICO MULTIMARCA ================= */
-let histMetSel = 'venta_pre';
-function rHistorico(){
-  const el = document.getElementById('tab-historico');
-  const H = DATA.multimarcaHistorico;
-  if(!H || !H.length){
-    el.innerHTML = `<h2>Histórico <span class="tag">multimarca mes a mes</span></h2>
-      <div class="card">Todavía no hay datos históricos conectados. En cuanto el driver publique la hoja <b>MULTIMARCA MES VS MES</b>, aquí aparecerá la evolución mes a mes por distrito.</div>`;
-    return;
-  }
-  const METS = [
-    {k:'todas',      n:'Todas juntas'},
-    {k:'venta_pre',  n:'Venta Prepago'},
-    {k:'cap_pre',    n:'Capilaridad Pre'},
-    {k:'venta_post', n:'Venta Postpago'},
-    {k:'cap_post',   n:'Capilaridad Post'}
-  ];
-  if(!METS.some(m=>m.k===histMetSel)) histMetSel = 'venta_pre';
-  const distritos = [...new Set(H.flatMap(b=>b.distritos.map(d=>d.d)))];
-  const selHTML = `<div class="segRow" id="selHistMet">${METS.map(m=>`<button class="segBtn ${m.k===histMetSel?'on':''}" data-k="${m.k}">${m.n}</button>`).join('')}</div>`;
-  const wireSel = () => document.querySelectorAll('#selHistMet .segBtn').forEach(b=>b.onclick=()=>{ histMetSel=b.dataset.k; rHistorico(); });
-  const palette = ['#E63946','#2A9D8F','#F4A300','#3B82F6','#8E44AD','#F72585','#06B6D4','#84CC16','#F97316','#264653'];
-  const mesColors = ['#3B4252','#B5302E','#1F8A55','#8E44AD','#2D6CDF','#C77D17','#0E7C7B','#A6303E'];
-  const mesTints  = ['#EEF1F6','#FBEAE9','#E7F6ED','#F3EAF8','#E9F0FD','#FCF3E3','#E4F5F4','#F7EBEC'];
-
-  if(histMetSel === 'todas'){
-    const METS4 = METS.slice(1);
-    const filasTodas = distritos.map(d=>{
-      const cols = H.map((b,mi)=>{
-        const dd = b.distritos.find(x=>x.d===d);
-        return METS4.map(m=>`<td class="num" style="background:${mesTints[mi%mesTints.length]}">${dd?fN(dd[m.k]||0):'—'}</td>`).join('');
-      }).join('');
-      return `<tr><td>${d}</td>${cols}</tr>`;
-    }).join('');
-    const totCols = H.map((b,mi)=>{
-      const t = b.total || {};
-      return METS4.map(m=>`<td class="num" style="background:${mesTints[mi%mesTints.length]}">${fN(t[m.k]||0)}</td>`).join('');
-    }).join('');
-    el.innerHTML = `
-    <h2>Histórico <span class="tag">multimarca mes a mes · fuente: MULTIMARCA MES VS MES</span></h2>
-    ${selHTML}
-    <div class="grid4">${METS4.map(m=>`<div class="chartbox"><div style="font-weight:700;font-size:13px;margin-bottom:8px">${m.n}</div><div class="ch" style="height:220px"><canvas id="chHist_${m.k}"></canvas></div></div>`).join('')}</div>
-    <h2 style="margin-top:22px">Por distrito</h2>
-    <div class="twrap"><table class="distTable">
-      <thead>
-        <tr><th rowspan="2">Distrito</th>${H.map((b,mi)=>`<th colspan="4" style="background:${mesColors[mi%mesColors.length]};color:#fff">${b.mes}</th>`).join('')}</tr>
-        <tr>${H.map((b,mi)=>METS4.map((m,i)=>`<th class="${i===0?'b-start':''}" style="background:${mesTints[mi%mesTints.length]};color:#3A3D42">${m.n.replace('Venta ','V.').replace('Capilaridad ','Cap.')}</th>`).join('')).join('')}</tr>
-      </thead>
-      <tbody>${filasTodas}
-        <tr class="tot"><td>TOTAL</td>${totCols}</tr>
-      </tbody>
-    </table></div>`;
-    wireSel();
-    METS4.forEach(m=>{
-      mkChart('chHist_'+m.k,{type:'bar',data:{labels:H.map(b=>b.mes),datasets:distritos.map((d,i)=>({
-        label:d, backgroundColor:palette[i%palette.length],
-        data:H.map(b=>{ const dd=b.distritos.find(x=>x.d===d); return dd?(dd[m.k]||0):0; })
-      }))},options:{maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{stacked:false},y:{stacked:false}}}});
-    });
-    return;
-  }
-
-  const totales = H.map(b=>b.total ? (b.total[histMetSel]||0) : b.distritos.reduce((s,d)=>s+(d[histMetSel]||0),0));
-  const filas = distritos.map((d,i)=>{
-    const vals = H.map(b=>{ const dd=b.distritos.find(x=>x.d===d); return dd?(dd[histMetSel]||0):null; });
-    return `<tr><td>${d}</td>${vals.map((v,mi)=>`<td class="num" style="background:${mesTints[mi%mesTints.length]}">${v==null?'—':fN(v)}</td>`).join('')}</tr>`;
-  }).join('');
-  el.innerHTML = `
-  <h2>Histórico <span class="tag">multimarca mes a mes · fuente: MULTIMARCA MES VS MES</span></h2>
-  ${selHTML}
-  <div class="chartbox"><div class="ch"><canvas id="chHistMM"></canvas></div></div>
-  <h2 style="margin-top:22px">Por distrito</h2>
-  <div class="twrap"><table>
-    <thead><tr><th>Distrito</th>${H.map((b,mi)=>`<th style="background:${mesColors[mi%mesColors.length]};color:#fff">${b.mes}</th>`).join('')}</tr></thead>
-    <tbody>${filas}
-      <tr class="tot"><td>TOTAL</td>${totales.map((v,mi)=>`<td class="num" style="background:${mesTints[mi%mesTints.length]}">${fN(v)}</td>`).join('')}</tr>
-    </tbody>
-  </table></div>`;
-  wireSel();
-  mkChart('chHistMM',{type:'bar',data:{labels:H.map(b=>b.mes),datasets:distritos.map((d,i)=>({
-    label:d, backgroundColor:palette[i%palette.length],
-    data:H.map(b=>{ const dd=b.distritos.find(x=>x.d===d); return dd?(dd[histMetSel]||0):0; })
-  }))},options:{maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},scales:{x:{stacked:false},y:{stacked:false}}}});
-}
-
 /* ================= ASESORES ================= */
 function rAsesores(ym){
   const el = document.getElementById('tab-asesores');
@@ -1386,244 +1188,13 @@ function renderFbar(){
   wireMsel('fbDist','d', dists.length, set=>{ distsGlob=set; }, distLabel);
 }
 
-/* ================= COMPARATIVO POR CLIENTE ================= */
-function rComparativo(){
-  const el=document.getElementById('tab-comparativo');
-  const cp = DATA.comparativo;
-  if(!cp || !cp.length){
-    el.innerHTML = `<h2>Comparativo por cliente</h2><div class="card">No se encontró la hoja <b>COMPARATIVO MULTIMARCA</b> en el archivo cargado. Agrégala al Excel y vuelve a actualizar.</div>`;
-    return;
-  }
-  // ---- Detecta automaticamente los meses disponibles en cada registro ----
-  // Soporta 2 formatos: (a) cp[i].meses = [{mes:'JUNIO',pre,post}, ...] (formato nuevo, ilimitado)
-  //                      (b) campos sueltos tipo abr_pre/abr_post/may_pre/.../jul_pre/jul_post (formato viejo, fijo)
-  const ORDEN_MESES = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
-  let mesesDetectados = [];
-  if(cp[0] && Array.isArray(cp[0].meses)){
-    const set = new Map();
-    cp.forEach(c=> (c.meses||[]).forEach(m=> set.set(m.mes, true)));
-    mesesDetectados = [...set.keys()].sort((a,b)=> ORDEN_MESES.indexOf(a.slice(0,3).toUpperCase())-ORDEN_MESES.indexOf(b.slice(0,3).toUpperCase()));
-  } else {
-    const claves = Object.keys(cp[0]||{});
-    const pref = new Set();
-    claves.forEach(k=>{ const m=k.match(/^([a-zA-Z]+)_pre$/); if(m && claves.includes(m[1]+'_post')) pref.add(m[1]); });
-    mesesDetectados = [...pref].sort((a,b)=> ORDEN_MESES.indexOf(a.slice(0,3).toUpperCase())-ORDEN_MESES.indexOf(b.slice(0,3).toUpperCase()));
-  }
-  const ult3 = mesesDetectados.slice(-3);
-  const getPre = (c,mes)=> Array.isArray(c.meses) ? (c.meses.find(m=>m.mes===mes)||{}).pre||0 : (c[mes+'_pre']||0);
-  const getPost = (c,mes)=> Array.isArray(c.meses) ? (c.meses.find(m=>m.mes===mes)||{}).post||0 : (c[mes+'_post']||0);
-  const lbl3 = ult3.length ? ult3.map(m=>m.slice(0,3).charAt(0).toUpperCase()+m.slice(1,3).toLowerCase()).join(' → ') : '';
-  el.innerHTML = `
-  <h2>Comparativo por cliente <span class="tag">Últimos ${ult3.length} meses cargados${lbl3?' · '+lbl3:''}</span></h2>
-  <div class="card" style="margin-bottom:14px">
-    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:14px;flex-wrap:wrap">
-      <div>
-        <label style="font-weight:600;display:block;margin-bottom:6px">Buscar por DNI o nombre</label>
-        <input id="cpBuscar" type="text" placeholder="Escribe un DNI o un nombre…" autocomplete="off"
-          style="width:100%;max-width:440px;padding:11px 14px;border:1px solid #2c2e38;border-radius:10px;background:#1b1c22;color:#e8e8ea;font-size:15px;outline:none">
-        <div style="color:var(--ink2);font-size:12px;margin-top:6px">${fN(cp.length)} clientes en la base.</div>
-      </div>
-      <button id="cpExportar" style="background:#1F8A55;color:#fff;border:none;border-radius:8px;padding:11px 18px;font-weight:700;cursor:pointer;white-space:nowrap">⬇ Exportar Excel</button>
-    </div>
-  </div>
-  <div id="cpRes"></div>`;
-  const inp=document.getElementById('cpBuscar'), res=document.getElementById('cpRes');
-
-  document.getElementById('cpExportar').onclick = async ()=>{
-    const btn = document.getElementById('cpExportar');
-    const txtOrig = btn.textContent; btn.textContent = 'Generando…'; btn.disabled = true;
-    try{
-      const PALETA_MES = ['FFD9EAD3','FFFCE5CD','FFCFE2F3','FFEAD1DC','FFD9D2E9','FFFFF2CC']; // se repite si hay mas de 6 meses
-      const COLOR_PROY = 'FFCFF3EA';
-      const mesActual = ult3.length ? ult3[ult3.length-1] : null;
-
-      const wb = new ExcelJS.Workbook();
-      const ws = wb.addWorksheet('Comparativo Multimarca');
-
-      // ---- Construye columnas: fijas + 3 por mes + 3 de proyeccion ----
-      const cols = [
-        {header:'DNI', key:'dni', width:12},
-        {header:'NOMBRE', key:'nombre', width:28},
-        {header:'DISTRITO', key:'distrito', width:16},
-        {header:'VENDEDOR', key:'vendedor', width:14},
-      ];
-      mesesDetectados.forEach(m=>{
-        cols.push({header:`${cabMes(m)} Pre`, key:m+'_pre', width:10});
-        cols.push({header:`${cabMes(m)} Post`, key:m+'_post', width:10});
-        cols.push({header:`${cabMes(m)} Cap`, key:m+'_cap', width:9});
-      });
-      // Prepago y Postpago son productos distintos: cada uno con su propia proyeccion
-      // Diaria / Semanal / Mensual. Nunca se suman entre si.
-      const hayProy = diaAv>0 && mesActual;
-      if(hayProy){
-        const lblMes = cabMes(mesActual);
-        ['Prepago','Postpago'].forEach(prod=>{
-          cols.push({header:`${prod} Diaria (${lblMes})`, key:prod.toLowerCase()+'_dia', width:16});
-          cols.push({header:`${prod} Semanal (${lblMes})`, key:prod.toLowerCase()+'_sem', width:17});
-          cols.push({header:`${prod} Mensual (${lblMes})`, key:prod.toLowerCase()+'_mes', width:17});
-        });
-      }
-      ws.columns = cols;
-
-      // ---- Filas de datos ----
-      cp.forEach(c=>{
-        const fila = { dni:c.dni, nombre:c.nombre||'', distrito:c.distrito||'', vendedor:c.vendedor||'' };
-        mesesDetectados.forEach(m=>{
-          const pre=getPre(c,m), post=getPost(c,m);
-          fila[m+'_pre']=pre; fila[m+'_post']=post; fila[m+'_cap']=(pre+post)>0?1:0;
-        });
-        if(hayProy){
-          const preAct=getPre(c,mesActual), postAct=getPost(c,mesActual);
-          fila['prepago_dia']=Math.round(preAct/diaAv); fila['prepago_sem']=Math.round(preAct/diaAv*7); fila['prepago_mes']=proy(preAct);
-          fila['postpago_dia']=Math.round(postAct/diaAv); fila['postpago_sem']=Math.round(postAct/diaAv*7); fila['postpago_mes']=proy(postAct);
-        }
-        ws.addRow(fila);
-      });
-
-      // ---- Encabezado: negro con letra blanca ----
-      const headerRow = ws.getRow(1);
-      headerRow.eachCell(cell=>{
-        cell.font = { bold:true, color:{argb:'FFFFFFFF'} };
-        cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FF1B1B1F'} };
-        cell.alignment = { horizontal:'center', vertical:'middle', wrapText:true };
-      });
-      headerRow.height = 24;
-
-      // ---- Color de fondo por mes (3 columnas cada uno) y por proyeccion ----
-      const colorPorColumna = {};
-      mesesDetectados.forEach((m,i)=>{
-        const color = PALETA_MES[i % PALETA_MES.length];
-        [m+'_pre', m+'_post', m+'_cap'].forEach(k=> colorPorColumna[k]=color);
-      });
-      if(hayProy){ ['prepago_dia','prepago_sem','prepago_mes','postpago_dia','postpago_sem','postpago_mes'].forEach(k=> colorPorColumna[k]=COLOR_PROY); }
-
-      ws.columns.forEach(col=>{
-        const color = colorPorColumna[col.key];
-        if(!color) return;
-        for(let r=2; r<=ws.rowCount; r++){
-          const cell = ws.getCell(r, col.number);
-          cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:color} };
-        }
-      });
-
-      // ---- Numeros en rojo si son negativos (Δ implicitos y, sobre todo, proyeccion) ----
-      if(hayProy){
-        ['prepago_dia','prepago_sem','prepago_mes','postpago_dia','postpago_sem','postpago_mes'].forEach(key=>{
-          const colNum = ws.getColumn(key).number;
-          for(let r=2; r<=ws.rowCount; r++){
-            const cell = ws.getCell(r, colNum);
-            if(typeof cell.value === 'number' && cell.value < 0){
-              cell.font = { color:{argb:'FFCC0000'}, bold:true };
-            }
-          }
-        });
-      }
-
-      // ---- Bordes finos y centrado en toda la tabla ----
-      for(let r=1; r<=ws.rowCount; r++){
-        for(let cIdx=1; cIdx<=cols.length; cIdx++){
-          const cell = ws.getCell(r,cIdx);
-          cell.border = { top:{style:'thin',color:{argb:'FFDDDDDD'}}, bottom:{style:'thin',color:{argb:'FFDDDDDD'}}, left:{style:'thin',color:{argb:'FFDDDDDD'}}, right:{style:'thin',color:{argb:'FFDDDDDD'}} };
-          if(r>1 && cIdx>4) cell.alignment = { horizontal:'center' };
-        }
-      }
-      ws.views = [{ state:'frozen', xSplit:4, ySplit:1 }];
-
-      const buf = await wb.xlsx.writeBuffer();
-      const blob = new Blob([buf], {type:'application/octet-stream'});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      const hoy = new Date().toISOString().slice(0,10);
-      a.href = url; a.download = `Comparativo_Multimarca_Blazel_${hoy}.xlsx`;
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }catch(e){ console.error('export comparativo', e); alert('No se pudo generar el Excel. Revisa la consola (F12).'); }
-    finally{ btn.textContent = txtOrig; btn.disabled = false; }
-  };
-  const arrow=v=> v>0?`<span class="pill pv">+${fN(v)}</span>`: v<0?`<span class="pill pr">-${fN(-v)}</span>`:`<span class="pill pn">=</span>`;
-  const cabMes = m=> m.slice(0,3).charAt(0).toUpperCase()+m.slice(1,3).toLowerCase();
-  // ---- Proyeccion de cierre del mes en curso (ultimo de los 3), en base al dia de avance ----
-  const ORDEN3 = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
-  const diaAv = Number(window._diaAvanceMM) || 0;
-  let diasDelMesActual = 0;
-  if(diaAv > 0 && ult3.length){
-    const idxMes = ORDEN3.indexOf(ult3[ult3.length-1]);
-    const anio = anioGlob || new Date().getFullYear();
-    if(idxMes >= 0) diasDelMesActual = new Date(anio, idxMes+1, 0).getDate();
-  }
-  const proy = v => (diaAv>0 && diasDelMesActual>0) ? Math.round(v/diaAv*diasDelMesActual) : null;
-  const fila = c=>{
-    const pres = ult3.map(m=>getPre(c,m)), posts = ult3.map(m=>getPost(c,m));
-    const tots = ult3.map((m,i)=>pres[i]+posts[i]);
-    const dPre = pres.length>1 ? arrow(pres[pres.length-1]-pres[pres.length-2]) : '';
-    const dPost = posts.length>1 ? arrow(posts[posts.length-1]-posts[posts.length-2]) : '';
-    const dTot = tots.length>1 ? arrow(tots[tots.length-1]-tots[tots.length-2]) : '';
-    return `<tr>
-      <td><b>${c.nombre||'—'}</b><div style="color:var(--ink2);font-size:11px">DNI ${c.dni} · ${c.distrito||''}${c.vendedor?' · '+c.vendedor:''}</div></td>
-      ${pres.map((v,i)=>`<td class="num b-tint-pre${i===0?' b-start':''}">${fN(v)}</td>`).join('')}<td class="num b-tint-pre">${dPre}</td>
-      ${posts.map((v,i)=>`<td class="num b-tint-post${i===0?' b-start':''}">${fN(v)}</td>`).join('')}<td class="num b-tint-post">${dPost}</td>
-      ${tots.map((v,i)=>`<td class="num b-tint-tot${i===0?' b-start':''}"><b>${fN(v)}</b></td>`).join('')}<td class="num b-tint-tot">${dTot}</td></tr>`;
-  };
-  const cajaProy = c=>{
-    // Prepago y Postpago son productos distintos: cada uno proyecta por su cuenta, nunca se suman.
-    const pres = ult3.map(m=>getPre(c,m)), posts = ult3.map(m=>getPost(c,m));
-    const valPre = pres[pres.length-1], valPost = posts[posts.length-1];
-    const diaria  = v => (diaAv>0) ? Math.round(v/diaAv) : null;
-    const semanal = v => (diaAv>0) ? Math.round(v/diaAv*7) : null;
-    const mensual = v => proy(v);
-    const bloque = (lbl, val, color) => {
-      const d = diaria(val), s = semanal(val), m = mensual(val);
-      const mini = (t,v)=> `<div style="flex:1;min-width:90px;text-align:center">
-          <div style="font-size:10px;font-weight:700;letter-spacing:.04em;color:var(--ink2)">${t}</div>
-          <div style="font-size:22px;font-weight:800;margin-top:2px;color:${color}">${v==null?'—':fN(v)}</div>
-        </div>`;
-      return `<div style="flex:1;min-width:260px;background:${color}12;border:1px solid ${color}40;border-radius:12px;padding:12px 14px">
-          <div style="font-size:12px;font-weight:800;letter-spacing:.04em;color:${color};margin-bottom:8px">${lbl}</div>
-          <div style="display:flex;gap:6px">
-            ${mini('DIARIA', d)}${mini('SEMANAL', s)}${mini('MENSUAL', m)}
-          </div>
-        </div>`;
-    };
-    const avisoDiaHtml = diaAv>0
-      ? `<span style="display:inline-block;background:#FFF3CD;color:#8A6100;font-weight:800;font-size:13px;padding:4px 12px;border-radius:20px;margin-left:8px">AVANZA AL DÍA ${diaAv} DE ${diasDelMesActual}</span>`
-      : `<span style="display:inline-block;background:#FDECEA;color:#B5302E;font-weight:800;font-size:13px;padding:4px 12px;border-radius:20px;margin-left:8px">FALTA PONER EL DÍA DE AVANCE</span>`;
-    return `<div class="card" style="margin-top:10px;margin-bottom:14px">
-      <div style="font-weight:700;margin-bottom:12px;display:flex;align-items:center;flex-wrap:wrap;gap:4px">
-        ${c.nombre||'—'} <span style="font-weight:400;color:var(--ink2);font-size:12px">· Proyección de cierre ${cabMes(ult3[ult3.length-1])}</span>${avisoDiaHtml}
-      </div>
-      <div style="display:flex;gap:12px;flex-wrap:wrap">
-        ${bloque('PREPAGO', valPre, '#3B4252')}
-        ${bloque('POSTPAGO', valPost, '#B5302E')}
-      </div>
-    </div>`;
-  };
-  const pintar = q=>{
-    q=(q||'').trim().toUpperCase();
-    if(!q){ res.innerHTML=`<div class="card">Escribe un <b>DNI</b> o un <b>nombre</b> arriba para ver su comparativo.</div>`; return; }
-    const todas = cp.filter(c=> String(c.dni).toUpperCase().includes(q) || (c.nombre||'').toUpperCase().includes(q));
-    if(!todas.length){ res.innerHTML=`<div class="card">Sin resultados para "${q}".</div>`; return; }
-    const lista = todas.slice(0,50);
-    const nCols = ult3.length;
-    const avisoDia = diaAv>0 ? '' : `<p class="note">Para ver la proyección de cierre, pon el <b>día de avance</b> en la pestaña Multimarca.</p>`;
-    res.innerHTML = `<div class="twrap"><table class="cmpTable">
-      <thead><tr><th rowspan="2" style="text-align:left">Cliente</th><th class="grpHead g-pre" colspan="${nCols+1}">Prepago</th><th class="grpHead g-post" colspan="${nCols+1}">Postpago</th><th class="grpHead g-tot" colspan="${nCols+1}">Total</th></tr>
-      <tr>${ult3.map(cabMes).map((l,i)=>`<th class="${i===0?'b-start':''}">${l}</th>`).join('')}<th>Δ</th>${ult3.map(cabMes).map((l,i)=>`<th class="${i===0?'b-start':''}">${l}</th>`).join('')}<th>Δ</th>${ult3.map(cabMes).map((l,i)=>`<th class="${i===0?'b-start':''}">${l}</th>`).join('')}<th>Δ</th></tr></thead>
-      <tbody>${lista.map(fila).join('')}</tbody></table></div>
-      ${avisoDia}
-      ${lista.map(cajaProy).join('')}
-      ${todas.length>50?`<p class="note">Mostrando 50 de ${fN(todas.length)}. Afina la búsqueda.</p>`:''}`;
-  };
-  inp.oninput = e=> pintar(e.target.value);
-  pintar('');
-}
-
 function renderAll(){
   const sel = document.getElementById('selMes');
   const ms = mesesDisponibles();
   const cur = curMonth();
   sel.innerHTML = ms.map(m=>{const [y,mm]=m.split('-');return `<option value="${m}" ${m===cur?'selected':''}>${MESN[+mm]} ${y}</option>`}).join('');
   actualizarIndicador();
-  rResumen(cur); rOperativos(cur); rDesabasto(cur); rDiario(cur); rDistritos(cur); rCanales(cur); rEvolutivo(); rMultimarca(cur); rHistorico(); rComparativo(); rAsesores(cur);
+  rResumen(cur); rOperativos(cur); rDesabasto(cur); rDiario(cur); rDistritos(cur); rCanales(cur); rEvolutivo(); rAsesores(cur);
 }
 document.getElementById('selMes').onchange = renderAll;
 
@@ -1864,8 +1435,7 @@ async function cargarLiveV2(){
 /* ===== Login recarga + botón MASIVO ===== */
 const USUARIOS_REC = {
   jmaza:  { clave:'jmaza',  masivo:true  },
-  amparo: { clave:'amparo', masivo:false },
-  gracie: { clave:'gracie', masivo:false, soloMM:true }
+  amparo: { clave:'amparo', masivo:false }
 };
 const URL_MASIVO = 'https://juliomazad.github.io/avance-pdv-blazel/DASHBOARD_BLAZEL_LIVE.html';
 (function(){
@@ -1876,17 +1446,6 @@ const URL_MASIVO = 'https://juliomazad.github.io/avance-pdv-blazel/DASHBOARD_BLA
     ov.style.display='none';
     const bm=document.getElementById('btnMasivo');
     if(USUARIOS_REC[u].masivo){ bm.style.display=''; bm.href=URL_MASIVO; } else { bm.style.display='none'; }
-    if(USUARIOS_REC[u].soloMM){
-      document.querySelectorAll('nav button').forEach(bt=>{
-        if(bt.dataset.t!=='multimarca' && bt.dataset.t!=='comparativo' && bt.dataset.t!=='historico') bt.style.display='none';
-      });
-      document.querySelectorAll('nav button').forEach(x=>x.classList.remove('on'));
-      document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
-      const btMM=document.querySelector('nav button[data-t="multimarca"]');
-      if(btMM) btMM.classList.add('on');
-      const tabMM=document.getElementById('tab-multimarca');
-      if(tabMM) tabMM.classList.add('on');
-    }
   }
   function entrar(){
     const u=document.getElementById('luser').value.trim().toLowerCase();
