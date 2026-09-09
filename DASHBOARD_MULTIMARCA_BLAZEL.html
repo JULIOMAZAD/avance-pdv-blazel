@@ -27,9 +27,6 @@ header{background:var(--negro);color:#fff;padding:0 20px;display:flex;align-item
 .logo .r{color:var(--rojo)}
 .logo .sub{font-size:11px;color:#9AA3B0;letter-spacing:1.5px;text-transform:uppercase}
 .spacer{flex:1}
-#btnDrop{background:var(--rojo);color:#fff;border:none;border-radius:8px;padding:9px 16px;font-weight:600;font-size:13px;cursor:pointer;white-space:nowrap}
-#btnDrop:hover{background:var(--rojo2)}
-#fileInput{display:none}
 #fechaData{font-size:11px;color:#9AA3B0;white-space:nowrap}
 
 nav{background:#26262C;display:flex;overflow-x:auto;padding:0 12px;position:sticky;top:62px;z-index:49}
@@ -102,10 +99,6 @@ tr.tot td{font-weight:700;background:#FAFAFB;border-top:2px solid var(--line)}
 .segBtn.on{background:#1B1B1F;color:#fff;border-color:#1B1B1F}
 .chartbox .ch{position:relative;height:300px}
 
-#dropZone{position:fixed;inset:0;background:rgba(20,20,26,.92);z-index:100;display:none;align-items:center;justify-content:center;color:#fff;flex-direction:column;gap:12px}
-#dropZone.on{display:flex}
-#dropZone .big{font-family:'Barlow Condensed';font-size:34px;font-weight:700}
-#dropZone .box{border:2px dashed #4A5568;border-radius:16px;padding:60px 80px;text-align:center}
 #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--negro);color:#fff;padding:12px 22px;border-radius:10px;font-size:13px;display:none;z-index:101;box-shadow:0 8px 24px rgba(0,0,0,.3)}
 .note{font-size:12px;color:var(--ink2);margin:8px 2px}
 .vcbody{display:none;overflow:hidden}
@@ -152,8 +145,6 @@ tr.tot td{font-weight:700;background:#FAFAFB;border-top:2px solid var(--line)}
   <div class="logo"><span class="b">MULTIMARCA<span class="r"> BLAZEL</span></span><span class="sub">Tablero de control</span></div>
   <div class="spacer"></div>
   <span id="fechaData"></span>
-  <button id="btnDrop" style="display:none">Actualizar Excel</button>
-  <input type="file" id="fileInput" accept=".xlsx,.xlsm" style="display:none">
 </header>
 
 <nav>
@@ -174,7 +165,6 @@ tr.tot td{font-weight:700;background:#FAFAFB;border-top:2px solid var(--line)}
   <section class="tab" id="tab-vendedor"></section>
 </main>
 
-<div id="dropZone"><div class="box"><div class="big">Suelta aquí tu Excel</div><div>CONTROL_MULTIMARCA_BLAZEL.xlsx — el tablero se recalcula al instante</div></div></div>
 <div id="toast"></div>
 
 <script>
@@ -182,13 +172,14 @@ const RAW = {"multimarca":{"titulo":"Canal Multimarca — SEPTIEMBRE 2026","indi
 const LS_KEY = 'blazel_mm_dashboard_data_v1';
 const LS_META = 'blazel_mm_dashboard_meta_v1';
 let DATA = RAW;
-let usandoGuardado = false;
 let usandoRemoto = false;
 let anioGlob = new Date().getFullYear();
+/* Mientras se descarga el Excel en línea (más abajo), pintamos con lo último que se
+   descargó con éxito en este navegador, si hay algo guardado — así no se ve en blanco. */
 (function(){
   try{
     const saved = localStorage.getItem(LS_KEY);
-    if(saved){ const d = JSON.parse(saved); if(d && (d.multimarca || (d.comparativo && d.comparativo.length))){ DATA = d; usandoGuardado = true; } }
+    if(saved){ const d = JSON.parse(saved); if(d && (d.multimarca || (d.comparativo && d.comparativo.length))){ DATA = d; } }
   }catch(e){ /* localStorage no disponible: seguimos con los datos cargados */ }
 })();
 let charts = {};
@@ -1243,46 +1234,12 @@ function parseWB(wb){
   return out;
 }
 
-function handleFile(file){
-  const rd = new FileReader();
-  rd.onload = e => {
-    try{
-      const wb = XLSX.read(new Uint8Array(e.target.result),{type:'array',cellDates:true});
-      DATA = parseWB(wb);
-      renderAll();
-      let guardado = false;
-      try{
-        localStorage.setItem(LS_KEY, JSON.stringify(DATA));
-        localStorage.setItem(LS_META, JSON.stringify({archivo:file.name, fecha:new Date().toISOString()}));
-        usandoGuardado = true; guardado = true;
-      }catch(err){ /* sin espacio o sin permiso */ }
-      actualizarIndicador();
-      toast(guardado ? '✓ Guardado: ' + file.name + ' (se conservará al reabrir)' : '✓ Cargado: ' + file.name + ' (no se pudo guardar en este navegador)');
-    }catch(err){ toast('Error: '+err, false); }
-  };
-  rd.readAsArrayBuffer(file);
-}
 function actualizarIndicador(){
   const el = document.getElementById('fechaData');
-  let meta = null;
-  try{ meta = JSON.parse(localStorage.getItem(LS_META)||'null'); }catch(e){}
   const corte = DATA.corte || (DATA.diaadia && DATA.diaadia.mesActual ? ('Datos de '+DATA.diaadia.mesActual) : '');
-  if(usandoRemoto){
-    el.innerHTML = `${corte} · <span style="color:#13A05F">✓ actualizado desde GitHub</span>`;
-  } else if(usandoGuardado && meta){
-    el.innerHTML = `${corte} · <span style="color:#13A05F">guardado</span> <button id="btnReset" title="Volver a los datos originales" style="background:none;border:1px solid #3A3A42;color:#9AA3B0;border-radius:6px;padding:2px 7px;font-size:10px;cursor:pointer;margin-left:4px">↺ Reiniciar</button>`;
-    const br = document.getElementById('btnReset');
-    if(br) br.onclick = resetData;
-  } else {
-    el.innerHTML = `${corte}`;
-  }
-}
-function resetData(){
-  try{ localStorage.removeItem(LS_KEY); localStorage.removeItem(LS_META); }catch(e){}
-  DATA = RAW; usandoGuardado = false; usandoRemoto = false;
-  renderAll(); actualizarIndicador();
-  toast('Tablero reiniciado a los datos originales');
-  cargarExcelRemoto();
+  el.innerHTML = usandoRemoto
+    ? `${corte} · <span style="color:#13A05F">✓ actualizado desde GitHub</span>`
+    : `${corte}`;
 }
 /* Intenta traer el Excel más reciente directo desde el mismo repositorio de GitHub (mismo
    nombre de archivo, subido junto al HTML con "Add file → Upload files"). Si el archivo todavía
@@ -1295,7 +1252,7 @@ function cargarExcelRemoto(){
     .then(buf => {
       const wb = XLSX.read(new Uint8Array(buf), {type:'array', cellDates:true});
       const parsed = parseWB(wb);
-      DATA = parsed; usandoGuardado = false; usandoRemoto = true;
+      DATA = parsed; usandoRemoto = true;
       try{
         localStorage.setItem(LS_KEY, JSON.stringify(DATA));
         localStorage.setItem(LS_META, JSON.stringify({archivo:EXCEL_REMOTO, fecha:new Date().toISOString()}));
@@ -1305,16 +1262,6 @@ function cargarExcelRemoto(){
     })
     .catch(err => { console.log('Excel en línea no disponible todavía:', err); });
 }
-document.getElementById('btnDrop').onclick = ()=>document.getElementById('fileInput').click();
-document.getElementById('fileInput').onchange = e => { if(e.target.files[0]) handleFile(e.target.files[0]); };
-let dragN = 0;
-window.addEventListener('dragenter', e=>{e.preventDefault(); dragN++; document.getElementById('dropZone').classList.add('on');});
-window.addEventListener('dragleave', e=>{e.preventDefault(); if(--dragN<=0){dragN=0;document.getElementById('dropZone').classList.remove('on');}});
-window.addEventListener('dragover', e=>e.preventDefault());
-window.addEventListener('drop', e=>{
-  e.preventDefault(); dragN=0; document.getElementById('dropZone').classList.remove('on');
-  if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
-});
 
 tabs();
 renderAll();
@@ -1334,7 +1281,6 @@ let USUARIO_MM = null;
   function aplicar(u){
     USUARIO_MM=u;
     ov.style.display='none';
-    document.getElementById('btnDrop').style.display = (u==='jmaza') ? '' : 'none';
   }
   function entrar(){
     const u=document.getElementById('luser').value.trim().toLowerCase();
