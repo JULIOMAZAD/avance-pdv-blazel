@@ -37,6 +37,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;ba
 .btn-out:hover{border-color:#cc0000;color:#cc0000}
 .btn-vend{padding:8px 16px;background:#1a1a2e;border:1.5px solid #1a1a2e;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;color:#fff;display:inline-flex;align-items:center}
 .btn-vend:hover{background:#2d3561}
+.btn-vend.active{background:#CC0000;border-color:#CC0000}
 .bico{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:7px;margin-right:7px;font-size:12px;line-height:1;flex-shrink:0}
 .btn-logout{padding:8px 16px;background:#FCE9E8;border:1.5px solid #D81F26;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;color:#D81F26}
 .btn-logout:hover{background:#D81F26;color:#fff}
@@ -207,10 +208,9 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
   <div class="main-wrap">
     <div class="top-bar">
       <div class="top-left"><h2>COORD. CAMPO — Avance de Campo</h2><div class="pdv">Avance por responsable y asesor</div></div>
-      <div class="top-actions"><button class="btn-vend" onclick="abrirSanFelipeAmparo()"><span class="bico" style="background:#1F8A55">🏪</span>San Felipe</button><button class="btn-vend" id="btnRecarDash" style="display:none" onclick="abrirRecargaAmparo()"><span class="bico" style="background:#E6A817">⚡</span>Recarga</button><button class="btn-vend" onclick="abrirPersonal('recarScreen')"><span class="bico" style="background:#3B4252">🗂️</span>Control Personal</button><button class="btn-vend" id="btnGPSAmparo" style="display:none" onclick="openEmbed('SEGUIMIENTO_GPS.html?u=amparo','📍 Seguimiento GPS','recarScreen')"><span class="bico" style="background:#0E7C7B">📍</span>Seguimiento GPS</button><button class="btn-vend" onclick="openEmbed('PRE_ENTREGAS_PANEL.html?u=amparo','📦 Pre-entregas','recarScreen')"><span class="bico" style="background:#C77D17">📦</span>Pre-entregas</button><button class="btn-logout" onclick="doLogout()">⏻ Cerrar sesión</button></div>
+      <div class="top-actions"><button class="btn-vend" id="btnCampoAmparo" onclick="toggleCampoAmparo()"><span class="bico" style="background:#CC0000">⚑</span>Campo</button><button class="btn-vend" onclick="abrirSanFelipeAmparo()"><span class="bico" style="background:#1F8A55">🏪</span>San Felipe</button><button class="btn-vend" id="btnRecarDash" style="display:none" onclick="abrirRecargaAmparo()"><span class="bico" style="background:#E6A817">⚡</span>Recarga</button><button class="btn-vend" onclick="abrirPersonal('recarScreen')"><span class="bico" style="background:#3B4252">🗂️</span>Control Personal</button><button class="btn-vend" id="btnGPSAmparo" style="display:none" onclick="openEmbed('SEGUIMIENTO_GPS.html?u=amparo','📍 Seguimiento GPS','recarScreen')"><span class="bico" style="background:#0E7C7B">📍</span>Seguimiento GPS</button><button class="btn-vend" onclick="openEmbed('PRE_ENTREGAS_PANEL.html?u=amparo','📦 Pre-entregas','recarScreen')"><span class="bico" style="background:#C77D17">📦</span>Pre-entregas</button><button class="btn-logout" onclick="doLogout()">⏻ Cerrar sesión</button></div>
     </div>
     <div class="bienvenida-banner">BIENVENIDA AMPARO</div>
-    <div class="mes-tabs"><button class="mes-tab" id="btnCampoAmparo" onclick="toggleCampoAmparo()">⚑ Campo</button></div>
     <div id="recarCampoBody" style="display:none">
       <div class="mes-tabs" id="recarMesTabs"></div>
       <div id="recarInfo" class="info-row"></div>
