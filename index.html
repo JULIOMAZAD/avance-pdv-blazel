@@ -210,11 +210,14 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
       <div class="top-actions"><button class="btn-vend" onclick="abrirSanFelipeAmparo()"><span class="bico" style="background:#1F8A55">🏪</span>San Felipe</button><button class="btn-vend" id="btnRecarDash" style="display:none" onclick="abrirRecargaAmparo()"><span class="bico" style="background:#E6A817">⚡</span>Recarga</button><button class="btn-vend" onclick="abrirPersonal('recarScreen')"><span class="bico" style="background:#3B4252">🗂️</span>Control Personal</button><button class="btn-vend" id="btnGPSAmparo" style="display:none" onclick="openEmbed('SEGUIMIENTO_GPS.html?u=amparo','📍 Seguimiento GPS','recarScreen')"><span class="bico" style="background:#0E7C7B">📍</span>Seguimiento GPS</button><button class="btn-vend" onclick="openEmbed('PRE_ENTREGAS_PANEL.html?u=amparo','📦 Pre-entregas','recarScreen')"><span class="bico" style="background:#C77D17">📦</span>Pre-entregas</button><button class="btn-logout" onclick="doLogout()">⏻ Cerrar sesión</button></div>
     </div>
     <div class="bienvenida-banner">BIENVENIDA AMPARO</div>
-    <div class="mes-tabs" id="recarMesTabs"></div>
-    <div id="recarInfo" class="info-row"></div>
-    <div id="recarKpis" class="kpis"></div>
-    <div id="recarMsg"></div>
-    <div id="recarTable"></div>
+    <div class="mes-tabs"><button class="mes-tab" id="btnCampoAmparo" onclick="toggleCampoAmparo()">⚑ Campo</button></div>
+    <div id="recarCampoBody" style="display:none">
+      <div class="mes-tabs" id="recarMesTabs"></div>
+      <div id="recarInfo" class="info-row"></div>
+      <div id="recarKpis" class="kpis"></div>
+      <div id="recarMsg"></div>
+      <div id="recarTable"></div>
+    </div>
   </div>
 </div>
 
@@ -439,8 +442,8 @@ function doLogin(){
     document.getElementById("btnRecarDash").style.display="";
     document.getElementById("btnGPSAmparo").style.display="";
     showScreen("recarScreen");
-    renderRecarMes();
-    loadRecar();
+    document.getElementById("recarCampoBody").style.display="none";
+    document.getElementById("btnCampoAmparo").classList.remove("active");
     return;
   }
   if(t==="GRACIE"){
@@ -1313,6 +1316,20 @@ function renderAsesores(recs){
 
 let recarMes="junio";
 function renderRecarMes(){ document.getElementById("recarMesTabs").innerHTML=MESES.map(m=>`<button class="mes-tab${m.key===recarMes?' active':''}" onclick="selRecarMes('${m.key}')">${m.label}</button>`).join(""); }
+function toggleCampoAmparo(){
+  const body=document.getElementById("recarCampoBody");
+  const btn=document.getElementById("btnCampoAmparo");
+  const showing=body.style.display!=="none";
+  if(showing){
+    body.style.display="none";
+    btn.classList.remove("active");
+  }else{
+    body.style.display="";
+    btn.classList.add("active");
+    renderRecarMes();
+    loadRecar();
+  }
+}
 function selRecarMes(m){recarMes=m;renderRecarMes();loadRecar();}
 let RECAR_TGT={info:"recarInfo",kpis:"recarKpis",table:"recarTable",combine:false};
 async function loadRecar(){
