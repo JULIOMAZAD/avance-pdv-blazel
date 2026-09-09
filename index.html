@@ -440,7 +440,7 @@ function doLogin(){
     document.getElementById("btnGPSAmparo").style.display="";
     showScreen("recarScreen");
     renderRecarMes();
-    document.getElementById("recarMsg").innerHTML='<div class="load-err" style="border-left-color:#3B82F6;background:#EEF4FE;color:#1B1B1F">Elige un mes arriba para ver el avance.</div>';
+    loadRecar();
     return;
   }
   if(t==="GRACIE"){
