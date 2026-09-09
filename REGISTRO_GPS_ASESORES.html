@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Registro de Asistencia — Blazel</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root{
     --rojo: #E4002B;
@@ -192,6 +193,34 @@
   .pedido-item .top{ display:flex; justify-content:space-between; align-items:center; gap:8px; }
   .pedido-item .nom{ font-weight:700; }
   .pedido-item button{ background:var(--verde); color:#fff; width:100%; margin-top:8px; padding:10px; font-size:13px; }
+
+  /* ===== "MI AVANCE" (Multimarca) — reutiliza el mismo patrón visual del tablero ===== */
+  :root{
+    --ink:#1B1B1F; --ink2:#6B7077; --line:#ECEDF0; --card:#FFFFFF;
+    --verde-bg:#E9F7EF; --rojo-bg:#FDEAEA;
+  }
+  .twrap{ overflow-x:auto; border:1px solid var(--line); border-radius:12px; background:var(--card); margin-bottom:6px; }
+  table{ width:100%; border-collapse:collapse; font-size:12.5px; }
+  th{ background:var(--tinta); color:#fff; text-align:right; padding:8px 9px; font-size:9.5px; letter-spacing:.6px; text-transform:uppercase; border-bottom:1px solid var(--line); white-space:nowrap; }
+  th:first-child, td:first-child{ text-align:left; }
+  td{ padding:7px 9px; border-bottom:1px solid #F0F2F4; text-align:right; white-space:nowrap; }
+  tr:last-child td{ border-bottom:none; }
+  .pill{ display:inline-block; padding:3px 9px; border-radius:14px; font-weight:700; font-size:11.5px; }
+  .pv{ background:var(--verde-bg); color:var(--verde); }
+  .pr{ background:var(--rojo-bg); color:var(--rojo); }
+  .pn{ background:#EEF0F3; color:var(--gris); }
+  .cmpTable th, .cmpTable td{ text-align:center; }
+  .cmpTable th:first-child, .cmpTable td:first-child{ text-align:left; }
+  .cmpTable .grpHead{ border-radius:8px 8px 0 0; padding:7px 8px; font-size:10px; }
+  .cmpTable .g-pre{ background:#3B4252; color:#fff; }
+  .cmpTable .g-post{ background:#B5302E; color:#fff; }
+  .cmpTable .g-tot{ background:#1F8A55; color:#fff; }
+  .cmpTable td.b-start{ border-left:2px solid var(--line); }
+  .note{ font-size:11px; color:var(--gris); margin:8px 2px; }
+  .vStatLbl{ font-size:10px; color:var(--gris); text-transform:uppercase; letter-spacing:.5px; font-weight:700; }
+  .vStatNum{ font-weight:700; font-size:17px; margin:2px 0; font-variant-numeric:tabular-nums; }
+  .vMiniNum{ font-weight:700; font-size:16px; font-variant-numeric:tabular-nums; text-align:center; }
+  .vMiniLbl{ font-size:9.5px; color:var(--gris); text-transform:uppercase; letter-spacing:.3px; text-align:center; margin-top:1px; }
 </style>
 </head>
 <body>
@@ -239,6 +268,7 @@
 
   <div class="tabs">
     <div class="tab activo" id="tabAsistencia" onclick="cambiarVista('asistencia')">📍 ASISTENCIA</div>
+    <div class="tab" id="tabAvance" onclick="cambiarVista('avance')">📊 MI AVANCE</div>
     <div class="tab" id="tabPre" onclick="cambiarVista('pre')">📦 PRE-ENTREGA CHIPS</div>
   </div>
 
@@ -262,6 +292,14 @@
   </div>
 
   <div class="pie">Al marcar, se envía tu ubicación GPS junto con la hora exacta. Necesitas tener el GPS del celular activado.</div>
+  </div>
+
+  <div class="vista" id="vistaAvance">
+    <div class="tarjeta" style="padding-bottom:16px">
+      <div class="estado cargando" id="avanceEstado" style="display:block">Selecciona tu nombre arriba para ver tu avance.</div>
+      <div id="avanceContenido" style="display:none"></div>
+    </div>
+    <div class="pie">Esta información se actualiza sola cada vez que Julio sube un Excel nuevo a GitHub — no necesitas hacer nada para que se refresque.</div>
   </div>
 
   <div class="vista" id="vistaPre">
@@ -447,10 +485,13 @@
 
   function cambiarVista(v){
     document.getElementById('vistaAsistencia').classList.toggle('activa', v==='asistencia');
+    document.getElementById('vistaAvance').classList.toggle('activa', v==='avance');
     document.getElementById('vistaPre').classList.toggle('activa', v==='pre');
     document.getElementById('tabAsistencia').classList.toggle('activo', v==='asistencia');
+    document.getElementById('tabAvance').classList.toggle('activo', v==='avance');
     document.getElementById('tabPre').classList.toggle('activo', v==='pre');
     if(v === 'pre') cargarMisPedidos();
+    if(v === 'avance') cargarAvance();
   }
 
   document.getElementById('nombre').addEventListener('change', cargarMisPedidos);
@@ -728,6 +769,360 @@
       enviar('', '');
     }
   }
+
+  // ======================================================================
+  // MI AVANCE — trae el mismo Excel de Multimarca (CONTROL_MULTIMARCA_BLAZEL.xlsx,
+  // subido a GitHub junto a este archivo) y muestra SOLO la tarjeta del vendedor
+  // que abrió sesión, igual a como se ve en "Por Vendedor" del tablero Multimarca.
+  // ======================================================================
+  const EXCEL_REMOTO_MM = 'CONTROL_MULTIMARCA_BLAZEL.xlsx';
+  const LS_MM_KEY = 'bz_avance_mm_data_v1';
+  let DATA_MM = null;
+  let avanceCargando = false;
+
+  // El nombre que el asesor elige aquí (arriba, en "Tu nombre") no siempre está escrito
+  // IGUAL en el Excel de Multimarca (a veces falta un segundo nombre, o un acento).
+  // Este mapeo dice: "el nombre de aquí = este otro nombre exacto en el Excel".
+  // PARA AGREGAR O CORREGIR UN CRUCE: agrega una línea como
+  //   'NOMBRE EN ESTA APP': 'NOMBRE EXACTO EN LA COLUMNA VENDEDOR DEL EXCEL',
+  // Si un asesor no vende Multimarca (o no tiene cartera propia todavía), no hace
+  // falta agregarlo aquí: simplemente verá "Todavía no hay información para ti".
+  const MAPEO_VENDEDOR_MULTIMARCA = {
+    'ANGELA ROJAS BOBBIO': 'ANGELA PATRICIA ROJAS BOBBIO',
+    'CAMILO RIVERA': 'CAMILO EDUARDO RIVERA VEGA',
+    'JESUS CRUZ ACUÑA': 'JESUS MISAEL CRUZ ACUÑA',
+    'JAVIER CASTELO JESÚS': 'JAVIER CASTELO JESUS',
+    'MARIO RAÚL GÁLVEZ MINAYA': 'MARIO RAUL GALVEZ MINAYA'
+    // ALBERTO ROJAS MENDOZA y DANITZA MEYLEEN CARRILLO MEZA ya están escritos igual
+    // en ambos lados, así que no necesitan línea aquí.
+  };
+  const normVend = s => String(s||'').trim().replace(/\s+/g,' ').toUpperCase();
+
+  const num_mm = v => (typeof v==='number' && isFinite(v)) ? v : null;
+  const fN_mm = n => n==null ? '—' : n.toLocaleString('es-PE',{maximumFractionDigits:0});
+  const MES_ABREV_MM = {ENERO:'ENE',FEBRERO:'FEB',MARZO:'MAR',ABRIL:'ABR',MAYO:'MAY',JUNIO:'JUN',JULIO:'JUL',AGOSTO:'AGO',SEPTIEMBRE:'SET',SETIEMBRE:'SET',OCTUBRE:'OCT',NOVIEMBRE:'NOV',DICIEMBRE:'DIC'};
+  const MES_NUM_MM = {ENERO:1,FEBRERO:2,MARZO:3,ABRIL:4,MAYO:5,JUNIO:6,JULIO:7,AGOSTO:8,SEPTIEMBRE:9,SETIEMBRE:9,OCTUBRE:10,NOVIEMBRE:11,DICIEMBRE:12};
+  const abrevMes_mm = nombre => { if(!nombre) return ''; const m = String(nombre).trim().toUpperCase().match(/^([A-ZÑ]+)/); return m ? (MES_ABREV_MM[m[1]]||m[1].slice(0,3)) : ''; };
+  const mesCodigo_mm = nombre => {
+    if(!nombre) return '';
+    const s = String(nombre).trim().toUpperCase();
+    const mm = s.match(/^([A-ZÑ]+)/), yy = s.match(/(\d{4})/);
+    if(!mm||!yy||!MES_NUM_MM[mm[1]]) return '';
+    return yy[1]+'-'+String(MES_NUM_MM[mm[1]]).padStart(2,'0');
+  };
+
+  /* Extrae de CONTROL_MULTIMARCA_BLAZEL.xlsx solo lo necesario para "Mi Avance":
+     COMPARATIVO_DIA_A_DIA (cartera por cliente), MAESTRO_MM (DNI->vendedor) y
+     BASE (ventas con fecha exacta), igual que hace parseWB() en el tablero Multimarca. */
+  function parseMultimarcaWB(wb){
+    const out = { diaadia:null, ventasDiarias:[], vendMap:{} };
+    const normDni = v => { const s=String(v==null?'':v).trim(); if(!s) return ''; const n=parseInt(s,10); return isNaN(n) ? s : String(n); };
+
+    const cd = wb.Sheets['COMPARATIVO_DIA_A_DIA'] || wb.Sheets['COMP_DIA_X_DIA'];
+    if(cd){
+      const rows = XLSX.utils.sheet_to_json(cd,{header:1,raw:true,defval:null});
+      const hdr2 = rows[1]||[];
+      const mesActual = hdr2[1]?String(hdr2[1]).trim():'';
+      const mesAnterior = hdr2[3]?String(hdr2[3]).trim():'';
+      const diaCorte = num_mm(hdr2[5]);
+      const hdrI = rows.findIndex(r=>r && r[0]==='Distrito' && r[1]==='DNI');
+      const puntos=[];
+      if(hdrI>=0){
+        for(let i=hdrI+2;i<rows.length;i++){
+          const r=rows[i]; if(!r || r[1]==null) continue;
+          puntos.push({
+            distrito:r[0]?String(r[0]).trim():'', dni:normDni(r[1]),
+            nombre:r[2]?String(r[2]).trim():'', direccion:r[3]?String(r[3]).trim():'',
+            vendedor:r[4]?String(r[4]).trim():'',
+            pre_ant:num_mm(r[5])||0, pre_act:num_mm(r[6])||0, pre_dif:num_mm(r[7])||0,
+            post_ant:num_mm(r[9])||0, post_act:num_mm(r[10])||0, post_dif:num_mm(r[11])||0,
+            tot_ant:num_mm(r[13])||0, tot_act:num_mm(r[14])||0, tot_dif:num_mm(r[15])||0
+          });
+        }
+      }
+      out.diaadia = {mesActual, mesAnterior, diaCorte, puntos};
+    }
+
+    const codActFiltro = mesCodigo_mm(out.diaadia && out.diaadia.mesActual);
+    const codAntFiltro = mesCodigo_mm(out.diaadia && out.diaadia.mesAnterior);
+
+    const mm2 = wb.Sheets['MAESTRO_MM'];
+    if(mm2){
+      const rows = XLSX.utils.sheet_to_json(mm2,{header:1,raw:true,defval:null});
+      const hdrI = rows.findIndex(r=>r && String(r[0]||'').trim().toUpperCase()==='DNI');
+      if(hdrI>=0){
+        const hdrRow = rows[hdrI];
+        const cDni = hdrRow.findIndex(c=>String(c||'').trim().toUpperCase()==='DNI');
+        const cVend = hdrRow.findIndex(c=>String(c||'').trim().toUpperCase()==='VENDEDOR');
+        for(let i=hdrI+1;i<rows.length;i++){
+          const r=rows[i]; if(!r || r[cDni]==null || r[cDni]==='') continue;
+          out.vendMap[normDni(r[cDni])] = (cVend>=0 && r[cVend]) ? String(r[cVend]).trim() : 'BLAZEL';
+        }
+      }
+    }
+
+    const bs = wb.Sheets['BASE'];
+    if(bs){
+      const rows = XLSX.utils.sheet_to_json(bs,{header:1,raw:true,defval:null});
+      const hdrI = rows.findIndex(r=>r && r.some(c=>String(c||'').trim().toUpperCase()==='FECHA_VENTA'));
+      if(hdrI>=0){
+        const hdrRow = rows[hdrI];
+        const colOf = name => hdrRow.findIndex(c=>String(c||'').trim().toUpperCase()===name);
+        const cFecha=colOf('FECHA_VENTA'), cDni=colOf('DNI_MULTIMARCA'), cModal=colOf('MODALIDAD_VENTA');
+        const ventas=[];
+        if(cFecha>=0){
+          for(let i=hdrI+1;i<rows.length;i++){
+            const r=rows[i]; if(!r) continue;
+            const f = r[cFecha]; if(f==null || f==='') continue;
+            let dstr;
+            if(f instanceof Date){ dstr = f.getFullYear()+'-'+String(f.getMonth()+1).padStart(2,'0')+'-'+String(f.getDate()).padStart(2,'0'); }
+            else { const s=String(f).trim().replace(/-/g,'/'); const p=s.split('/'); if(p.length<3) continue; dstr = p[0]+'-'+p[1].padStart(2,'0')+'-'+p[2].padStart(2,'0'); }
+            const cod = dstr.slice(0,7);
+            if(cod!==codActFiltro && cod!==codAntFiltro) continue;
+            const dni = cDni>=0 ? normDni(r[cDni]) : '';
+            const m = cModal>=0 && String(r[cModal]||'').trim().toUpperCase().startsWith('POST') ? 2 : 1;
+            ventas.push({f:dstr, d:dni, m});
+          }
+        }
+        out.ventasDiarias = ventas;
+      }
+    }
+
+    return out;
+  }
+
+  function ventasByDni_mm(){
+    if(DATA_MM._vbd) return DATA_MM._vbd;
+    const idx = {};
+    (DATA_MM.ventasDiarias||[]).forEach(function(v){ if(!v.d) return; (idx[v.d] || (idx[v.d]=[])).push(v); });
+    DATA_MM._vbd = idx;
+    return idx;
+  }
+  function diaClienteStats_mm(dni, diaNum){
+    const dd = DATA_MM.diaadia;
+    const codAct = mesCodigo_mm(dd&&dd.mesActual), codAnt = mesCodigo_mm(dd&&dd.mesAnterior);
+    const arr = ventasByDni_mm()[dni] || [];
+    let pre_ant=0, post_ant=0, pre_act=0, post_act=0;
+    arr.forEach(function(v){
+      const cod = v.f.slice(0,7);
+      if(cod!==codAct && cod!==codAnt) return;
+      const day = parseInt(v.f.slice(8,10),10);
+      if(day!==diaNum) return;
+      const esPre = v.m!==2;
+      if(cod===codAct){ if(esPre) pre_act++; else post_act++; }
+      else { if(esPre) pre_ant++; else post_ant++; }
+    });
+    return {pre_ant:pre_ant,post_ant:post_ant,pre_act:pre_act,post_act:post_act,tot_ant:pre_ant+post_ant,tot_act:pre_act+post_act};
+  }
+  function computeDiario_mm(filtroVendedor){
+    const dd = DATA_MM.diaadia;
+    const ventas = DATA_MM.ventasDiarias||[];
+    const codAct = mesCodigo_mm(dd&&dd.mesActual), codAnt = mesCodigo_mm(dd&&dd.mesAnterior);
+    const corte = (dd&&dd.diaCorte) || 0;
+    const dias = []; for(let d=1; d<=Math.max(corte,1); d++) dias.push(d);
+    const vendMap = DATA_MM.vendMap||{};
+    const porDia = function(codigo){
+      const activPorDia = {}, dniActPorDia = {};
+      ventas.forEach(function(v){
+        if(!v.f || v.f.slice(0,7)!==codigo) return;
+        if(filtroVendedor && (vendMap[v.d]||'BLAZEL')!==filtroVendedor) return;
+        const d = parseInt(v.f.slice(8,10),10); if(!d) return;
+        activPorDia[d] = (activPorDia[d]||0)+1;
+        if(!dniActPorDia[d]) dniActPorDia[d] = new Set();
+        if(v.d) dniActPorDia[d].add(v.d);
+      });
+      let acum=0; const acumSet = new Set();
+      const serieDia=[], serieAcum=[], serieCapAcum=[];
+      dias.forEach(function(d){
+        const c = activPorDia[d]||0; acum+=c; serieDia.push(c); serieAcum.push(acum);
+        if(dniActPorDia[d]) dniActPorDia[d].forEach(function(x){ acumSet.add(x); });
+        serieCapAcum.push(acumSet.size);
+      });
+      return {serieDia:serieDia, serieAcum:serieAcum, serieCapAcum:serieCapAcum};
+    };
+    const act = codAct ? porDia(codAct) : {serieDia:dias.map(function(){return 0;}), serieAcum:dias.map(function(){return 0;}), serieCapAcum:dias.map(function(){return 0;})};
+    const ant = codAnt ? porDia(codAnt) : {serieDia:dias.map(function(){return 0;}), serieAcum:dias.map(function(){return 0;}), serieCapAcum:dias.map(function(){return 0;})};
+    return {dias:dias, act:act, ant:ant, tieneDatos: ventas.length>0 && !!codAct};
+  }
+  function renderDiarioBlock_mm(targetElId, filtroVendedor){
+    const el = document.getElementById(targetElId);
+    if(!el) return;
+    const dd = DATA_MM.diaadia;
+    const D = computeDiario_mm(filtroVendedor);
+    if(!D.tieneDatos || !D.dias.length){
+      el.innerHTML = '<div class="note">No encontré ventas con fecha para armar tu día a día. Avisa a Julio si esto no debería pasar.</div>';
+      return;
+    }
+    const abAnt = abrevMes_mm(dd.mesAnterior)||'mes anterior', abAct = abrevMes_mm(dd.mesActual)||'mes actual';
+    const arrowDia = function(v){ return v>0?('<span class="pill pv">+'+fN_mm(v)+'</span>'): v<0?('<span class="pill pr">'+fN_mm(v)+'</span>'):'<span class="pill pn">=</span>'; };
+    const filaDia = function(d,i){
+      const dif = D.act.serieDia[i]-D.ant.serieDia[i];
+      return '<tr><td>Día '+d+'</td>'+
+        '<td class="num">'+fN_mm(D.ant.serieDia[i])+'</td>'+
+        '<td class="num">'+fN_mm(D.act.serieDia[i])+'</td>'+
+        '<td class="num">'+arrowDia(dif)+'</td>'+
+        '<td class="num">'+fN_mm(D.ant.serieAcum[i])+'</td>'+
+        '<td class="num"><b>'+fN_mm(D.act.serieAcum[i])+'</b></td>'+
+        '<td class="num">'+fN_mm(D.act.serieCapAcum[i])+'</td></tr>';
+    };
+    el.innerHTML =
+      '<div class="twrap"><table>'+
+      '<thead><tr><th style="text-align:left">Día</th><th>'+abAnt+'</th><th>'+abAct+'</th><th>Dif</th><th>Acum. '+abAnt+'</th><th>Acum. '+abAct+'</th><th>Capilaridad '+abAct+'</th></tr></thead>'+
+      '<tbody>'+D.dias.map(filaDia).join('')+'</tbody>'+
+      '</table></div>'+
+      '<p class="note">Las columnas del medio son lo que activaste solo ese día. Acumulado = va sumando desde el día 1 del mes.</p>';
+  }
+  function renderClientesBlock_mm(containerId, v, dd, diaNum){
+    const el = document.getElementById(containerId);
+    if(!el) return;
+    const abAnt = abrevMes_mm(dd.mesAnterior)||'Ant.', abAct = abrevMes_mm(dd.mesActual)||'Act.';
+    const arrow = function(n){ return n>0?('<span class="pill pv">+'+fN_mm(n)+'</span>'): n<0?('<span class="pill pr">'+fN_mm(n)+'</span>'):'<span class="pill pn">=</span>'; };
+    const dNum = (diaNum==null || diaNum==='') ? null : parseInt(diaNum,10);
+    const conDia = dNum!=null && !isNaN(dNum) && dNum>0;
+    const lblAnt = conDia ? (abAnt+' (día '+dNum+')') : abAnt;
+    const lblAct = conDia ? (abAct+' (día '+dNum+')') : abAct;
+    const filaCliente = function(p){
+      let s = p;
+      if(conDia){
+        const d = diaClienteStats_mm(p.dni, dNum);
+        s = {pre_ant:d.pre_ant, pre_act:d.pre_act, pre_dif:d.pre_act-d.pre_ant,
+          post_ant:d.post_ant, post_act:d.post_act, post_dif:d.post_act-d.post_ant,
+          tot_ant:d.tot_ant, tot_act:d.tot_act, tot_dif:d.tot_act-d.tot_ant};
+      }
+      return '<tr><td>'+(p.nombre||'—')+'<div style="color:var(--gris);font-size:11px">DNI '+p.dni+' · '+(p.distrito||'')+'</div></td>'+
+        '<td class="num">'+fN_mm(s.pre_ant)+'</td><td class="num">'+fN_mm(s.pre_act)+'</td><td class="num">'+arrow(s.pre_dif)+'</td>'+
+        '<td class="num">'+fN_mm(s.post_ant)+'</td><td class="num">'+fN_mm(s.post_act)+'</td><td class="num">'+arrow(s.post_dif)+'</td>'+
+        '<td class="num"><b>'+fN_mm(s.tot_ant)+'</b></td><td class="num"><b>'+fN_mm(s.tot_act)+'</b></td><td class="num">'+arrow(s.tot_dif)+'</td></tr>';
+    };
+    el.innerHTML = '<div class="twrap"><table class="cmpTable">'+
+      '<thead><tr><th rowspan="2" style="text-align:left">Cliente</th><th class="grpHead g-pre" colspan="3">Prepago</th><th class="grpHead g-post" colspan="3">Postpago</th><th class="grpHead g-tot" colspan="3">Total</th></tr>'+
+      '<tr><th class="b-start">'+lblAnt+'</th><th>'+lblAct+'</th><th>Dif</th><th class="b-start">'+lblAnt+'</th><th>'+lblAct+'</th><th>Dif</th><th class="b-start">'+lblAnt+'</th><th>'+lblAct+'</th><th>Dif</th></tr></thead>'+
+      '<tbody>'+v.puntos.slice().sort(function(a,b){return b.tot_act-a.tot_act;}).map(filaCliente).join('')+'</tbody></table></div>'+
+      '<p class="note">'+(conDia
+        ? ('Solo lo que activaste el día '+dNum+' exacto (no acumulado). Borra el día para ver el total del mes.')
+        : 'Total acumulado del mes hasta el corte. Escribe un día arriba (ej. 8) para ver qué activaste ese día exacto por cliente.')+'</p>';
+  }
+
+  function pintarAvance(){
+    const estado = document.getElementById('avanceEstado');
+    const cont = document.getElementById('avanceContenido');
+    const nombreSel = (document.getElementById('nombre').value||'').trim();
+
+    if(!nombreSel){
+      estado.className = 'estado cargando'; estado.style.display = 'block';
+      estado.textContent = 'Selecciona tu nombre arriba para ver tu avance.';
+      cont.style.display = 'none';
+      return;
+    }
+    if(!DATA_MM){
+      estado.className = 'estado cargando'; estado.style.display = 'block';
+      estado.textContent = 'Cargando tu información…';
+      cont.style.display = 'none';
+      return;
+    }
+    const dd = DATA_MM.diaadia;
+    if(!dd || !dd.puntos || !dd.puntos.length){
+      estado.className = 'estado error'; estado.style.display = 'block';
+      estado.textContent = 'No se pudo leer la información de Multimarca. Intenta de nuevo más tarde.';
+      cont.style.display = 'none';
+      return;
+    }
+
+    const nombreObjetivo = normVend(MAPEO_VENDEDOR_MULTIMARCA[nombreSel] || nombreSel);
+    const puntos = dd.puntos.filter(function(p){ return normVend(p.vendedor)===nombreObjetivo; });
+
+    if(!puntos.length){
+      estado.className = 'estado'; estado.style.display = 'block';
+      estado.style.background = 'var(--gris-claro)'; estado.style.color = 'var(--gris)';
+      estado.textContent = 'Todavía no hay información de Multimarca para tu usuario. Si crees que es un error, avisa a Julio.';
+      cont.style.display = 'none';
+      return;
+    }
+
+    estado.style.display = 'none';
+    cont.style.display = 'block';
+
+    const v = { vendedor: puntos[0].vendedor, puntos: puntos,
+      pre_ant:0, pre_act:0, post_ant:0, post_act:0, tot_ant:0, tot_act:0 };
+    puntos.forEach(function(p){
+      v.pre_ant+=p.pre_ant; v.pre_act+=p.pre_act; v.post_ant+=p.post_ant; v.post_act+=p.post_act;
+      v.tot_ant+=p.tot_ant; v.tot_act+=p.tot_act;
+    });
+    v.falta = Math.max(0, v.tot_ant - v.tot_act);
+    v.cap_ant = puntos.filter(function(p){ return p.tot_ant>0; }).length;
+    v.cap_act = puntos.filter(function(p){ return p.tot_act>0; }).length;
+    v.falta_cap = Math.max(0, v.cap_ant - v.cap_act);
+    v.numClientes = puntos.length;
+
+    const abAnt = abrevMes_mm(dd.mesAnterior), abAct = abrevMes_mm(dd.mesActual);
+    const pillFalta = function(falta){ return falta>0 ? ('<span class="pill pr">Faltan '+fN_mm(falta)+'</span>') : '<span class="pill pv">✔ OK</span>'; };
+
+    cont.innerHTML =
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">'+
+        '<div>'+
+          '<div style="font-family:-apple-system,sans-serif;font-weight:800;font-size:17px">'+v.vendedor+'</div>'+
+          '<div style="color:var(--gris);font-size:12px">'+(dd.mesActual||'')+(dd.diaCorte?' (al día '+dd.diaCorte+')':'')+(dd.mesAnterior?' vs '+dd.mesAnterior:'')+'</div>'+
+        '</div>'+
+        '<button class="btn-link" style="margin-top:2px" onclick="DATA_MM=null;cargarAvance();">🔄 Actualizar</button>'+
+      '</div>'+
+      '<div style="margin-bottom:14px">'+
+        '<div class="vStatLbl">Activación</div>'+
+        '<div class="vStatNum">'+fN_mm(v.tot_ant)+' → '+fN_mm(v.tot_act)+'</div>'+
+        pillFalta(v.falta)+
+      '</div>'+
+      '<div style="display:flex;gap:16px;align-items:flex-end;margin-bottom:18px;flex-wrap:wrap">'+
+        '<div><div class="vMiniNum">'+fN_mm(v.numClientes)+'</div><div class="vMiniLbl">Cartera</div></div>'+
+        '<div><div class="vMiniNum">'+fN_mm(v.cap_ant)+'</div><div class="vMiniLbl">Atendió '+abAnt+'</div></div>'+
+        '<div><div class="vMiniNum">'+fN_mm(v.cap_act)+'</div><div class="vMiniLbl">Va '+abAct+'</div></div>'+
+        '<div>'+pillFalta(v.falta_cap)+'</div>'+
+      '</div>'+
+      '<h3 style="font-size:13px;text-transform:uppercase;letter-spacing:.4px;margin:0 0 8px;color:var(--tinta)">Clientes a tu nombre</h3>'+
+      '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">'+
+        '<label for="avanceDia" style="font-size:12px;color:var(--gris);font-weight:600;margin-bottom:0">Ver un día exacto:</label>'+
+        '<input id="avanceDia" type="number" min="1" max="'+(dd.diaCorte||31)+'" placeholder="Ej: 8" style="width:80px;padding:6px 10px;font-size:13px;margin-bottom:0">'+
+      '</div>'+
+      '<div id="avanceClientes"></div>'+
+      '<h3 style="font-size:13px;text-transform:uppercase;letter-spacing:.4px;margin:20px 0 8px;color:var(--tinta)">Tu día a día</h3>'+
+      '<div id="avanceDiario"></div>';
+
+    renderClientesBlock_mm('avanceClientes', v, dd, null);
+    const diaInp = document.getElementById('avanceDia');
+    if(diaInp) diaInp.oninput = function(e){ renderClientesBlock_mm('avanceClientes', v, dd, e.target.value); };
+    renderDiarioBlock_mm('avanceDiario', v.vendedor);
+  }
+
+  function cargarAvance(){
+    pintarAvance();
+    if(DATA_MM || avanceCargando) return;
+    avanceCargando = true;
+    try{
+      const saved = localStorage.getItem(LS_MM_KEY);
+      if(saved){ const d = JSON.parse(saved); if(d && d.diaadia){ DATA_MM = d; pintarAvance(); } }
+    }catch(e){}
+    fetch(EXCEL_REMOTO_MM + '?t=' + Date.now(), {cache:'no-store'})
+      .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.arrayBuffer(); })
+      .then(function(buf){
+        const wb = XLSX.read(new Uint8Array(buf), {type:'array', cellDates:true});
+        DATA_MM = parseMultimarcaWB(wb);
+        try{ localStorage.setItem(LS_MM_KEY, JSON.stringify(DATA_MM)); }catch(e){}
+        avanceCargando = false;
+        pintarAvance();
+      })
+      .catch(function(err){
+        avanceCargando = false;
+        if(!DATA_MM){
+          const estado = document.getElementById('avanceEstado');
+          estado.className = 'estado error'; estado.style.display = 'block';
+          estado.textContent = 'No se pudo cargar tu información. Revisa tu conexión e intenta de nuevo.';
+          document.getElementById('avanceContenido').style.display = 'none';
+        }
+        console.log('avance multimarca no disponible:', err);
+      });
+  }
+
+  document.getElementById('nombre').addEventListener('change', function(){
+    if(document.getElementById('vistaAvance').classList.contains('activa')) pintarAvance();
+  });
 </script>
 <!-- redeploy 2026-08-26 21:05 UTC -->
 </body>
