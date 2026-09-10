@@ -798,6 +798,96 @@
   };
   const normVend = s => String(s||'').trim().replace(/\s+/g,' ').toUpperCase();
 
+  // ======================================================================
+  // RECARGA — trae VENTAS CRL 2026.xlsx (hoja "VENTAS", tabla dinámica
+  // Venta/Cuota/Falta) y muestra solo la fila del vendedor que abrió sesión.
+  // ======================================================================
+  const EXCEL_VCRL_REMOTO = 'VENTAS CRL 2026.xlsx';
+  const LS_VCRL_KEY = 'bz_avance_vcrl_data_v1';
+  let DATA_VCRL = null;
+  let avanceRecargaCargando = false;
+
+  // Mismo tipo de cruce que arriba, pero contra las etiquetas "VEND"/"SUP" de Recarga.
+  // PARA AGREGAR O CORREGIR UN CRUCE: agrega una línea como
+  //   'NOMBRE EN ESTA APP': 'ETIQUETA EXACTA EN LA COLUMNA "Etiquetas de fila" DE RECARGA',
+  const MAPEO_VENDEDOR_RECARGA = {
+    'ALBERTO ROJAS MENDOZA': 'VEND CARABAYLLO ALBERTO ROJAS MENDOZA',
+    'ANGELA ROJAS BOBBIO': 'VEND-ANGELA ROJAS BOBBIO',
+    'CAMILO RIVERA': 'VEND-CAMILO RIVERA',
+    'JESUS CRUZ ACUÑA': 'VEND-JESUS CRUZ ACUÑA',
+    'JAVIER CASTELO JESÚS': 'VEND CM JAVIER CASTELO',
+    'LUIS FERNANDO ROSADO': 'VEND SMP FERNANDO ROSADO',
+    'RIGOBERTO JUNIOR TERRANOVA GARCIA': 'VEND SMP RIGOBERTO TERRANOVA',
+    'GRACIE ARACELI MANRIQUE MORQUENCHO': 'SUP GRACIE MANRIQUE',
+    'AMPARO SUAREZ ACEVEDO': 'SUP AMPARO SUAREZ ACEVEDO',
+    'MARIO RAÚL GÁLVEZ MINAYA': 'VEND SMP MARIO GALVEZ'
+    // DANITZA MEYLEEN CARRILLO MEZA no aparece en Recarga (solo vende Multimarca).
+  };
+  const num_vcrl = v => {
+    if(typeof v==='number' && isFinite(v)) return v;
+    if(typeof v==='string' && v.trim()!=='' && v.trim()!=='-' && !isNaN(parseFloat(v))) return parseFloat(v);
+    return null;
+  };
+  /* Escanea la hoja "VENTAS" buscando cada tabla dinámica por su encabezado
+     "Etiquetas de fila" (puede haber varias una al lado de otra) — igual que en
+     DASHBOARD_RECARGAS_BLAZEL.html, para no depender de filas/columnas fijas. */
+  function parseVentasCRL_gps(wb){
+    const ws = wb.Sheets['VENTAS'];
+    if(!ws) throw new Error('No encuentro la hoja "VENTAS" en '+EXCEL_VCRL_REMOTO);
+    const rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null});
+    const pivots = [];
+    for(let r=0; r<rows.length; r++){
+      const row = rows[r]||[];
+      for(let c=0; c<row.length; c++){
+        if(row[c]!=='Etiquetas de fila') continue;
+        const campos = [];
+        let cc = c+1;
+        while(cc<row.length && row[cc]!=null && row[cc]!==''){ campos.push({nombre:String(row[cc]).trim(), col:cc}); cc++; }
+        const filtros = {};
+        for(let rr=Math.max(0,r-10); rr<r; rr++){
+          const lbl = rows[rr] && rows[rr][c];
+          if(lbl!=null && lbl!=='' && rows[rr][c+1]!=null){ filtros[String(lbl).trim()] = rows[rr][c+1]; }
+        }
+        const filas = [];
+        let total = null;
+        let rr = r+1;
+        while(rr<rows.length){
+          const lblRow = rows[rr] && rows[rr][c];
+          if(lblRow==null || lblRow===''){ break; }
+          const rec = {etiqueta:String(lblRow).trim()};
+          campos.forEach(function(cp){ rec[cp.nombre] = num_vcrl(rows[rr][cp.col]); });
+          if(rec.etiqueta.toUpperCase()==='TOTAL GENERAL'){ total = rec; rr++; break; }
+          filas.push(rec);
+          rr++;
+        }
+        pivots.push({campos: campos.map(function(cp){ return cp.nombre; }), filtros: filtros, filas: filas, total: total});
+      }
+    }
+    return {pivots: pivots};
+  }
+  function bloqueRecargaHTML(nombreSel){
+    if(!DATA_VCRL){
+      return '<div class="note" style="margin:16px 0">Cargando tu avance de Recarga…</div>';
+    }
+    const pCuota = DATA_VCRL.pivots.filter(function(p){ return p.campos.indexOf('CUOTA')>=0; })[0];
+    if(!pCuota){
+      return '<div class="note" style="margin:16px 0">No pude leer el avance de cuota de Recarga. Intenta de nuevo más tarde.</div>';
+    }
+    const nombreObjetivo = normVend(MAPEO_VENDEDOR_RECARGA[nombreSel] || nombreSel);
+    const fila = pCuota.filas.filter(function(f){ return normVend(f.etiqueta)===nombreObjetivo; })[0];
+    if(!fila){
+      return '<div class="note" style="margin:16px 0">Todavía no hay información de Recarga para tu usuario. Si crees que es un error, avisa a Julio.</div>';
+    }
+    const mesLbl = pCuota.filtros['MES']||'';
+    const falta = fila.FALTA;
+    const pill = falta==null ? '<span class="pill pn">Sin cuota asignada</span>'
+      : (falta<0 ? ('<span class="pill pr">Faltan '+fN_mm(Math.abs(falta))+'</span>')
+                  : ('<span class="pill pv">✔ Cumplida'+(falta>0?(' (+'+fN_mm(falta)+')'):'')+'</span>'));
+    return '<div class="vStatLbl">Venta de Recarga'+(mesLbl?(' — '+mesLbl):'')+'</div>'+
+      '<div class="vStatNum">S/ '+fN_mm(fila.VENTA)+(fila.CUOTA!=null?(' de S/ '+fN_mm(fila.CUOTA)):'')+'</div>'+
+      pill;
+  }
+
   const num_mm = v => (typeof v==='number' && isFinite(v)) ? v : null;
   const fN_mm = n => n==null ? '—' : n.toLocaleString('es-PE',{maximumFractionDigits:0});
   const MES_ABREV_MM = {ENERO:'ENE',FEBRERO:'FEB',MARZO:'MAR',ABRIL:'ABR',MAYO:'MAY',JUNIO:'JUN',JULIO:'JUL',AGOSTO:'AGO',SEPTIEMBRE:'SET',SETIEMBRE:'SET',OCTUBRE:'OCT',NOVIEMBRE:'NOV',DICIEMBRE:'DIC'};
@@ -1003,44 +1093,21 @@
         : 'Total acumulado del mes hasta el corte. Escribe un día arriba (ej. 8) para ver qué activaste ese día exacto por cliente.')+'</p>';
   }
 
-  function pintarAvance(){
-    const estado = document.getElementById('avanceEstado');
-    const cont = document.getElementById('avanceContenido');
-    const nombreSel = (document.getElementById('nombre').value||'').trim();
-
-    if(!nombreSel){
-      estado.className = 'estado cargando'; estado.style.display = 'block';
-      estado.textContent = 'Selecciona tu nombre arriba para ver tu avance.';
-      cont.style.display = 'none';
-      return;
-    }
+  /* Construye el bloque de Multimarca (tarjeta + cartera + día a día) para el nombre
+     dado, o un mensaje de estado si todavía no hay datos / no le corresponde. */
+  function bloqueMultimarcaHTML(nombreSel){
     if(!DATA_MM){
-      estado.className = 'estado cargando'; estado.style.display = 'block';
-      estado.textContent = 'Cargando tu información…';
-      cont.style.display = 'none';
-      return;
+      return '<div class="note" style="margin:0 0 16px">Cargando tu avance de Multimarca…</div>';
     }
     const dd = DATA_MM.diaadia;
     if(!dd || !dd.puntos || !dd.puntos.length){
-      estado.className = 'estado error'; estado.style.display = 'block';
-      estado.textContent = 'No se pudo leer la información de Multimarca. Intenta de nuevo más tarde.';
-      cont.style.display = 'none';
-      return;
+      return '<div class="note" style="margin:0 0 16px">No se pudo leer la información de Multimarca. Intenta de nuevo más tarde.</div>';
     }
-
     const nombreObjetivo = normVend(MAPEO_VENDEDOR_MULTIMARCA[nombreSel] || nombreSel);
     const puntos = dd.puntos.filter(function(p){ return normVend(p.vendedor)===nombreObjetivo; });
-
     if(!puntos.length){
-      estado.className = 'estado'; estado.style.display = 'block';
-      estado.style.background = 'var(--gris-claro)'; estado.style.color = 'var(--gris)';
-      estado.textContent = 'Todavía no hay información de Multimarca para tu usuario. Si crees que es un error, avisa a Julio.';
-      cont.style.display = 'none';
-      return;
+      return '<div class="note" style="margin:0 0 16px">Todavía no hay información de Multimarca para tu usuario.</div>';
     }
-
-    estado.style.display = 'none';
-    cont.style.display = 'block';
 
     const v = { vendedor: puntos[0].vendedor, puntos: puntos,
       pre_ant:0, pre_act:0, post_ant:0, post_act:0, tot_ant:0, tot_act:0 };
@@ -1057,14 +1124,11 @@
     const abAnt = abrevMes_mm(dd.mesAnterior), abAct = abrevMes_mm(dd.mesActual);
     const pillFalta = function(falta){ return falta>0 ? ('<span class="pill pr">Faltan '+fN_mm(falta)+'</span>') : '<span class="pill pv">✔ OK</span>'; };
 
-    cont.innerHTML =
-      '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">'+
-        '<div>'+
-          '<div style="font-family:-apple-system,sans-serif;font-weight:800;font-size:17px">'+v.vendedor+'</div>'+
-          '<div style="color:var(--gris);font-size:12px">'+(dd.mesActual||'')+(dd.diaCorte?' (al día '+dd.diaCorte+')':'')+(dd.mesAnterior?' vs '+dd.mesAnterior:'')+'</div>'+
-        '</div>'+
-        '<button class="btn-link" style="margin-top:2px" onclick="DATA_MM=null;cargarAvance();">🔄 Actualizar</button>'+
-      '</div>'+
+    // se guardan en window para que cargarAvance() los use al conectar los eventos
+    window._avanceMM_v = v; window._avanceMM_dd = dd;
+
+    return '<h3 style="font-size:13px;text-transform:uppercase;letter-spacing:.4px;margin:0 0 8px;color:var(--tinta)">Multimarca</h3>'+
+      '<div style="color:var(--gris);font-size:12px;margin-bottom:10px">'+(dd.mesActual||'')+(dd.diaCorte?' (al día '+dd.diaCorte+')':'')+(dd.mesAnterior?' vs '+dd.mesAnterior:'')+'</div>'+
       '<div style="margin-bottom:14px">'+
         '<div class="vStatLbl">Activación</div>'+
         '<div class="vStatNum">'+fN_mm(v.tot_ant)+' → '+fN_mm(v.tot_act)+'</div>'+
@@ -1076,48 +1140,96 @@
         '<div><div class="vMiniNum">'+fN_mm(v.cap_act)+'</div><div class="vMiniLbl">Va '+abAct+'</div></div>'+
         '<div>'+pillFalta(v.falta_cap)+'</div>'+
       '</div>'+
-      '<h3 style="font-size:13px;text-transform:uppercase;letter-spacing:.4px;margin:0 0 8px;color:var(--tinta)">Clientes a tu nombre</h3>'+
+      '<h4 style="font-size:12.5px;text-transform:uppercase;letter-spacing:.4px;margin:0 0 8px;color:var(--tinta)">Clientes a tu nombre</h4>'+
       '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">'+
         '<label for="avanceDia" style="font-size:12px;color:var(--gris);font-weight:600;margin-bottom:0">Ver un día exacto:</label>'+
         '<input id="avanceDia" type="number" min="1" max="'+(dd.diaCorte||31)+'" placeholder="Ej: 8" style="width:80px;padding:6px 10px;font-size:13px;margin-bottom:0">'+
       '</div>'+
       '<div id="avanceClientes"></div>'+
-      '<h3 style="font-size:13px;text-transform:uppercase;letter-spacing:.4px;margin:20px 0 8px;color:var(--tinta)">Tu día a día</h3>'+
+      '<h4 style="font-size:12.5px;text-transform:uppercase;letter-spacing:.4px;margin:20px 0 8px;color:var(--tinta)">Tu día a día</h4>'+
       '<div id="avanceDiario"></div>';
+  }
 
-    renderClientesBlock_mm('avanceClientes', v, dd, null);
-    const diaInp = document.getElementById('avanceDia');
-    if(diaInp) diaInp.oninput = function(e){ renderClientesBlock_mm('avanceClientes', v, dd, e.target.value); };
-    renderDiarioBlock_mm('avanceDiario', v.vendedor);
+  function pintarAvance(){
+    const estado = document.getElementById('avanceEstado');
+    const cont = document.getElementById('avanceContenido');
+    const nombreSel = (document.getElementById('nombre').value||'').trim();
+
+    if(!nombreSel){
+      estado.className = 'estado cargando'; estado.style.display = 'block';
+      estado.textContent = 'Selecciona tu nombre arriba para ver tu avance.';
+      cont.style.display = 'none';
+      return;
+    }
+    estado.style.display = 'none';
+    cont.style.display = 'block';
+
+    window._avanceMM_v = null; window._avanceMM_dd = null;
+    const htmlMM = bloqueMultimarcaHTML(nombreSel);
+    const htmlVCRL = bloqueRecargaHTML(nombreSel);
+
+    cont.innerHTML =
+      '<div style="display:flex;justify-content:flex-end;margin-bottom:2px">'+
+        '<button class="btn-link" style="margin-top:0" onclick="DATA_MM=null;DATA_VCRL=null;cargarAvance();">🔄 Actualizar</button>'+
+      '</div>'+
+      htmlMM+
+      '<div style="border-top:1px solid var(--borde);margin:18px 0 16px"></div>'+
+      '<h3 style="font-size:13px;text-transform:uppercase;letter-spacing:.4px;margin:0 0 8px;color:var(--tinta)">Recarga</h3>'+
+      htmlVCRL;
+
+    const v = window._avanceMM_v, dd = window._avanceMM_dd;
+    if(v && dd){
+      renderClientesBlock_mm('avanceClientes', v, dd, null);
+      const diaInp = document.getElementById('avanceDia');
+      if(diaInp) diaInp.oninput = function(e){ renderClientesBlock_mm('avanceClientes', v, dd, e.target.value); };
+      renderDiarioBlock_mm('avanceDiario', v.vendedor);
+    }
   }
 
   function cargarAvance(){
     pintarAvance();
-    if(DATA_MM || avanceCargando) return;
-    avanceCargando = true;
-    try{
-      const saved = localStorage.getItem(LS_MM_KEY);
-      if(saved){ const d = JSON.parse(saved); if(d && d.diaadia){ DATA_MM = d; pintarAvance(); } }
-    }catch(e){}
-    fetch(EXCEL_REMOTO_MM + '?t=' + Date.now(), {cache:'no-store'})
-      .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.arrayBuffer(); })
-      .then(function(buf){
-        const wb = XLSX.read(new Uint8Array(buf), {type:'array', cellDates:true});
-        DATA_MM = parseMultimarcaWB(wb);
-        try{ localStorage.setItem(LS_MM_KEY, JSON.stringify(DATA_MM)); }catch(e){}
-        avanceCargando = false;
-        pintarAvance();
-      })
-      .catch(function(err){
-        avanceCargando = false;
-        if(!DATA_MM){
-          const estado = document.getElementById('avanceEstado');
-          estado.className = 'estado error'; estado.style.display = 'block';
-          estado.textContent = 'No se pudo cargar tu información. Revisa tu conexión e intenta de nuevo.';
-          document.getElementById('avanceContenido').style.display = 'none';
-        }
-        console.log('avance multimarca no disponible:', err);
-      });
+    if(!DATA_MM && !avanceCargando){
+      avanceCargando = true;
+      try{
+        const saved = localStorage.getItem(LS_MM_KEY);
+        if(saved){ const d = JSON.parse(saved); if(d && d.diaadia){ DATA_MM = d; pintarAvance(); } }
+      }catch(e){}
+      fetch(EXCEL_REMOTO_MM + '?t=' + Date.now(), {cache:'no-store'})
+        .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.arrayBuffer(); })
+        .then(function(buf){
+          const wb = XLSX.read(new Uint8Array(buf), {type:'array', cellDates:true});
+          DATA_MM = parseMultimarcaWB(wb);
+          try{ localStorage.setItem(LS_MM_KEY, JSON.stringify(DATA_MM)); }catch(e){}
+          avanceCargando = false;
+          pintarAvance();
+        })
+        .catch(function(err){
+          avanceCargando = false;
+          console.log('avance multimarca no disponible:', err);
+          pintarAvance();
+        });
+    }
+    if(!DATA_VCRL && !avanceRecargaCargando){
+      avanceRecargaCargando = true;
+      try{
+        const saved = localStorage.getItem(LS_VCRL_KEY);
+        if(saved){ const d = JSON.parse(saved); if(d && d.pivots){ DATA_VCRL = d; pintarAvance(); } }
+      }catch(e){}
+      fetch(encodeURI(EXCEL_VCRL_REMOTO) + '?t=' + Date.now(), {cache:'no-store'})
+        .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.arrayBuffer(); })
+        .then(function(buf){
+          const wb = XLSX.read(new Uint8Array(buf), {type:'array', cellDates:true});
+          DATA_VCRL = parseVentasCRL_gps(wb);
+          try{ localStorage.setItem(LS_VCRL_KEY, JSON.stringify(DATA_VCRL)); }catch(e){}
+          avanceRecargaCargando = false;
+          pintarAvance();
+        })
+        .catch(function(err){
+          avanceRecargaCargando = false;
+          console.log('avance recarga no disponible:', err);
+          pintarAvance();
+        });
+    }
   }
 
   document.getElementById('nombre').addEventListener('change', function(){
