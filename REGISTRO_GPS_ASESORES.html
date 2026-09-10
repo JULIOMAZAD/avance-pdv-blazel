@@ -879,13 +879,26 @@
       return '<div class="note" style="margin:16px 0">Todavía no hay información de Recarga para tu usuario. Si crees que es un error, avisa a Julio.</div>';
     }
     const mesLbl = pCuota.filtros['MES']||'';
+    const diaAv = diaAvance_vcrl(DATA_VCRL.pivots);
     const falta = fila.FALTA;
     const pill = falta==null ? '<span class="pill pn">Sin cuota asignada</span>'
       : (falta<0 ? ('<span class="pill pr">Faltan '+fN_mm(Math.abs(falta))+'</span>')
                   : ('<span class="pill pv">✔ Cumplida'+(falta>0?(' (+'+fN_mm(falta)+')'):'')+'</span>'));
-    return '<div class="vStatLbl">Venta de Recarga'+(mesLbl?(' — '+mesLbl):'')+'</div>'+
+    return '<div class="vStatLbl">Venta de Recarga'+(mesLbl?(' — '+mesLbl):'')+(diaAv?(' (al día '+diaAv+')'):'')+'</div>'+
       '<div class="vStatNum">S/ '+fN_mm(fila.VENTA)+(fila.CUOTA!=null?(' de S/ '+fN_mm(fila.CUOTA)):'')+'</div>'+
       pill;
+  }
+  /* Busca en cualquiera de las tablas dinámicas un filtro de fecha que sea un día
+     exacto (no "(Varios elementos)") y devuelve el día del mes — así "Mi Avance"
+     siempre marca "al día X" igual que Julio lo escribe a mano en su Excel. */
+  function diaAvance_vcrl(pivots){
+    for(const p of pivots){
+      for(const k in p.filtros){
+        const v = p.filtros[k];
+        if(v instanceof Date && !isNaN(v)) return v.getDate();
+      }
+    }
+    return null;
   }
 
   const num_mm = v => (typeof v==='number' && isFinite(v)) ? v : null;

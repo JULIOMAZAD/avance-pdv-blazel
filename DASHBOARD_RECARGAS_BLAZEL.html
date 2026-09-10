@@ -1440,6 +1440,19 @@ function faltaPill_vcrl(falta){
   if(falta==null) return '<span class="pill pn">Sin cuota</span>';
   return falta<0 ? `<span class="pill pr">Faltan ${fN(Math.abs(falta))}</span>` : `<span class="pill pv">✔ Cumplida${falta>0?(' (+'+fN(falta)+')'):''}</span>`;
 }
+/* Busca en cualquiera de las tablas dinámicas un filtro de fecha que sea un día
+   exacto (no "(Varios elementos)") y devuelve el día del mes — así el tablero
+   siempre marca "al día X" igual que Julio lo escribe a mano en su Excel,
+   sin depender de que agregue una celda nueva. */
+function diaAvance_vcrl(pivots){
+  for(const p of pivots){
+    for(const k in p.filtros){
+      const v = p.filtros[k];
+      if(v instanceof Date && !isNaN(v)) return v.getDate();
+    }
+  }
+  return null;
+}
 function rVentaDiaria(){
   const el = document.getElementById('tab-ventadiaria');
   if(!el) return;
@@ -1448,6 +1461,7 @@ function rVentaDiaria(){
   const pCuota = DATA_VCRL.pivots.find(p=>p.campos.includes('CUOTA'));
   if(!pDiario && !pCuota){ el.innerHTML = `<h2>Venta Diaria</h2><div class="card">No encontré las tablas de Envíos/Venta/Depósito ni Venta/Cuota/Falta en la hoja VENTAS de ${EXCEL_VCRL_REMOTO}.</div>`; return; }
 
+  const diaAv = diaAvance_vcrl(DATA_VCRL.pivots);
   let h = `<h2>Venta Diaria <span class="tag">de ${EXCEL_VCRL_REMOTO}</span></h2>`;
 
   if(pDiario){
@@ -1463,7 +1477,7 @@ function rVentaDiaria(){
   if(pCuota){
     const mesLbl = pCuota.filtros['MES']||'';
     const filas = pCuota.filas.slice().sort((a,b)=>(a.FALTA==null?Infinity:a.FALTA)-(b.FALTA==null?Infinity:b.FALTA));
-    h += `<div class="secHead" style="margin-top:22px"><h2 style="margin:0">Avance de cuota${mesLbl?(' — '+mesLbl):''} <span class="tag">acumulado del mes</span></h2></div>
+    h += `<div class="secHead" style="margin-top:22px"><h2 style="margin:0">Avance de cuota${mesLbl?(' — '+mesLbl):''}${diaAv?(' (al día '+diaAv+')'):''} <span class="tag">acumulado del mes</span></h2></div>
     <div class="twrap"><table><thead><tr><th style="text-align:left">Asesor</th><th>Venta</th><th>Cuota</th><th>Falta</th></tr></thead>
       <tbody>${filas.map(f=>`<tr><td>${f.etiqueta}</td><td class="num">${fS(f.VENTA)}</td><td class="num">${f.CUOTA==null?'—':fS(f.CUOTA)}</td><td class="num">${faltaPill_vcrl(f.FALTA)}</td></tr>`).join('')}
       ${pCuota.total?`<tr class="tot"><td>Total general</td><td class="num">${fS(pCuota.total.VENTA)}</td><td class="num">${fS(pCuota.total.CUOTA)}</td><td class="num">${faltaPill_vcrl(pCuota.total.FALTA)}</td></tr>`:''}
