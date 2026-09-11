@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Registro de Asistencia — Blazel</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
   :root{
     --rojo: #E4002B;
@@ -270,6 +271,7 @@
     <div class="tab activo" id="tabAsistencia" onclick="cambiarVista('asistencia')">📍 ASISTENCIA</div>
     <div class="tab" id="tabAvance" onclick="cambiarVista('avance')">📊 MI AVANCE</div>
     <div class="tab" id="tabPre" onclick="cambiarVista('pre')">📦 PRE-ENTREGA CHIPS</div>
+    <div class="tab" id="tabRecarga" onclick="cambiarVista('recarga')">⚡ RECARGA</div>
   </div>
 
   <div class="vista activa" id="vistaAsistencia">
@@ -300,6 +302,14 @@
       <div id="avanceContenido" style="display:none"></div>
     </div>
     <div class="pie">Esta información se actualiza sola cada vez que Julio sube un Excel nuevo a GitHub — no necesitas hacer nada para que se refresque.</div>
+  </div>
+
+  <div class="vista" id="vistaRecarga">
+    <div class="tarjeta" style="padding-bottom:16px">
+      <div class="estado cargando" id="recargaEstado" style="display:block">Selecciona tu nombre arriba para ver tu avance.</div>
+      <div id="recargaContenido" style="display:none"></div>
+    </div>
+    <div class="pie">Esta información se actualiza sola cada vez que Julio sube VENTAS CRL 2026.xlsx a GitHub.</div>
   </div>
 
   <div class="vista" id="vistaPre">
@@ -487,11 +497,14 @@
     document.getElementById('vistaAsistencia').classList.toggle('activa', v==='asistencia');
     document.getElementById('vistaAvance').classList.toggle('activa', v==='avance');
     document.getElementById('vistaPre').classList.toggle('activa', v==='pre');
+    document.getElementById('vistaRecarga').classList.toggle('activa', v==='recarga');
     document.getElementById('tabAsistencia').classList.toggle('activo', v==='asistencia');
     document.getElementById('tabAvance').classList.toggle('activo', v==='avance');
     document.getElementById('tabPre').classList.toggle('activo', v==='pre');
+    document.getElementById('tabRecarga').classList.toggle('activo', v==='recarga');
     if(v === 'pre') cargarMisPedidos();
     if(v === 'avance') cargarAvance();
+    if(v === 'recarga') cargarRecarga();
   }
 
   document.getElementById('nombre').addEventListener('change', cargarMisPedidos);
@@ -799,13 +812,16 @@
   const normVend = s => String(s||'').trim().replace(/\s+/g,' ').toUpperCase();
 
   // ======================================================================
-  // RECARGA — trae VENTAS CRL 2026.xlsx (hoja "VENTAS", tabla dinámica
-  // Venta/Cuota/Falta) y muestra solo la fila del vendedor que abrió sesión.
+  // RECARGA — trae VENTAS CRL 2026.xlsx (hoja "VENTAS" para el total del mes
+  // y hoja "BASE DE DATOS" para el día a día) y muestra el avance de cuota,
+  // el día a día y la proyección del vendedor que abrió sesión. Vive en su
+  // propia pestaña "⚡ RECARGA", separada de "Mi Avance" (que es Multimarca).
   // ======================================================================
   const EXCEL_VCRL_REMOTO = 'VENTAS CRL 2026.xlsx';
-  const LS_VCRL_KEY = 'bz_avance_vcrl_data_v1';
+  const LS_VCRL_KEY = 'bz_recarga_vcrl_data_v2';
   let DATA_VCRL = null;
-  let avanceRecargaCargando = false;
+  let recargaCargando = false;
+  let _rcCharts = {};
 
   // Mismo tipo de cruce que arriba, pero contra las etiquetas "VEND"/"SUP" de Recarga.
   // PARA AGREGAR O CORREGIR UN CRUCE: agrega una línea como
@@ -828,13 +844,17 @@
     if(typeof v==='string' && v.trim()!=='' && v.trim()!=='-' && !isNaN(parseFloat(v))) return parseFloat(v);
     return null;
   };
+  /* Todas las fechas de VENTAS CRL vienen como medianoche UTC (SheetJS cellDates),
+     así que SIEMPRE se leen con los getters UTC — con getDate() normal, un celular
+     en Lima (UTC-5) puede mostrar el día anterior por la resta de huso horario. */
+  function claveDia_vcrl(v){ return v.getUTCFullYear()+'-'+String(v.getUTCMonth()+1).padStart(2,'0')+'-'+String(v.getUTCDate()).padStart(2,'0'); }
   /* Escanea la hoja "VENTAS" buscando cada tabla dinámica por su encabezado
      "Etiquetas de fila" (puede haber varias una al lado de otra) — igual que en
      DASHBOARD_RECARGAS_BLAZEL.html, para no depender de filas/columnas fijas. */
   function parseVentasCRL_gps(wb){
     const ws = wb.Sheets['VENTAS'];
     if(!ws) throw new Error('No encuentro la hoja "VENTAS" en '+EXCEL_VCRL_REMOTO);
-    const rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null});
+    const rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null, cellDates:true});
     const pivots = [];
     for(let r=0; r<rows.length; r++){
       const row = rows[r]||[];
@@ -865,40 +885,84 @@
     }
     return {pivots: pivots};
   }
-  function bloqueRecargaHTML(nombreSel){
-    if(!DATA_VCRL){
-      return '<div class="note" style="margin:16px 0">Cargando tu avance de Recarga…</div>';
+  /* Lee la hoja "BASE DE DATOS" (el detalle transacción por transacción) para armar
+     el día a día y la proyección de CADA vendedor — las tablas dinámicas de la hoja
+     VENTAS no alcanzan para esto porque una es solo "hoy" y la otra ya viene sumada
+     de todo el mes. Agrupa por "NOMBRE DEL USUARIO" (el asesor que envía la recarga)
+     + fecha, con los mismos filtros que usa la tabla dinámica de Recarga. Verificado
+     contra el tablero de Recargas: los totales coinciden sol por sol. */
+  function parseBaseDatosVCRL_gps(wb){
+    const ws = wb.Sheets['BASE DE DATOS'];
+    if(!ws) return null;
+    const rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null, cellDates:true});
+    let hdrI=-1, hdr=null;
+    for(let r=0; r<Math.min(rows.length,10); r++){
+      const row = rows[r];
+      if(row && row.some(function(c){ return String(c||'').trim().toUpperCase()==='NOMBRE DEL USUARIO'; }) && row.some(function(c){ return String(c||'').trim().toUpperCase()==='CR'; })){ hdrI=r; hdr=row; break; }
     }
-    const pCuota = DATA_VCRL.pivots.filter(function(p){ return p.campos.indexOf('CUOTA')>=0; })[0];
-    if(!pCuota){
-      return '<div class="note" style="margin:16px 0">No pude leer el avance de cuota de Recarga. Intenta de nuevo más tarde.</div>';
+    if(hdrI<0) return null;
+    const colOf = function(name){ return hdr.findIndex(function(c){ return String(c||'').trim().toUpperCase()===name; }); };
+    const cFecha=colOf('FECHA SEGÚN HORARIO DE TRANSFERENCIA'), cMonto=colOf('CR'), cVend=colOf('NOMBRE DEL USUARIO'),
+          cTipoTx=colOf('TIPO DE TRANSFERENCIA'), cProd=colOf('NOMBRE DEL PRODUCTO'), cTipoUsr=colOf('TIPO DE USUARIO(DEL USUARIO)');
+    if(cFecha<0 || cMonto<0 || cVend<0) return null;
+    const porDia = {};
+    for(let i=hdrI+1; i<rows.length; i++){
+      const r = rows[i]; if(!r) continue;
+      if(cTipoTx>=0 && String(r[cTipoTx]||'').trim()!=='Transferencia') continue;
+      if(cProd>=0 && String(r[cProd]||'').trim()!=='Prepago') continue;
+      if(cTipoUsr>=0 && String(r[cTipoUsr]||'').trim()!=='No encontrado') continue;
+      const f = r[cFecha]; if(!(f instanceof Date) || isNaN(f)) continue;
+      const monto = num_vcrl(r[cMonto]); if(monto==null) continue;
+      const vend = r[cVend] ? String(r[cVend]).trim() : null; if(!vend) continue;
+      const key = claveDia_vcrl(f);
+      if(!porDia[key]) porDia[key] = {};
+      if(!porDia[key][vend]) porDia[key][vend] = {monto:0, envios:0};
+      porDia[key][vend].monto += monto; porDia[key][vend].envios++;
     }
-    const nombreObjetivo = normVend(MAPEO_VENDEDOR_RECARGA[nombreSel] || nombreSel);
-    const fila = pCuota.filas.filter(function(f){ return normVend(f.etiqueta)===nombreObjetivo; })[0];
-    if(!fila){
-      return '<div class="note" style="margin:16px 0">Todavía no hay información de Recarga para tu usuario. Si crees que es un error, avisa a Julio.</div>';
-    }
-    const mesLbl = pCuota.filtros['MES']||'';
-    const diaAv = diaAvance_vcrl(DATA_VCRL.pivots);
-    const falta = fila.FALTA;
-    const pill = falta==null ? '<span class="pill pn">Sin cuota asignada</span>'
-      : (falta<0 ? ('<span class="pill pr">Faltan '+fN_mm(Math.abs(falta))+'</span>')
-                  : ('<span class="pill pv">✔ Cumplida'+(falta>0?(' (+'+fN_mm(falta)+')'):'')+'</span>'));
-    return '<div class="vStatLbl">Venta de Recarga'+(mesLbl?(' — '+mesLbl):'')+(diaAv?(' (al día '+diaAv+')'):'')+'</div>'+
-      '<div class="vStatNum">S/ '+fN_mm(fila.VENTA)+(fila.CUOTA!=null?(' de S/ '+fN_mm(fila.CUOTA)):'')+'</div>'+
-      pill;
+    return porDia;
   }
   /* Busca en cualquiera de las tablas dinámicas un filtro de fecha que sea un día
-     exacto (no "(Varios elementos)") y devuelve el día del mes — así "Mi Avance"
-     siempre marca "al día X" igual que Julio lo escribe a mano en su Excel. */
+     exacto (no "(Varios elementos)") y devuelve el día del mes (en UTC) — así
+     "Recarga" siempre marca "al día X" igual que Julio lo escribe a mano en su Excel. */
   function diaAvance_vcrl(pivots){
     for(const p of pivots){
       for(const k in p.filtros){
         const v = p.filtros[k];
-        if(v instanceof Date && !isNaN(v)) return v.getDate();
+        if(v instanceof Date && !isNaN(v)) return v.getUTCDate();
       }
     }
     return null;
+  }
+  function anioMesAvance_vcrl(pivots){
+    for(const p of pivots){
+      for(const k in p.filtros){
+        const v = p.filtros[k];
+        if(v instanceof Date && !isNaN(v)) return {anio:v.getUTCFullYear(), mes:v.getUTCMonth()+1};
+      }
+    }
+    return null;
+  }
+  const semColorGPS = p => p==null ? '#9AA3B0' : p>=1 ? getComputedStyle(document.documentElement).getPropertyValue('--verde').trim() : getComputedStyle(document.documentElement).getPropertyValue('--rojo').trim();
+  const donaCentroGPS = {
+    id:'donaCentroGPS',
+    afterDraw(chart){
+      const o = chart.options.plugins.donaCentroGPS;
+      if(!o || !o.texto) return;
+      const {ctx, chartArea:{width,height,left,top}} = chart;
+      ctx.save();
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.font='700 22px -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif'; ctx.fillStyle=o.color||'#1B1B1F';
+      ctx.fillText(o.texto, left+width/2, top+height/2 - (o.sub?6:0));
+      if(o.sub){ ctx.font='600 9px -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif'; ctx.fillStyle='#6B6B75'; ctx.fillText(o.sub, left+width/2, top+height/2+11); }
+      ctx.restore();
+    }
+  };
+  if(window.Chart) Chart.register(donaCentroGPS);
+  function mkChartRC(id, cfg){ if(_rcCharts[id]){ _rcCharts[id].destroy(); delete _rcCharts[id]; } const el=document.getElementById(id); if(el && window.Chart) _rcCharts[id]=new Chart(el,cfg); }
+  function donaRC(id, frac, color, texto, sub){
+    const v = Math.max(0, Math.min(1, frac==null?0:frac));
+    mkChartRC(id,{type:'doughnut',data:{datasets:[{data:[v,1-v],backgroundColor:[color,'#ECEDF0'],borderWidth:0,borderRadius:6}]},
+      options:{cutout:'72%',maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{enabled:false},donaCentroGPS:{texto,sub,color}}}});
   }
 
   const num_mm = v => (typeof v==='number' && isFinite(v)) ? v : null;
@@ -1178,17 +1242,11 @@
     cont.style.display = 'block';
 
     window._avanceMM_v = null; window._avanceMM_dd = null;
-    const htmlMM = bloqueMultimarcaHTML(nombreSel);
-    const htmlVCRL = bloqueRecargaHTML(nombreSel);
-
     cont.innerHTML =
       '<div style="display:flex;justify-content:flex-end;margin-bottom:2px">'+
-        '<button class="btn-link" style="margin-top:0" onclick="DATA_MM=null;DATA_VCRL=null;cargarAvance();">🔄 Actualizar</button>'+
+        '<button class="btn-link" style="margin-top:0" onclick="DATA_MM=null;cargarAvance();">🔄 Actualizar</button>'+
       '</div>'+
-      htmlMM+
-      '<div style="border-top:1px solid var(--borde);margin:18px 0 16px"></div>'+
-      '<h3 style="font-size:13px;text-transform:uppercase;letter-spacing:.4px;margin:0 0 8px;color:var(--tinta)">Recarga</h3>'+
-      htmlVCRL;
+      bloqueMultimarcaHTML(nombreSel);
 
     const v = window._avanceMM_v, dd = window._avanceMM_dd;
     if(v && dd){
@@ -1222,32 +1280,151 @@
           pintarAvance();
         });
     }
-    if(!DATA_VCRL && !avanceRecargaCargando){
-      avanceRecargaCargando = true;
+  }
+
+  document.getElementById('nombre').addEventListener('change', function(){
+    if(document.getElementById('vistaAvance').classList.contains('activa')) pintarAvance();
+    if(document.getElementById('vistaRecarga').classList.contains('activa')) pintarRecarga();
+  });
+
+  // ======================================================================
+  // Pestaña "⚡ RECARGA" — avance de cuota, día a día y proyección del
+  // vendedor que abrió sesión, con gráficos (igual de dinámico que el
+  // tablero de Recargas que usa Julio).
+  // ======================================================================
+  let _rcDiaSel = null; // clave 'YYYY-MM-DD' del día mostrado en el detalle
+  function pintarRecarga(){
+    const estado = document.getElementById('recargaEstado');
+    const cont = document.getElementById('recargaContenido');
+    const nombreSel = (document.getElementById('nombre').value||'').trim();
+
+    if(!nombreSel){
+      estado.className = 'estado cargando'; estado.style.display = 'block';
+      estado.textContent = 'Selecciona tu nombre arriba para ver tu avance.';
+      cont.style.display = 'none';
+      return;
+    }
+    estado.style.display = 'none';
+    cont.style.display = 'block';
+
+    if(!DATA_VCRL){
+      cont.innerHTML = '<div style="display:flex;justify-content:flex-end;margin-bottom:2px">'+
+        '<button class="btn-link" style="margin-top:0" onclick="DATA_VCRL=null;cargarRecarga();">🔄 Actualizar</button></div>'+
+        '<div class="note" style="margin:16px 0">Cargando tu avance de Recarga…</div>';
+      return;
+    }
+    const pCuota = DATA_VCRL.pivots.filter(function(p){ return p.campos.indexOf('CUOTA')>=0; })[0];
+    const refrescar = '<div style="display:flex;justify-content:flex-end;margin-bottom:2px">'+
+        '<button class="btn-link" style="margin-top:0" onclick="DATA_VCRL=null;cargarRecarga();">🔄 Actualizar</button></div>';
+    if(!pCuota){
+      cont.innerHTML = refrescar+'<div class="note" style="margin:16px 0">No pude leer el avance de cuota de Recarga. Intenta de nuevo más tarde.</div>';
+      return;
+    }
+    const nombreObjetivo = normVend(MAPEO_VENDEDOR_RECARGA[nombreSel] || nombreSel);
+    const fila = pCuota.filas.filter(function(f){ return normVend(f.etiqueta)===nombreObjetivo; })[0];
+    if(!fila){
+      cont.innerHTML = refrescar+'<div class="note" style="margin:16px 0">Todavía no hay información de Recarga para tu usuario. Si crees que es un error, avisa a Julio.</div>';
+      return;
+    }
+
+    const mesLbl = pCuota.filtros['MES']||'';
+    const diaAv = diaAvance_vcrl(DATA_VCRL.pivots);
+    const ym = anioMesAvance_vcrl(DATA_VCRL.pivots);
+    const porDia = DATA_VCRL.porDia;
+    // días del mes actual, con datos de ESTE vendedor, ordenados
+    const clavesMes = (porDia && ym) ? Object.keys(porDia).filter(function(k){ return k.startsWith(ym.anio+'-'+String(ym.mes).padStart(2,'0')); }).sort() : [];
+    const diasDelMes = ym ? new Date(Date.UTC(ym.anio, ym.mes, 0)).getUTCDate() : null;
+    const serieDias = clavesMes.map(function(k){ return {k:k, dia:+k.slice(8,10), monto:(porDia[k][nombreObjetivo]?porDia[k][nombreObjetivo].monto:0), envios:(porDia[k][nombreObjetivo]?porDia[k][nombreObjetivo].envios:0)}; });
+    if(!_rcDiaSel || !clavesMes.includes(_rcDiaSel)) _rcDiaSel = clavesMes.length ? clavesMes[clavesMes.length-1] : null;
+
+    const cuota = fila.CUOTA;
+    const acumulado = fila.VENTA||0;
+    const proyeccion = (diaAv && diasDelMes) ? acumulado/diaAv*diasDelMes : null;
+    const pct = (cuota && proyeccion!=null) ? proyeccion/cuota : null;
+    const falta = fila.FALTA;
+    const pillFalta = falta==null ? '<span class="pill pn">Sin cuota asignada</span>'
+      : (falta<0 ? ('<span class="pill pr">Faltan '+fN_mm(Math.abs(falta))+'</span>')
+                  : ('<span class="pill pv">✔ Cumplida'+(falta>0?(' (+'+fN_mm(falta)+')'):'')+'</span>'));
+
+    let h = refrescar +
+      '<div style="color:var(--gris);font-size:12px;margin-bottom:10px">Venta de Recarga'+(mesLbl?(' — '+mesLbl):'')+(diaAv?(' (al día '+diaAv+')'):'')+'</div>'+
+      '<div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;flex-wrap:wrap">'+
+        '<div style="position:relative;width:92px;height:92px;flex-shrink:0"><canvas id="dnRecarga"></canvas></div>'+
+        '<div style="flex:1;min-width:150px">'+
+          '<div class="vStatLbl">Venta acumulada</div>'+
+          '<div class="vStatNum">S/ '+fN_mm(acumulado)+(cuota!=null?(' de S/ '+fN_mm(cuota)):'')+'</div>'+
+          pillFalta+
+        '</div>'+
+      '</div>'+
+      '<div style="display:flex;gap:16px;align-items:flex-end;margin-bottom:18px;flex-wrap:wrap">'+
+        '<div><div class="vMiniNum">'+(cuota==null?'—':'S/ '+fN_mm(proyeccion))+'</div><div class="vMiniLbl">Proyección fin de mes</div></div>'+
+        '<div><div class="vMiniNum">'+(diaAv||'—')+' / '+(diasDelMes||'—')+'</div><div class="vMiniLbl">días transcurridos</div></div>'+
+      '</div>';
+
+    if(serieDias.length){
+      h += '<h4 style="font-size:12.5px;text-transform:uppercase;letter-spacing:.4px;margin:0 0 8px;color:var(--tinta)">Tu venta día a día</h4>'+
+        '<div style="position:relative;height:170px;margin-bottom:14px"><canvas id="chRecargaDia"></canvas></div>'+
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">'+
+          '<label for="selDiaRC" style="font-size:12px;color:var(--gris);font-weight:600;margin-bottom:0">Ver un día:</label>'+
+          '<select id="selDiaRC" style="padding:6px 10px;font-size:13px;border-radius:8px;border:1.5px solid var(--borde)">'+
+            serieDias.map(function(d){ return '<option value="'+d.k+'" '+(d.k===_rcDiaSel?'selected':'')+'>Día '+d.dia+'</option>'; }).join('')+
+          '</select>'+
+        '</div>'+
+        '<div id="detalleDiaRC"></div>';
+    }
+    cont.innerHTML = h;
+
+    donaRC('dnRecarga', pct, cuota==null?'#C9CCD2':semColorGPS(pct), pct==null?'—':(pct*100).toFixed(0)+'%', null);
+
+    if(serieDias.length){
+      const cuotaDiaria = (cuota && diasDelMes) ? cuota/diasDelMes : null;
+      const rojo = getComputedStyle(document.documentElement).getPropertyValue('--rojo').trim();
+      mkChartRC('chRecargaDia', {
+        type:'bar',
+        data:{labels:serieDias.map(function(d){ return 'D'+d.dia; }), datasets:[
+          {label:'Venta', data:serieDias.map(function(d){ return d.monto; }), backgroundColor:serieDias.map(function(d){ return d.k===_rcDiaSel?'#7A0014':rojo; }), borderRadius:4}
+        ].concat(cuotaDiaria?[{type:'line', label:'Cuota diaria', data:serieDias.map(function(){ return cuotaDiaria; }), borderColor:'#1B1B1F', borderDash:[4,3], pointRadius:0, fill:false}]:[])},
+        options:{maintainAspectRatio:false, plugins:{legend:{display:false}},
+          scales:{y:{beginAtZero:true, ticks:{font:{size:9}}}, x:{ticks:{font:{size:9}}}},
+          onClick:function(evt,els){ if(els.length){ _rcDiaSel = serieDias[els[0].index].k; pintarRecarga(); } }}
+      });
+      const sel = document.getElementById('selDiaRC');
+      if(sel) sel.onchange = function(e){ _rcDiaSel = e.target.value; pintarRecarga(); };
+      const dSel = serieDias.filter(function(d){ return d.k===_rcDiaSel; })[0];
+      const det = document.getElementById('detalleDiaRC');
+      if(det && dSel){
+        det.innerHTML = '<div class="vStatLbl">Día '+dSel.dia+'</div>'+
+          '<div class="vStatNum">S/ '+fN_mm(dSel.monto)+' <span style="font-weight:500;font-size:12px;color:var(--gris)">('+fN_mm(dSel.envios)+' envíos)</span></div>';
+      }
+    }
+  }
+
+  function cargarRecarga(){
+    pintarRecarga();
+    if(!DATA_VCRL && !recargaCargando){
+      recargaCargando = true;
       try{
         const saved = localStorage.getItem(LS_VCRL_KEY);
-        if(saved){ const d = JSON.parse(saved); if(d && d.pivots){ DATA_VCRL = d; pintarAvance(); } }
+        if(saved){ const d = JSON.parse(saved); if(d && d.pivots){ DATA_VCRL = d; pintarRecarga(); } }
       }catch(e){}
       fetch(encodeURI(EXCEL_VCRL_REMOTO) + '?t=' + Date.now(), {cache:'no-store'})
         .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.arrayBuffer(); })
         .then(function(buf){
           const wb = XLSX.read(new Uint8Array(buf), {type:'array', cellDates:true});
-          DATA_VCRL = parseVentasCRL_gps(wb);
+          const parsed = parseVentasCRL_gps(wb);
+          try{ parsed.porDia = parseBaseDatosVCRL_gps(wb); }catch(e){ console.log('BASE DE DATOS de VENTAS CRL no disponible:', e); parsed.porDia = null; }
+          DATA_VCRL = parsed;
           try{ localStorage.setItem(LS_VCRL_KEY, JSON.stringify(DATA_VCRL)); }catch(e){}
-          avanceRecargaCargando = false;
-          pintarAvance();
+          recargaCargando = false;
+          pintarRecarga();
         })
         .catch(function(err){
-          avanceRecargaCargando = false;
+          recargaCargando = false;
           console.log('avance recarga no disponible:', err);
-          pintarAvance();
+          pintarRecarga();
         });
     }
   }
-
-  document.getElementById('nombre').addEventListener('change', function(){
-    if(document.getElementById('vistaAvance').classList.contains('activa')) pintarAvance();
-  });
 </script>
 <!-- redeploy 2026-08-26 21:05 UTC -->
 </body>

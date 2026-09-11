@@ -1392,10 +1392,17 @@ const num_vcrl = v => {
   if(typeof v==='string' && v.trim()!=='' && v.trim()!=='-' && !isNaN(parseFloat(v))) return parseFloat(v);
   return null;
 };
+/* Todas las fechas de VENTAS CRL vienen como medianoche UTC (SheetJS cellDates),
+   así que SIEMPRE se leen con los getters UTC — con getDate()/toLocaleDateString()
+   normales, un celular en Lima (UTC-5) puede mostrar el día anterior por la resta
+   de huso horario. */
 function fFecha_vcrl(v){
   if(v==null || v==='') return '';
-  if(v instanceof Date && !isNaN(v)) return v.toLocaleDateString('es-PE');
+  if(v instanceof Date && !isNaN(v)) return String(v.getUTCDate()).padStart(2,'0')+'/'+String(v.getUTCMonth()+1).padStart(2,'0')+'/'+v.getUTCFullYear();
   return String(v);
+}
+function claveDia_vcrl(v){
+  return v.getUTCFullYear()+'-'+String(v.getUTCMonth()+1).padStart(2,'0')+'-'+String(v.getUTCDate()).padStart(2,'0');
 }
 /* Escanea la hoja buscando cada tabla dinámica por su encabezado "Etiquetas de fila"
    (puede haber varias, una al lado de otra) y las lee de forma genérica: nombres de
@@ -1404,7 +1411,7 @@ function fFecha_vcrl(v){
 function parseVentasCRL(wb){
   const ws = wb.Sheets['VENTAS'];
   if(!ws) throw new Error('No encuentro la hoja "VENTAS" en '+EXCEL_VCRL_REMOTO);
-  const rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null});
+  const rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null, cellDates:true});
   const pivots = [];
   for(let r=0; r<rows.length; r++){
     const row = rows[r]||[];
@@ -1436,23 +1443,74 @@ function parseVentasCRL(wb){
   if(!pivots.length) throw new Error('No encuentro ninguna tabla dinámica ("Etiquetas de fila") en la hoja VENTAS.');
   return {pivots};
 }
+/* Lee la hoja "BASE DE DATOS" (el detalle transacción por transacción que alimenta
+   las tablas dinámicas de la hoja VENTAS) para poder armar el día a día y la
+   proyección — cosa que las dos tablas dinámicas por sí solas no permiten, porque
+   una es solo "hoy" y la otra ya viene sumada de todo el mes.
+   Busca la fila de encabezados por nombre (no por número de fila fijo) y agrupa
+   por "NOMBRE DEL USUARIO" (el asesor que envía la recarga) + fecha, aplicando
+   los mismos filtros que ya usa la tabla dinámica de Recarga (Transferencia /
+   Prepago / TIPO DE USUARIO(DEL USUARIO)=No encontrado). Verificado: los totales
+   que da esto coinciden exactamente, sol por sol, con los de la tabla dinámica. */
+function parseBaseDatosVCRL(wb){
+  const ws = wb.Sheets['BASE DE DATOS'];
+  if(!ws) return null;
+  const rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null, cellDates:true});
+  let hdrI=-1, hdr=null;
+  for(let r=0; r<Math.min(rows.length,10); r++){
+    const row = rows[r];
+    if(row && row.some(c=>String(c||'').trim().toUpperCase()==='NOMBRE DEL USUARIO') && row.some(c=>String(c||'').trim().toUpperCase()==='CR')){ hdrI=r; hdr=row; break; }
+  }
+  if(hdrI<0) return null;
+  const colOf = name => hdr.findIndex(c=>String(c||'').trim().toUpperCase()===name);
+  const cFecha=colOf('FECHA SEGÚN HORARIO DE TRANSFERENCIA'), cMonto=colOf('CR'), cVend=colOf('NOMBRE DEL USUARIO'),
+        cTipoTx=colOf('TIPO DE TRANSFERENCIA'), cProd=colOf('NOMBRE DEL PRODUCTO'), cTipoUsr=colOf('TIPO DE USUARIO(DEL USUARIO)');
+  if(cFecha<0 || cMonto<0 || cVend<0) return null;
+  const porDia = {};
+  for(let i=hdrI+1; i<rows.length; i++){
+    const r = rows[i]; if(!r) continue;
+    if(cTipoTx>=0 && String(r[cTipoTx]||'').trim()!=='Transferencia') continue;
+    if(cProd>=0 && String(r[cProd]||'').trim()!=='Prepago') continue;
+    if(cTipoUsr>=0 && String(r[cTipoUsr]||'').trim()!=='No encontrado') continue;
+    const f = r[cFecha]; if(!(f instanceof Date) || isNaN(f)) continue;
+    const monto = num_vcrl(r[cMonto]); if(monto==null) continue;
+    const vend = r[cVend] ? String(r[cVend]).trim() : null; if(!vend) continue;
+    const key = claveDia_vcrl(f);
+    if(!porDia[key]) porDia[key] = {monto:0, envios:0, porVend:{}};
+    porDia[key].monto += monto; porDia[key].envios++;
+    if(!porDia[key].porVend[vend]) porDia[key].porVend[vend] = {monto:0, envios:0};
+    porDia[key].porVend[vend].monto += monto;
+    porDia[key].porVend[vend].envios++;
+  }
+  return porDia;
+}
 function faltaPill_vcrl(falta){
   if(falta==null) return '<span class="pill pn">Sin cuota</span>';
   return falta<0 ? `<span class="pill pr">Faltan ${fN(Math.abs(falta))}</span>` : `<span class="pill pv">✔ Cumplida${falta>0?(' (+'+fN(falta)+')'):''}</span>`;
 }
 /* Busca en cualquiera de las tablas dinámicas un filtro de fecha que sea un día
-   exacto (no "(Varios elementos)") y devuelve el día del mes — así el tablero
-   siempre marca "al día X" igual que Julio lo escribe a mano en su Excel,
+   exacto (no "(Varios elementos)") y devuelve el día del mes (en UTC) — así el
+   tablero siempre marca "al día X" igual que Julio lo escribe a mano en su Excel,
    sin depender de que agregue una celda nueva. */
 function diaAvance_vcrl(pivots){
   for(const p of pivots){
     for(const k in p.filtros){
       const v = p.filtros[k];
-      if(v instanceof Date && !isNaN(v)) return v.getDate();
+      if(v instanceof Date && !isNaN(v)) return v.getUTCDate();
     }
   }
   return null;
 }
+function anioMesAvance_vcrl(pivots){
+  for(const p of pivots){
+    for(const k in p.filtros){
+      const v = p.filtros[k];
+      if(v instanceof Date && !isNaN(v)) return {anio:v.getUTCFullYear(), mes:v.getUTCMonth()+1};
+    }
+  }
+  return null;
+}
+let _vcrlDiaSel = null; // clave 'YYYY-MM-DD' del día que se está mostrando en el detalle
 function rVentaDiaria(){
   const el = document.getElementById('tab-ventadiaria');
   if(!el) return;
@@ -1462,29 +1520,129 @@ function rVentaDiaria(){
   if(!pDiario && !pCuota){ el.innerHTML = `<h2>Venta Diaria</h2><div class="card">No encontré las tablas de Envíos/Venta/Depósito ni Venta/Cuota/Falta en la hoja VENTAS de ${EXCEL_VCRL_REMOTO}.</div>`; return; }
 
   const diaAv = diaAvance_vcrl(DATA_VCRL.pivots);
+  const ym = anioMesAvance_vcrl(DATA_VCRL.pivots);
+  const mesLbl = (pCuota && pCuota.filtros['MES']) || '';
+  const porDia = DATA_VCRL.porDia;
+  // días del mes actual que ya tienen datos en BASE DE DATOS, ordenados
+  const clavesMes = (porDia && ym) ? Object.keys(porDia).filter(k=>k.startsWith(ym.anio+'-'+String(ym.mes).padStart(2,'0'))).sort() : [];
+  const diasDelMes = ym ? new Date(Date.UTC(ym.anio, ym.mes, 0)).getUTCDate() : null;
+  const cuotaTotal = pCuota && pCuota.total ? pCuota.total.CUOTA : null;
+  const acumTotal = clavesMes.length ? clavesMes.reduce((s,k)=>s+porDia[k].monto,0) : (pCuota && pCuota.total ? pCuota.total.VENTA : null);
+  const proyTotal = (diaAv && diasDelMes && acumTotal!=null) ? acumTotal/diaAv*diasDelMes : null;
+  const pctProy = (cuotaTotal && proyTotal!=null) ? proyTotal/cuotaTotal : null;
+  if(!_vcrlDiaSel || !clavesMes.includes(_vcrlDiaSel)) _vcrlDiaSel = clavesMes.length ? clavesMes[clavesMes.length-1] : null;
+
   let h = `<h2>Venta Diaria <span class="tag">de ${EXCEL_VCRL_REMOTO}</span></h2>`;
 
-  if(pDiario){
-    const fecha = fFecha_vcrl(pDiario.filtros['FECHA SEGÚN HORARIO DE TRANSFERENCIA']);
-    const filas = pDiario.filas.slice().sort((a,b)=>(b.VENTA||0)-(a.VENTA||0));
-    h += `<div class="secHead"><h2 style="margin:0">Venta del día${fecha?(' — '+fecha):''}</h2></div>
-    <div class="twrap"><table><thead><tr><th style="text-align:left">Asesor</th><th>Envíos</th><th>Venta</th><th>Depósito</th></tr></thead>
-      <tbody>${filas.map(f=>`<tr><td>${f.etiqueta}</td><td class="num">${fN(f.ENVIOS)}</td><td class="num">${fS(f.VENTA)}</td><td class="num">${fS(f.DEPOSITO)}</td></tr>`).join('')}
-      ${pDiario.total?`<tr class="tot"><td>Total general</td><td class="num">${fN(pDiario.total.ENVIOS)}</td><td class="num">${fS(pDiario.total.VENTA)}</td><td class="num">${fS(pDiario.total.DEPOSITO)}</td></tr>`:''}
-      </tbody></table></div>`;
+  // ---- Dona de cuota del equipo + KPIs ----
+  h += `<div class="grid donas">
+    <div class="card dona">
+      <div class="dch"><canvas id="dnVcrlCuota"></canvas></div>
+      <div class="info">
+        <div class="t">Avance de cuota${mesLbl?(' · '+mesLbl):''}${diaAv?(' (al día '+diaAv+')'):''}</div>
+        <div class="big" style="color:${cuotaTotal==null?'var(--ink2)':semColor(pctProy)}">${cuotaTotal==null?'Sin cuota':(pctProy==null?'—':(pctProy*100).toFixed(1)+'%')} ${cuotaTotal==null?'':'<span style="font-size:15px;color:var(--ink2)">proyectado</span>'}</div>
+        <div class="stats">
+          <div class="s"><div class="sl">Cuota equipo</div><div class="sv num">${fS(cuotaTotal)}</div></div>
+          <div class="s"><div class="sl">Venta acumulada</div><div class="sv num" style="color:var(--rojo)">${fS(acumTotal)}</div></div>
+          <div class="s"><div class="sl">Proyección fin de mes</div><div class="sv num" style="color:${cuotaTotal==null?'inherit':semColor(pctProy)}">${fS(proyTotal)}</div></div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+
+  const ventaHoy = _vcrlDiaSel && porDia ? porDia[_vcrlDiaSel].monto : (pDiario && pDiario.total ? pDiario.total.VENTA : null);
+  const enviosHoy = _vcrlDiaSel && porDia ? porDia[_vcrlDiaSel].envios : (pDiario && pDiario.total ? pDiario.total.ENVIOS : null);
+  const promDiaEquipo = (clavesMes.length && acumTotal!=null) ? acumTotal/clavesMes.length : null;
+  h += `<div class="grid kpis">
+    <div class="card kpi"><div class="chip ch-rojo">${ICO.dinero}</div><div><div class="lbl">Venta del día${diaAv?(' (día '+diaAv+')'):''}</div><div class="val num">${fS(ventaHoy)}</div></div></div>
+    <div class="card kpi"><div class="chip ch-negro">${ICO.rayo}</div><div><div class="lbl">Envíos del día</div><div class="val num">${fN(enviosHoy)}</div></div></div>
+    <div class="card kpi"><div class="chip ch-gris">${ICO.flecha}</div><div><div class="lbl">Promedio diario equipo</div><div class="val num">${fS(promDiaEquipo)}</div></div></div>
+    <div class="card kpi"><div class="chip ch-negro">${ICO.cal}</div><div><div class="lbl">Días del mes</div><div class="val num">${diaAv||'—'} <small>/ ${diasDelMes||'—'}</small></div><div class="lbl" style="font-weight:500;text-transform:none;letter-spacing:0;margin-top:4px">transcurridos / totales</div></div></div>
+  </div>`;
+
+  // ---- Venta día a día (equipo) ----
+  if(clavesMes.length){
+    h += `<div class="secHead"><h2 style="margin:0">Venta día a día${mesLbl?(' — '+mesLbl):''}</h2><span class="tag">toca una barra o elige un día para ver el detalle por asesor</span></div>
+    <div class="chartbox"><div class="ch" style="height:280px"><canvas id="chVcrlDia"></canvas></div></div>`;
+  }
+
+  // ---- Detalle de un día (desplegable) ----
+  if(clavesMes.length){
+    const opciones = clavesMes.map(k=>{
+      const d = +k.slice(8,10);
+      return `<option value="${k}" ${k===_vcrlDiaSel?'selected':''}>Día ${d}</option>`;
+    }).join('');
+    h += `<div class="secHead"><h2 style="margin:0">Detalle por día</h2><select id="selDiaVCRL">${opciones}</select></div>
+    <div class="twrap" id="tDiaVCRL"></div>`;
+  }
+
+  // ---- Ranking del mes por asesor ----
+  if(pCuota){
+    const rank = pCuota.filas.slice().sort((a,b)=>(b.VENTA||0)-(a.VENTA||0));
+    h += `<div class="secHead" style="margin-top:22px"><h2 style="margin:0">Venta acumulada por asesor${mesLbl?(' — '+mesLbl):''}</h2></div>
+    <div class="chartbox"><div class="ch" style="height:${Math.max(220, rank.length*40)}px"><canvas id="chVcrlRank"></canvas></div></div>`;
+  }
+
+  // ---- Tabla avance de cuota con proyección por asesor ----
+  if(pCuota){
+    const filas = pCuota.filas.slice().sort((a,b)=>(a.FALTA==null?Infinity:a.FALTA)-(b.FALTA==null?Infinity:b.FALTA));
+    h += `<div class="secHead" style="margin-top:22px"><h2 style="margin:0">Avance de cuota${mesLbl?(' — '+mesLbl):''}${diaAv?(' (al día '+diaAv+')'):''} <span class="tag">acumulado del mes</span></h2></div>
+    <div class="twrap"><table><thead><tr><th style="text-align:left">Asesor</th><th>Venta</th><th>Cuota</th><th>Proyección</th><th>Falta</th></tr></thead>
+      <tbody>${filas.map(f=>{
+        const pct = f.CUOTA ? Math.max(0,Math.min(1,(f.VENTA||0)/f.CUOTA)) : null;
+        const proyV = (diaAv && diasDelMes) ? (f.VENTA||0)/diaAv*diasDelMes : null;
+        const col = f.CUOTA==null ? '#C9CCD2' : semColor(proyV!=null&&f.CUOTA?proyV/f.CUOTA:pct);
+        return `<tr><td>${f.etiqueta}${pct!=null?`<div style="background:#EEF0F3;border-radius:6px;height:5px;width:100%;overflow:hidden;margin-top:5px"><div style="background:${col};height:100%;width:${(pct*100).toFixed(0)}%"></div></div>`:''}</td>
+        <td class="num">${fS(f.VENTA)}</td><td class="num">${f.CUOTA==null?'—':fS(f.CUOTA)}</td>
+        <td class="num" style="color:${f.CUOTA==null?'inherit':col}">${f.CUOTA==null?'—':fS(proyV)}</td>
+        <td class="num">${faltaPill_vcrl(f.FALTA)}</td></tr>`;
+      }).join('')}
+      ${pCuota.total?`<tr class="tot"><td>Total general</td><td class="num">${fS(pCuota.total.VENTA)}</td><td class="num">${fS(pCuota.total.CUOTA)}</td><td class="num">${fS(proyTotal)}</td><td class="num">${faltaPill_vcrl(pCuota.total.FALTA)}</td></tr>`:''}
+      </tbody></table></div>
+    <p class="note">"Proyección" = venta acumulada ÷ días transcurridos × días del mes (si sigue al mismo ritmo). "Falta" = Venta − Cuota. "Sin cuota" = ese usuario no tiene cuota asignada en el Excel.</p>`;
+  }
+  el.innerHTML = h;
+
+  // ---- dibujar gráficos ----
+  dona('dnVcrlCuota', pctProy, cuotaTotal==null?'#C9CCD2':semColor(pctProy), pctProy==null?'—':(pctProy*100).toFixed(1)+'%', 'proyección');
+
+  if(clavesMes.length){
+    const cuotaDiaria = (cuotaTotal && diasDelMes) ? cuotaTotal/diasDelMes : null;
+    mkChart('chVcrlDia', {
+      type:'bar',
+      data:{labels:clavesMes.map(k=>'Día '+(+k.slice(8,10))), datasets:[
+        {type:'bar', label:'Venta del día', data:clavesMes.map(k=>porDia[k].monto), backgroundColor:clavesMes.map(k=>k===_vcrlDiaSel?'#B5151B':'#D81F26'), borderRadius:5},
+        ...(cuotaDiaria?[{type:'line', label:'Cuota diaria (promedio)', data:clavesMes.map(()=>cuotaDiaria), borderColor:'#1B1B1F', borderDash:[5,4], pointRadius:0, fill:false}]:[])
+      ]},
+      options:{maintainAspectRatio:false, plugins:{legend:{position:'bottom'}},
+        scales:{y:{beginAtZero:true, ticks:{callback:v=>'S/'+fN(v)}}},
+        onClick:(evt,els)=>{ if(els.length){ _vcrlDiaSel = clavesMes[els[0].index]; rVentaDiaria(); } }}
+    });
+    const sel = document.getElementById('selDiaVCRL');
+    if(sel) sel.onchange = e=>{ _vcrlDiaSel = e.target.value; rVentaDiaria(); };
+    renderDetalleDiaVCRL(_vcrlDiaSel, porDia);
   }
 
   if(pCuota){
-    const mesLbl = pCuota.filtros['MES']||'';
-    const filas = pCuota.filas.slice().sort((a,b)=>(a.FALTA==null?Infinity:a.FALTA)-(b.FALTA==null?Infinity:b.FALTA));
-    h += `<div class="secHead" style="margin-top:22px"><h2 style="margin:0">Avance de cuota${mesLbl?(' — '+mesLbl):''}${diaAv?(' (al día '+diaAv+')'):''} <span class="tag">acumulado del mes</span></h2></div>
-    <div class="twrap"><table><thead><tr><th style="text-align:left">Asesor</th><th>Venta</th><th>Cuota</th><th>Falta</th></tr></thead>
-      <tbody>${filas.map(f=>`<tr><td>${f.etiqueta}</td><td class="num">${fS(f.VENTA)}</td><td class="num">${f.CUOTA==null?'—':fS(f.CUOTA)}</td><td class="num">${faltaPill_vcrl(f.FALTA)}</td></tr>`).join('')}
-      ${pCuota.total?`<tr class="tot"><td>Total general</td><td class="num">${fS(pCuota.total.VENTA)}</td><td class="num">${fS(pCuota.total.CUOTA)}</td><td class="num">${faltaPill_vcrl(pCuota.total.FALTA)}</td></tr>`:''}
-      </tbody></table></div>
-    <p class="note">"Falta" = Venta − Cuota. Negativo (rojo) = todavía le falta para llegar a su cuota del mes. "Sin cuota" = ese usuario no tiene cuota asignada en el Excel.</p>`;
+    const rank = pCuota.filas.slice().sort((a,b)=>(b.VENTA||0)-(a.VENTA||0));
+    mkChart('chVcrlRank', {type:'bar',
+      data:{labels:rank.map(f=>f.etiqueta), datasets:[{label:'Venta acumulada', data:rank.map(f=>f.VENTA||0), backgroundColor:rank.map(f=>f.CUOTA?semColor((f.VENTA||0)/f.CUOTA):'#8E939B'), borderRadius:5, labelColor:'#1B1B1F'}]},
+      options:{indexAxis:'y', maintainAspectRatio:false, layout:{padding:{right:56}},
+        plugins:{legend:{display:false}, barLabels:{on:true, horizontal:true, fmt:'k'}},
+        scales:{x:{ticks:{callback:v=>'S/'+fN(v)}, grace:'10%'}}}
+    });
   }
-  el.innerHTML = h;
+}
+function renderDetalleDiaVCRL(key, porDia){
+  const cont = document.getElementById('tDiaVCRL');
+  if(!cont) return;
+  if(!key || !porDia || !porDia[key]){ cont.innerHTML = '<div class="card">Sin datos para este día.</div>'; return; }
+  const d = porDia[key];
+  const filas = Object.keys(d.porVend).map(v=>({etiqueta:v, ...d.porVend[v]})).sort((a,b)=>b.monto-a.monto);
+  cont.innerHTML = `<table><thead><tr><th style="text-align:left">Asesor</th><th>Envíos</th><th>Venta</th></tr></thead>
+    <tbody>${filas.map(f=>`<tr><td>${f.etiqueta}</td><td class="num">${fN(f.envios)}</td><td class="num">${fS(f.monto)}</td></tr>`).join('')}
+    <tr class="tot"><td>Total general</td><td class="num">${fN(d.envios)}</td><td class="num">${fS(d.monto)}</td></tr>
+    </tbody></table>`;
 }
 function cargarExcelVentasCRL(){
   fetch(encodeURI(EXCEL_VCRL_REMOTO) + '?t=' + Date.now(), {cache:'no-store'})
@@ -1492,6 +1650,7 @@ function cargarExcelVentasCRL(){
     .then(buf => {
       const wb = XLSX.read(new Uint8Array(buf), {type:'array', cellDates:true});
       DATA_VCRL = parseVentasCRL(wb);
+      try{ DATA_VCRL.porDia = parseBaseDatosVCRL(wb); }catch(e){ console.log('BASE DE DATOS de VENTAS CRL no disponible:', e); DATA_VCRL.porDia = null; }
       rVentaDiaria();
     })
     .catch(err => {
