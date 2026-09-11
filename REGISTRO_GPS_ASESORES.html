@@ -264,14 +264,15 @@
       <label>Tu nombre en este celular</label>
       <div style="font-weight:800;font-size:16px;margin-bottom:6px" id="nombreBloqueadoTexto"></div>
       <div style="font-size:12px;color:var(--gris)" id="estadoSesionBloqueada"></div>
+      <button class="btn-link" style="margin-top:10px" onclick="cambiarNombreDispositivo()">🔓 Cambiar nombre de este celular (admin)</button>
     </div>
   </div>
 
   <div class="tabs">
     <div class="tab activo" id="tabAsistencia" onclick="cambiarVista('asistencia')">📍 ASISTENCIA</div>
-    <div class="tab" id="tabAvance" onclick="cambiarVista('avance')">📊 MI AVANCE</div>
-    <div class="tab" id="tabPre" onclick="cambiarVista('pre')">📦 PRE-ENTREGA CHIPS</div>
+    <div class="tab" id="tabAvance" onclick="cambiarVista('avance')">📊 MULTIMARCA</div>
     <div class="tab" id="tabRecarga" onclick="cambiarVista('recarga')">⚡ RECARGA</div>
+    <div class="tab" id="tabPre" onclick="cambiarVista('pre')">📦 PRE-ENTREGA CHIPS</div>
   </div>
 
   <div class="vista activa" id="vistaAsistencia">
@@ -380,11 +381,15 @@
     el.textContent = mensaje;
   }
 
-  // ---- Acceso oculto de administrador: libera el nombre bloqueado en este
-  // celular. Toca 5 veces seguidas el título "JMD-GERENCIA" y pide un PIN.
+  // ---- Acceso de administrador: libera el nombre bloqueado en este celular
+  // (para pruebas, o para prestarle el celular a otro asesor). Hay un botón
+  // visible "🔓 Cambiar nombre de este celular (admin)" en la pantalla
+  // bloqueada, y además el gesto oculto de tocar 5 veces seguidas el título
+  // "JMD-GERENCIA" (se deja por si acaso). Ambos caminos piden el mismo PIN.
   // Solo funciona con el PIN de Julio, Amparo o Gracie. No es un hueco de
   // seguridad: para abrir la sesión de cualquier asesor siempre se sigue
-  // pidiendo su PIN correcto, verificado en el servidor.
+  // pidiendo su PIN correcto, verificado en el servidor — esto solo libera
+  // el nombre que quedó guardado en ESTE celular, nada más.
   const PINES_ADMIN = ['1980', '3883', '5779']; // Julio, Amparo, Gracie
   let toquesTitulo = 0;
   let toquesTituloTimer = null;
@@ -1208,8 +1213,12 @@
       '<div style="color:var(--gris);font-size:12px;margin-bottom:10px">'+(dd.mesActual||'')+(dd.diaCorte?' (al día '+dd.diaCorte+')':'')+(dd.mesAnterior?' vs '+dd.mesAnterior:'')+'</div>'+
       '<div style="margin-bottom:14px">'+
         '<div class="vStatLbl">Activación</div>'+
-        '<div class="vStatNum">'+fN_mm(v.tot_ant)+' → '+fN_mm(v.tot_act)+'</div>'+
-        pillFalta(v.falta)+
+        '<div style="display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin:4px 0 8px">'+
+          '<div><div class="vMiniNum" style="font-size:22px">'+fN_mm(v.tot_ant)+'</div><div class="vMiniLbl">'+abAnt+' (cerrado)</div></div>'+
+          '<div style="font-size:20px;color:var(--gris);padding-bottom:5px">→</div>'+
+          '<div><div class="vMiniNum" style="font-size:22px;color:var(--rojo)">'+fN_mm(v.tot_act)+'</div><div class="vMiniLbl">'+abAct+' (vas)</div></div>'+
+          '<div style="padding-bottom:3px">'+pillFalta(v.falta)+'</div>'+
+        '</div>'+
       '</div>'+
       '<div style="display:flex;gap:16px;align-items:flex-end;margin-bottom:18px;flex-wrap:wrap">'+
         '<div><div class="vMiniNum">'+fN_mm(v.numClientes)+'</div><div class="vMiniLbl">Cartera</div></div>'+
