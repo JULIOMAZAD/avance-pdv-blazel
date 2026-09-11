@@ -33,6 +33,9 @@
     align-items:baseline;
     gap:2px;
     margin-bottom:4px;
+    touch-action:manipulation;
+    -webkit-tap-highlight-color:transparent;
+    user-select:none;
   }
   .marca .b{font-weight:800; font-size:18px; letter-spacing:-0.01em;}
   .marca .l{font-weight:800; font-size:18px; letter-spacing:-0.01em; color:var(--rojo);}
@@ -264,7 +267,6 @@
       <label>Tu nombre en este celular</label>
       <div style="font-weight:800;font-size:16px;margin-bottom:6px" id="nombreBloqueadoTexto"></div>
       <div style="font-size:12px;color:var(--gris)" id="estadoSesionBloqueada"></div>
-      <button class="btn-link" style="margin-top:10px" onclick="cambiarNombreDispositivo()">🔓 Cambiar nombre de este celular (admin)</button>
     </div>
   </div>
 
@@ -382,10 +384,11 @@
   }
 
   // ---- Acceso de administrador: libera el nombre bloqueado en este celular
-  // (para pruebas, o para prestarle el celular a otro asesor). Hay un botón
-  // visible "🔓 Cambiar nombre de este celular (admin)" en la pantalla
-  // bloqueada, y además el gesto oculto de tocar 5 veces seguidas el título
-  // "JMD-GERENCIA" (se deja por si acaso). Ambos caminos piden el mismo PIN.
+  // (para pruebas, o para prestarle el celular a otro asesor). A propósito
+  // NO hay ningún botón visible para esto — si lo hubiera, cualquier asesor
+  // lo vería y empezaría a adivinar el PIN. El único camino es el gesto
+  // oculto de tocar 5 veces seguidas el título "JMD-GERENCIA" (ahora con
+  // una ventana de tiempo más amplia para que sea más fácil de lograr).
   // Solo funciona con el PIN de Julio, Amparo o Gracie. No es un hueco de
   // seguridad: para abrir la sesión de cualquier asesor siempre se sigue
   // pidiendo su PIN correcto, verificado en el servidor — esto solo libera
@@ -397,7 +400,7 @@
   function tocarTitulo(){
     toquesTitulo++;
     clearTimeout(toquesTituloTimer);
-    toquesTituloTimer = setTimeout(function(){ toquesTitulo = 0; }, 3000);
+    toquesTituloTimer = setTimeout(function(){ toquesTitulo = 0; }, 6000);
     if(toquesTitulo >= 5){
       toquesTitulo = 0;
       clearTimeout(toquesTituloTimer);
@@ -1175,6 +1178,49 @@
         : 'Total acumulado del mes hasta el corte. Escribe un día arriba (ej. 8) para ver qué activaste ese día exacto por cliente.')+'</p>';
   }
 
+  function exportarCarteraExcel_mm(){
+    const v = window._avanceMM_v, dd = window._avanceMM_dd;
+    if(!v || !dd || !window.XLSX) return;
+    const diaInp = document.getElementById('avanceDia');
+    const dNum = diaInp && diaInp.value ? parseInt(diaInp.value,10) : null;
+    const conDia = dNum!=null && !isNaN(dNum) && dNum>0;
+    const abAnt = abrevMes_mm(dd.mesAnterior)||'Ant.', abAct = abrevMes_mm(dd.mesActual)||'Act.';
+    const lblAnt = conDia ? (abAnt+' (dia '+dNum+')') : abAnt;
+    const lblAct = conDia ? (abAct+' (dia '+dNum+')') : abAct;
+    const filas = v.puntos.slice().sort(function(a,b){return b.tot_act-a.tot_act;}).map(function(p){
+      let s = p;
+      if(conDia){
+        const d = diaClienteStats_mm(p.dni, dNum);
+        s = {pre_ant:d.pre_ant, pre_act:d.pre_act, pre_dif:d.pre_act-d.pre_ant,
+          post_ant:d.post_ant, post_act:d.post_act, post_dif:d.post_act-d.post_ant,
+          tot_ant:d.tot_ant, tot_act:d.tot_act, tot_dif:d.tot_act-d.tot_ant};
+      }
+      const fila = {};
+      fila['Cliente'] = p.nombre||'—';
+      fila['DNI'] = p.dni;
+      fila['Distrito'] = p.distrito||'';
+      fila['Prepago '+lblAnt] = s.pre_ant;
+      fila['Prepago '+lblAct] = s.pre_act;
+      fila['Prepago Dif'] = s.pre_dif;
+      fila['Postpago '+lblAnt] = s.post_ant;
+      fila['Postpago '+lblAct] = s.post_act;
+      fila['Postpago Dif'] = s.post_dif;
+      fila['Total '+lblAnt] = s.tot_ant;
+      fila['Total '+lblAct] = s.tot_act;
+      fila['Total Dif'] = s.tot_dif;
+      return fila;
+    });
+    try{
+      const ws = XLSX.utils.json_to_sheet(filas);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Cartera');
+      const nombreArchivo = 'Cartera_'+(v.vendedor||'vendedor').replace(/[^A-Za-z0-9]+/g,'_')+(conDia?('_dia'+dNum):'')+'.xlsx';
+      XLSX.writeFile(wb, nombreArchivo);
+    }catch(e){
+      alert('No se pudo generar el Excel. Intenta de nuevo.');
+    }
+  }
+
   /* Construye el bloque de Multimarca (tarjeta + cartera + día a día) para el nombre
      dado, o un mensaje de estado si todavía no hay datos / no le corresponde. */
   function bloqueMultimarcaHTML(nombreSel){
@@ -1230,6 +1276,7 @@
       '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">'+
         '<label for="avanceDia" style="font-size:12px;color:var(--gris);font-weight:600;margin-bottom:0">Ver un día exacto:</label>'+
         '<input id="avanceDia" type="number" min="1" max="'+(dd.diaCorte||31)+'" placeholder="Ej: 8" style="width:80px;padding:6px 10px;font-size:13px;margin-bottom:0">'+
+        '<button class="btn-link" style="margin-top:0;margin-left:auto" onclick="exportarCarteraExcel_mm()">📥 Exportar a Excel</button>'+
       '</div>'+
       '<div id="avanceClientes"></div>'+
       '<h4 style="font-size:12.5px;text-transform:uppercase;letter-spacing:.4px;margin:20px 0 8px;color:var(--tinta)">Tu día a día</h4>'+
