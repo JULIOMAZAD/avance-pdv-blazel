@@ -3134,9 +3134,15 @@ function _eqnum(v){
 }
 // alias de tiendas que llegan con nombres distintos en el CSV en vivo pero son
 // la MISMA tienda física (ej. "Santa Anita" y "Santa Anita 1" se unifican en "Santa Anita")
+// Mega Plaza: el local original ("Mega Plaza" / "Mega Plaza 1") se une como la tienda
+// antigua, y la tienda nueva que se aperturó en el mismo local queda como "Mega Plaza 2 (Nuevo)"
 const PDV_ALIAS_LIVE = {
   'santa anita 1': 'Santa Anita',
   'santa anita1': 'Santa Anita',
+  'mega plaza': 'Mega Plaza 1 (Antiguo)',
+  'mega plaza1': 'Mega Plaza 1 (Antiguo)',
+  'mega plaza 1': 'Mega Plaza 1 (Antiguo)',
+  'mega plaza 2': 'Mega Plaza 2 (Nuevo)',
 };
 function _stripPdv(p){
   p=String(p==null?'':p).trim();
