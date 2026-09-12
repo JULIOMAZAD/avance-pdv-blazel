@@ -328,7 +328,7 @@
       <div class="estado cargando" id="planesEstado" style="display:block">Selecciona tu nombre arriba para ver tus planes.</div>
       <div id="planesContenido" style="display:none"></div>
     </div>
-    <div class="pie">Esta información se actualiza sola cada vez que Julio sube VENTAS MULTIMARCA JULIO-AGOSTO.xlsx a GitHub.</div>
+    <div class="pie">Esta información se actualiza sola cada vez que Julio sube CONTROL_MULTIMARCA_BLAZEL.xlsx a GitHub.</div>
   </div>
 
   <div class="vista" id="vistaPre">
@@ -818,7 +818,6 @@
   const EXCEL_REMOTO_MM = 'CONTROL_MULTIMARCA_BLAZEL.xlsx';
   const LS_MM_KEY = 'bz_avance_mm_data_v1';
   let DATA_MM = null;
-  let avanceCargando = false;
 
   // El nombre que el asesor elige aquí (arriba, en "Tu nombre") no siempre está escrito
   // IGUAL en el Excel de Multimarca (a veces falta un segundo nombre, o un acento).
@@ -839,18 +838,21 @@
   const normVend = s => String(s||'').trim().replace(/\s+/g,' ').toUpperCase();
 
   // ======================================================================
-  // TUS PLANES — trae VENTAS MULTIMARCA JULIO-AGOSTO.xlsx (subido a GitHub
-  // junto a este archivo) y muestra, por mes, cuánto activó el vendedor en
-  // cada tipo de plan (HFC, Portabilidad, Alta Nueva, Alta Pre, Prepago Chip,
-  // Migración). Se desglosa por MES (no por día) con los chips de arriba.
-  // Julio puede ir subiendo el mismo archivo con más filas cada mes, o
-  // agregar una hoja nueva — este código busca solas las hojas que tengan
-  // columnas FECHA/ASESOR/CAMPAÑA, sin importar el nombre de la hoja.
+  // TUS PLANES — vive DENTRO de CONTROL_MULTIMARCA_BLAZEL.xlsx (el mismo
+  // Excel de "Mi Avance"/Multimarca, subido a GitHub junto a este archivo),
+  // en una pestaña adicional con columnas FECHA/ASESOR/CAMPAÑA/PLAN - CARGO
+  // FIJO. Muestra, por mes, cuánto activó el vendedor en cada tipo de plan
+  // (HFC, Portabilidad, Alta Nueva, Alta Pre, Prepago Chip, Migración) y el
+  // total de Cargo Fijo. Se desglosa por MES (no por día) con los chips de
+  // arriba. Julio puede ir agregando filas a esa pestaña cada mes, o crear
+  // una pestaña nueva — este código busca solo las hojas que tengan columnas
+  // FECHA/ASESOR/CAMPAÑA, sin importar el nombre de la hoja, así que no hace
+  // falta tocar código si cambia el nombre de la pestaña. Se lee del MISMO
+  // archivo ya descargado para "Mi Avance" (EXCEL_REMOTO_MM) — no hace falta
+  // subir/descargar un segundo archivo aparte.
   // ======================================================================
-  const EXCEL_PLANES_REMOTO = 'VENTAS MULTIMARCA JULIO-AGOSTO.xlsx';
   const LS_PLANES_KEY = 'bz_planes_mm_data_v1';
   let DATA_PLANES = null;
-  let planesCargando = false;
   let _planesCharts = {};
   let _planesMesSel = {}; // recuerda el mes elegido por vendedor mientras dura la sesión
 
@@ -864,7 +866,8 @@
     {clave:'MIGRACIÓN', etiqueta:'Migración', color:'#C77D17'},
   ];
   // Mismo tipo de cruce que arriba, pero contra el nombre de ASESOR tal cual viene
-  // escrito en VENTAS MULTIMARCA JULIO-AGOSTO.xlsx (a veces solo el primer nombre).
+  // escrito en la pestaña de Planes de CONTROL_MULTIMARCA_BLAZEL.xlsx (a veces
+  // solo el primer nombre).
   const MAPEO_VENDEDOR_PLANES = {
     'ALBERTO': 'ALBERTO ROJAS MENDOZA', 'ALBERTO ROJAS': 'ALBERTO ROJAS MENDOZA',
     'AMPARO': 'AMPARO SUAREZ ACEVEDO',
@@ -1440,28 +1443,42 @@
     }
   }
 
+  /* CONTROL_MULTIMARCA_BLAZEL.xlsx alimenta a la vez "Mi Avance"/Multimarca Y
+     "Planes" (que vive en una pestaña adicional dentro del mismo archivo) —
+     así que se descarga y se lee UNA sola vez para las dos, en vez de pedirle
+     al celular del asesor que baje el mismo archivo grande dos veces. */
+  let controlMMCargando = false;
+  function cargarControlMM(){
+    if(controlMMCargando) return;
+    controlMMCargando = true;
+    fetch(EXCEL_REMOTO_MM + '?t=' + Date.now(), {cache:'no-store'})
+      .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.arrayBuffer(); })
+      .then(function(buf){
+        const wb = XLSX.read(new Uint8Array(buf), {type:'array', cellDates:true});
+        DATA_MM = parseMultimarcaWB(wb);
+        try{ localStorage.setItem(LS_MM_KEY, JSON.stringify(DATA_MM)); }catch(e){}
+        DATA_PLANES = parsePlanesWB(wb);
+        try{ localStorage.setItem(LS_PLANES_KEY, JSON.stringify(DATA_PLANES)); }catch(e){}
+        controlMMCargando = false;
+        pintarAvance();
+        pintarPlanes();
+      })
+      .catch(function(err){
+        controlMMCargando = false;
+        console.log('control multimarca no disponible:', err);
+        pintarAvance();
+        pintarPlanes();
+      });
+  }
+
   function cargarAvance(){
     pintarAvance();
-    if(!DATA_MM && !avanceCargando){
-      avanceCargando = true;
+    if(!DATA_MM && !controlMMCargando){
       try{
         const saved = localStorage.getItem(LS_MM_KEY);
         if(saved){ const d = JSON.parse(saved); if(d && d.diaadia){ DATA_MM = d; pintarAvance(); } }
       }catch(e){}
-      fetch(EXCEL_REMOTO_MM + '?t=' + Date.now(), {cache:'no-store'})
-        .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.arrayBuffer(); })
-        .then(function(buf){
-          const wb = XLSX.read(new Uint8Array(buf), {type:'array', cellDates:true});
-          DATA_MM = parseMultimarcaWB(wb);
-          try{ localStorage.setItem(LS_MM_KEY, JSON.stringify(DATA_MM)); }catch(e){}
-          avanceCargando = false;
-          pintarAvance();
-        })
-        .catch(function(err){
-          avanceCargando = false;
-          console.log('avance multimarca no disponible:', err);
-          pintarAvance();
-        });
+      cargarControlMM();
     }
   }
 
@@ -1495,26 +1512,12 @@
 
   function cargarPlanesTab(){
     pintarPlanes();
-    if(!DATA_PLANES && !planesCargando){
-      planesCargando = true;
+    if(!DATA_PLANES && !controlMMCargando){
       try{
         const saved = localStorage.getItem(LS_PLANES_KEY);
         if(saved){ const d = JSON.parse(saved); if(d && d.meses){ DATA_PLANES = d; pintarPlanes(); } }
       }catch(e){}
-      fetch(encodeURI(EXCEL_PLANES_REMOTO) + '?t=' + Date.now(), {cache:'no-store'})
-        .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.arrayBuffer(); })
-        .then(function(buf){
-          const wb = XLSX.read(new Uint8Array(buf), {type:'array', cellDates:true});
-          DATA_PLANES = parsePlanesWB(wb);
-          try{ localStorage.setItem(LS_PLANES_KEY, JSON.stringify(DATA_PLANES)); }catch(e){}
-          planesCargando = false;
-          pintarPlanes();
-        })
-        .catch(function(err){
-          planesCargando = false;
-          console.log('planes multimarca no disponible:', err);
-          pintarPlanes();
-        });
+      cargarControlMM();
     }
   }
 

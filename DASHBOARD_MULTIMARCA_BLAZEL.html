@@ -1248,10 +1248,12 @@ function actualizarIndicador(){
    no existe ahí, o falla la descarga, seguimos tranquilamente con los datos ya cargados
    (lo guardado en este navegador, o la foto de fábrica) — nada se rompe. */
 
-/* ================= PLANES (HFC / Portabilidad / Alta Nueva / Alta Pre / Prepago Chip / Migración) ================= */
-const EXCEL_PLANES_REMOTO = 'VENTAS MULTIMARCA JULIO-AGOSTO.xlsx';
+/* ================= PLANES (HFC / Portabilidad / Alta Nueva / Alta Pre / Prepago Chip / Migración) =================
+   Vive DENTRO de CONTROL_MULTIMARCA_BLAZEL.xlsx (el mismo Excel de arriba), en una
+   pestaña adicional con columnas FECHA/ASESOR/CAMPAÑA/PLAN - CARGO FIJO — no hace
+   falta un segundo archivo. Se lee del mismo workbook ya descargado por
+   cargarExcelRemoto(), así que no se duplica la descarga del archivo grande. */
 const LS_PLANES_KEY = 'blazel_mm_planes_data_v1';
-let planesCargando = false;
 let DATA_PLANES = null;
 let planesMesSel = null;
 const MESES_ES_PLANES = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Setiembre','Octubre','Noviembre','Diciembre'];
@@ -1349,7 +1351,7 @@ function rPlanes(){
   const el = document.getElementById('tab-planes');
   const P = DATA_PLANES;
   if(!P || !P.meses || !P.meses.length){
-    el.innerHTML = `<h2>Planes <span class="tag">HFC, Portabilidad, Alta Nueva, Alta Pre, Prepago Chip, Migración</span></h2><div class="card">No se encontró ${escAttr(EXCEL_PLANES_REMOTO)} en el repositorio todavía.</div>`;
+    el.innerHTML = `<h2>Planes <span class="tag">HFC, Portabilidad, Alta Nueva, Alta Pre, Prepago Chip, Migración</span></h2><div class="card">Todavía no encuentro una pestaña de Planes (con columnas FECHA/ASESOR/CAMPAÑA) dentro de ${escAttr(EXCEL_REMOTO)}.</div>`;
     return;
   }
   if(!planesMesSel || P.meses.indexOf(planesMesSel)<0) planesMesSel = P.meses[P.meses.length-1];
@@ -1452,27 +1454,12 @@ function rPlanes(){
     : `<div class="card">Nadie tiene activaciones registradas en ${planesMesSel}.</div>`;
 }
 
-function cargarExcelPlanes(){
-  if(planesCargando) return;
-  planesCargando = true;
-  try{
-    const saved = localStorage.getItem(LS_PLANES_KEY);
-    if(saved){ const d = JSON.parse(saved); if(d && d.meses){ DATA_PLANES = d; rPlanes(); } }
-  }catch(e){}
-  fetch(encodeURI(EXCEL_PLANES_REMOTO) + '?t=' + Date.now(), {cache:'no-store'})
-    .then(r => { if(!r.ok) throw new Error('HTTP '+r.status); return r.arrayBuffer(); })
-    .then(buf => {
-      const wb = XLSX.read(new Uint8Array(buf), {type:'array', cellDates:true});
-      DATA_PLANES = parsePlanesWB(wb);
-      try{ localStorage.setItem(LS_PLANES_KEY, JSON.stringify(DATA_PLANES)); }catch(e){}
-      planesCargando = false;
-      rPlanes();
-    })
-    .catch(err => { planesCargando = false; console.log('planes no disponible todavía:', err); });
-}
-
 const EXCEL_REMOTO = 'CONTROL_MULTIMARCA_BLAZEL.xlsx';
 function cargarExcelRemoto(){
+  try{
+    const savedP = localStorage.getItem(LS_PLANES_KEY);
+    if(savedP){ const d = JSON.parse(savedP); if(d && d.meses){ DATA_PLANES = d; rPlanes(); } }
+  }catch(e){}
   fetch(EXCEL_REMOTO + '?t=' + Date.now(), {cache:'no-store'})
     .then(r => { if(!r.ok) throw new Error('HTTP '+r.status); return r.arrayBuffer(); })
     .then(buf => {
@@ -1483,8 +1470,11 @@ function cargarExcelRemoto(){
         localStorage.setItem(LS_KEY, JSON.stringify(DATA));
         localStorage.setItem(LS_META, JSON.stringify({archivo:EXCEL_REMOTO, fecha:new Date().toISOString()}));
       }catch(e){}
+      DATA_PLANES = parsePlanesWB(wb);
+      try{ localStorage.setItem(LS_PLANES_KEY, JSON.stringify(DATA_PLANES)); }catch(e){}
       renderAll();
       actualizarIndicador();
+      rPlanes();
     })
     .catch(err => { console.log('Excel en línea no disponible todavía:', err); });
 }
@@ -1493,7 +1483,6 @@ tabs();
 renderAll();
 actualizarIndicador();
 cargarExcelRemoto();
-cargarExcelPlanes();
 
 /* ===== Login multimarca ===== */
 const USUARIOS_MM = {
