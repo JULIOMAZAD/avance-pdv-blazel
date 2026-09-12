@@ -420,7 +420,8 @@ window.verVendedor = function(elHead){
   }
 };
 const ICO = {
-  rayo:'<svg viewBox="0 0 24 24"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z"/></svg>'
+  rayo:'<svg viewBox="0 0 24 24"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z"/></svg>',
+  moneda:'<svg viewBox="0 0 24 24"><path d="M12 1v3.1c-2.9.5-5 2.3-5 4.9 0 3 2.7 4 5.3 4.7 2.4.6 3.2 1.2 3.2 2.3 0 1.3-1.4 2-3.1 2-2.1 0-3-.9-3.2-2.1H6.6c.2 2.5 2.1 4 4.4 4.4V23h2.2v-2.9c2.9-.5 5.1-2.2 5.1-5 0-3.2-2.7-4.2-5.3-4.9-2.5-.6-3.2-1.2-3.2-2.2 0-1.1 1-1.9 2.7-1.9 1.8 0 2.6.9 2.7 2.1h2.4c-.2-2.3-1.7-3.7-3.9-4.1V1h-2.2z"/></svg>'
 };
 function killChart(id){ if(charts[id]){charts[id].destroy(); delete charts[id];} }
 function mkChart(id, cfg){ killChart(id); const el=document.getElementById(id); if(el) charts[id]=new Chart(el,cfg); }
@@ -1374,6 +1375,10 @@ function rPlanes(){
     totalAntPorCat[c.clave] = Object.keys(datosMesAnt).reduce(function(s,v){ return s+(datosMesAnt[v][c.clave]||0); }, 0);
   });
   const fmtSoles = n => 'S/ '+n.toLocaleString('es-PE',{minimumFractionDigits:2, maximumFractionDigits:2});
+  const totalGeneralAnt = mesAntLbl ? CATS_PLANES.reduce(function(s,c){ return s+(totalAntPorCat[c.clave]||0); }, 0) : null;
+  const cargoFijoGeneralAnt = mesAntLbl ? Object.keys(datosMesAnt).reduce(function(s,v){ return s+(datosMesAnt[v]['_CF']||0); }, 0) : null;
+  const difTotalGeneral = totalGeneralAnt!=null ? (totalGeneral-totalGeneralAnt) : null;
+  const difCargoFijoGeneral = cargoFijoGeneralAnt!=null ? (cargoFijoGeneral-cargoFijoGeneralAnt) : null;
 
   const segHTML = `<div class="segRow" id="selPlanesMes">${P.meses.map(m=>`<button class="segBtn ${m===planesMesSel?'on':''}" data-m="${escAttr(m)}">${m}</button>`).join('')}</div>`;
 
@@ -1394,14 +1399,22 @@ function rPlanes(){
   <div class="grid kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px">
     ${CATS_PLANES.map(kpiCard).join('')}
   </div>
-  <div class="grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:14px">
-    <div class="card">
-      <div class="lbl">Total activaciones ${planesMesSel}</div>
-      <div class="val num" style="font-size:34px">${fN(totalGeneral)}</div>
+  <div class="grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:14px">
+    <div class="card kpi" style="display:flex;gap:14px;align-items:center">
+      <div class="chip ch-rojo" style="width:52px;height:52px">${ICO.rayo}</div>
+      <div>
+        <div class="lbl">Total activaciones ${planesMesSel}</div>
+        <div class="val num" style="font-size:34px">${fN(totalGeneral)}</div>
+        ${difTotalGeneral!=null ? `<div class="vs ${difTotalGeneral>0?'up':difTotalGeneral<0?'dn':'eq'}" style="${difTotalGeneral>0?'background:var(--verde-bg);color:var(--verde)':difTotalGeneral<0?'background:var(--rojo-bg);color:var(--rojo)':''}">${difTotalGeneral>0?'+':''}${difTotalGeneral} vs ${mesAntLbl}</div>` : ''}
+      </div>
     </div>
-    <div class="card">
-      <div class="lbl">Cargo fijo total (CF) ${planesMesSel}</div>
-      <div class="val num" style="font-size:34px">${fmtSoles(cargoFijoGeneral)}</div>
+    <div class="card kpi" style="display:flex;gap:14px;align-items:center">
+      <div class="chip ch-verde" style="width:52px;height:52px">${ICO.moneda}</div>
+      <div>
+        <div class="lbl">Cargo fijo total (CF) ${planesMesSel}</div>
+        <div class="val num" style="font-size:34px">${fmtSoles(cargoFijoGeneral)}</div>
+        ${difCargoFijoGeneral!=null ? `<div class="vs ${difCargoFijoGeneral>0?'up':difCargoFijoGeneral<0?'dn':'eq'}" style="${difCargoFijoGeneral>0?'background:var(--verde-bg);color:var(--verde)':difCargoFijoGeneral<0?'background:var(--rojo-bg);color:var(--rojo)':''}">${difCargoFijoGeneral>0?'+':difCargoFijoGeneral<0?'-':''}${fmtSoles(Math.abs(difCargoFijoGeneral))} vs ${mesAntLbl}</div>` : ''}
+      </div>
     </div>
   </div>
   <h3 style="font-family:'Barlow Condensed';font-weight:700;font-size:16px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink);margin:18px 0 10px">Por asesor</h3>
