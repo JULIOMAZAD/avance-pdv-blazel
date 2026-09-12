@@ -1728,14 +1728,27 @@ function renderHfc(){
 
   // HFC mensual 2023 -> 2026 (respeta tienda si hay una sola seleccionada)
   document.getElementById('tHfcEvo').textContent = pdvUnico? `HFC mensual 2023 → 2026 · ${pdvShort(pdvUnico)}` : 'HFC mensual 2023 → 2026';
-  const hLabels=[],hVals=[],hColors=[];
+  const hLabels=[],hVals=[],hColors=[],hValsProy=[];
   const toneHfc={2023:'#5a6b82',2024:'#f5b041',2025:'#4aa3ff',2026:'#e63329'};
   [2023,2024,2025,2026].forEach(y=>{for(let m=1;m<=12;m++){
     const v=opsCountFor(y,m,'HFC',pdvUnico);
-    if(v>0||y<2026||m<=DATA.mesActual){hLabels.push(MESES[m-1]+" '"+String(y).slice(2));hVals.push(v);hColors.push(toneHfc[y]||'#8b97a8');}
+    if(v>0||y<2026||m<=DATA.mesActual){
+      hLabels.push(MESES[m-1]+" '"+String(y).slice(2));hVals.push(v);hColors.push(toneHfc[y]||'#8b97a8');
+      const esMesActualHfc = (y===DATA.anioActual && m===DATA.mesActual);
+      hValsProy.push(esMesActualHfc ? (v/avanceDias*diasMes(m))-v : 0);
+    }
   }});
-  mkChart('chHfcFull',{type:'bar',data:{labels:hLabels,datasets:[{data:hVals,backgroundColor:hColors,borderRadius:3}]},
-    options:{maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>fmt(c.raw)+' uds'}}},
+  // Igual que en Evolución Cargo Fijo: el mes en curso apila un segmento de "Proyección"
+  // (borde punteado) arriba de lo ya avanzado, mostrando el total proyectado al cierre.
+  mkChart('chHfcFull',{type:'bar',data:{labels:hLabels,datasets:[
+    {label:'HFC',data:hVals,backgroundColor:hColors,borderRadius:3,stack:'s'},
+    {label:'Proyección',data:hValsProy,backgroundColor:'#e6332944',borderColor:'#e63329',borderWidth:1,borderDash:[4,3],borderRadius:3,stack:'s',
+      datalabels:{
+        display:(ctx)=>hValsProy[ctx.dataIndex]>0,
+        formatter:(v,ctx)=>fmt(Math.round(hVals[ctx.dataIndex]+v))
+      }}
+  ]},
+    options:{maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': '+fmt(c.raw)+' uds'}}},
     scales:{x:{ticks:{maxRotation:90,font:{size:9}}},y:{ticks:{callback:v=>fmt(v)}}}}});
 
   // ranking de tiendas por ritmo HFC
@@ -3134,15 +3147,15 @@ function _eqnum(v){
 }
 // alias de tiendas que llegan con nombres distintos en el CSV en vivo pero son
 // la MISMA tienda física (ej. "Santa Anita" y "Santa Anita 1" se unifican en "Santa Anita")
-// Mega Plaza: el local original ("Mega Plaza" / "Mega Plaza 1") se une como la tienda
-// antigua, y la tienda nueva que se aperturó en el mismo local queda como "Mega Plaza 2 (Nuevo)"
+// Mega Plaza: el local original ("Mega Plaza" / "Mega Plaza 1") se une bajo "Mega Plaza 1",
+// y la tienda nueva que se aperturó en el mismo local queda como "Mega Plaza 2"
 const PDV_ALIAS_LIVE = {
   'santa anita 1': 'Santa Anita',
   'santa anita1': 'Santa Anita',
-  'mega plaza': 'Mega Plaza 1 (Antiguo)',
-  'mega plaza1': 'Mega Plaza 1 (Antiguo)',
-  'mega plaza 1': 'Mega Plaza 1 (Antiguo)',
-  'mega plaza 2': 'Mega Plaza 2 (Nuevo)',
+  'mega plaza': 'Mega Plaza 1',
+  'mega plaza1': 'Mega Plaza 1',
+  'mega plaza 1': 'Mega Plaza 1',
+  'mega plaza 2': 'Mega Plaza 2',
 };
 function _stripPdv(p){
   p=String(p==null?'':p).trim();
