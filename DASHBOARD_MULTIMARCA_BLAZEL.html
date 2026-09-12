@@ -1270,12 +1270,15 @@ const normVendPlanes = s => String(s||'').trim().replace(/\s+/g,' ').toUpperCase
 const MAPEO_VENDEDOR_PLANES = {
   'ALBERTO': 'ALBERTO ROJAS MENDOZA', 'ALBERTO ROJAS': 'ALBERTO ROJAS MENDOZA',
   'AMPARO': 'AMPARO SUAREZ ACEVEDO',
-  'ANGELA': 'ANGELA ROJAS BOBBIO', 'ANGELA ROJAS': 'ANGELA ROJAS BOBBIO',
+  'ANGELA': 'ANGELA ROJAS BOBBIO', 'ANGELA ROJAS': 'ANGELA ROJAS BOBBIO', 'ANGELAS ROJAS': 'ANGELA ROJAS BOBBIO',
   'FERNANDO': 'LUIS FERNANDO ROSADO', 'FERNANDO ROSADO': 'LUIS FERNANDO ROSADO',
   'JAVIER': 'JAVIER CASTELO JESÚS', 'JAVIER CASTELO': 'JAVIER CASTELO JESÚS',
   'JESUS': 'JESUS CRUZ ACUÑA', 'JESUS CRUZ': 'JESUS CRUZ ACUÑA',
   'RIGOBERTO': 'RIGOBERTO JUNIOR TERRANOVA GARCIA', 'RIGOBERTO TERRANOVA': 'RIGOBERTO JUNIOR TERRANOVA GARCIA',
-  'MARIO GALVEZ': 'MARIO RAÚL GÁLVEZ MINAYA',
+  'MARIO': 'MARIO RAÚL GÁLVEZ MINAYA', 'MARIO GALVEZ': 'MARIO RAÚL GÁLVEZ MINAYA',
+  'DANITZA': 'DANITZA MEYLEEN CARRILLO MEZA', 'DANITZA CARRILLO': 'DANITZA MEYLEEN CARRILLO MEZA',
+  'GRACE': 'GRACIE ARACELI MANRIQUE MORQUENCHO', 'GRACIE': 'GRACIE ARACELI MANRIQUE MORQUENCHO',
+  'CAMILO': 'CAMILO RIVERA',
 };
 /* La columna "PLAN - CARGO FIJO" viene sucia: a veces un número limpio (89),
    a veces texto con el precio al final ("MAX 29.90", "MAX NEGOCIOS + 55.90"),
@@ -1330,7 +1333,11 @@ function parsePlanesWB(wb){
       const campanaRaw = kCell && kCell.v!=null ? normVendPlanes(kCell.v) : '';
       if(!asesorRaw || !campanaRaw) continue;
       const asesor = MAPEO_VENDEDOR_PLANES[asesorRaw] || asesorRaw;
-      const cat = CATS_PLANES.find(function(c){ return normVendPlanes(c.clave)===campanaRaw || (c.clave==='MIGRACIÓN' && campanaRaw==='MIGRACION'); });
+      const cat = CATS_PLANES.find(function(c){
+        return normVendPlanes(c.clave)===campanaRaw
+          || (c.clave==='MIGRACIÓN' && campanaRaw==='MIGRACION')
+          || (c.clave==='ALTA NUEVA' && campanaRaw==='ALTA POST'); // Julio renombró "Alta Nueva" (postpago) a "Alta Post" en set-2026
+      });
       const claveCat = cat ? cat.clave : 'OTROS';
       const mesLbl = MESES_ES_PLANES[fv.getUTCMonth()+1] + ' ' + fv.getUTCFullYear();
       mesesSet[mesLbl] = fv.getUTCFullYear()*100 + (fv.getUTCMonth()+1);
