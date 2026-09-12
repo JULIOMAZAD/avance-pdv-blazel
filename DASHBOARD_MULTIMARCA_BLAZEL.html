@@ -50,7 +50,7 @@ main{max-width:1180px;margin:0 auto;padding:20px 16px 60px}
 .vs{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;border-radius:12px;padding:2px 8px;margin-top:6px}
 .vs.up{background:var(--verde-bg);color:var(--verde)}
 .vs.dn{background:var(--rojo-bg);color:var(--rojo)}
-.vs.eq{background:#EEF0F3;color:var(--ink2)}
+.vs.eq{background:#DCDFE5;color:#33333B}
 
 h2{font-family:'Barlow Condensed';font-weight:600;font-size:20px;letter-spacing:.5px;text-transform:uppercase;margin:18px 0 10px;color:var(--ink);border-left:4px solid var(--rojo);padding-left:10px}
 h2 .tag{font-size:12px;color:var(--ink2);font-family:'Inter';font-weight:500;text-transform:none;letter-spacing:0}
@@ -65,7 +65,7 @@ tr.tot td{font-weight:700;background:#FAFAFB;border-top:2px solid var(--line)}
 .pill{display:inline-block;padding:3px 10px;border-radius:14px;font-weight:700;font-size:12px}
 .pv{background:var(--verde-bg);color:var(--verde)}
 .pr{background:var(--rojo-bg);color:var(--rojo)}
-.pn{background:#EEF0F3;color:var(--ink2)}
+.pn{background:#DCDFE5;color:#33333B}
 
 .cmpTable th, .cmpTable td{text-align:center}
 .cmpTable th:first-child, .cmpTable td:first-child{text-align:left}
@@ -1432,14 +1432,33 @@ function rPlanes(){
     return { vendedor:v, d:d, dAnt:dAnt, tot:tot };
   }).sort(function(a,b){ return b.tot-a.tot; });
 
+  const miniPillDif = (dif, esSoles) => {
+    if(dif==null) return '';
+    const cls = dif>0?'up':dif<0?'dn':'eq';
+    const style = dif>0?'background:var(--verde-bg);color:var(--verde)':dif<0?'background:var(--rojo-bg);color:var(--rojo)':'';
+    const txt = esSoles
+      ? (dif>0?'+':dif<0?'-':'')+fmtSoles(Math.abs(dif))
+      : (dif>0?'+':'')+dif;
+    return `<div class="vs ${cls}" style="${style};margin-top:5px">${txt}</div>`;
+  };
   const miniStat = (c,d,dAnt) => {
     const n = d[c.clave]||0, nAnt = dAnt[c.clave]||0;
     const dif = mesAntLbl ? (n-nAnt) : null;
-    return `<div><div class="vMiniNum">${fN(n)}</div><div class="vMiniLbl">${c.etiqueta}${dif!=null?` (${dif>0?'+':''}${dif})`:''}</div></div>`;
+    return `<div style="border:1px solid var(--line);border-radius:10px;padding:9px 8px;background:var(--paper);text-align:center">
+        <div class="vMiniNum" style="font-size:18px">${fN(n)}</div>
+        <div class="vMiniLbl" style="font-size:10.5px;margin-top:2px">${c.etiqueta}</div>
+        ${miniPillDif(dif,false)}
+      </div>`;
   };
-  const miniStatCF = (d) => {
+  const miniStatCF = (d,dAnt) => {
     const n = d['_CF']||0;
-    return `<div><div class="vMiniNum">${fmtSoles(n)}</div><div class="vMiniLbl">Cargo fijo (CF)</div></div>`;
+    const nAnt = dAnt ? (dAnt['_CF']||0) : 0;
+    const dif = mesAntLbl ? (n-nAnt) : null;
+    return `<div style="border:1px solid var(--line);border-radius:10px;padding:9px 8px;background:var(--paper);text-align:center">
+        <div class="vMiniNum" style="font-size:18px">${fmtSoles(n)}</div>
+        <div class="vMiniLbl" style="font-size:10.5px;margin-top:2px">Cargo fijo (CF)</div>
+        ${miniPillDif(dif,true)}
+      </div>`;
   };
   const bloqueVend = (x,i) => {
     const idc = 'pv'+i;
@@ -1455,9 +1474,9 @@ function rPlanes(){
         </div>
       </div>
       <div id="${idc}" class="vcbody">
-        <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:14px">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;margin-top:14px">
           ${CATS_PLANES.map(c=>miniStat(c,x.d,x.dAnt)).join('')}
-          ${miniStatCF(x.d)}
+          ${miniStatCF(x.d,x.dAnt)}
         </div>
       </div>
     </div>`;
