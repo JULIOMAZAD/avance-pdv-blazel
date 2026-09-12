@@ -154,6 +154,7 @@ tr.tot td{font-weight:700;background:#FAFAFB;border-top:2px solid var(--line)}
   <button data-t="comparativo">Comparativo</button>
   <button data-t="diaadia">Día a día</button>
   <button data-t="vendedor">Por Vendedor</button>
+  <button data-t="planes">Planes</button>
 </nav>
 
 <main>
@@ -163,6 +164,7 @@ tr.tot td{font-weight:700;background:#FAFAFB;border-top:2px solid var(--line)}
   <section class="tab" id="tab-comparativo"></section>
   <section class="tab" id="tab-diaadia"></section>
   <section class="tab" id="tab-vendedor"></section>
+  <section class="tab" id="tab-planes"></section>
 </main>
 
 <div id="toast"></div>
@@ -1058,7 +1060,7 @@ function setGlobals(){
 }
 function renderAll(){
   setGlobals();
-  rMultimarca(); rCuotas(); rHistorico(); rComparativo(); rDiaADia(); rPorVendedor();
+  rMultimarca(); rCuotas(); rHistorico(); rComparativo(); rDiaADia(); rPorVendedor(); rPlanes();
   requestAnimationFrame(()=>Object.values(charts).forEach(c=>{try{c.resize();c.draw();}catch(e){}}));
 }
 
@@ -1245,6 +1247,230 @@ function actualizarIndicador(){
    nombre de archivo, subido junto al HTML con "Add file → Upload files"). Si el archivo todavía
    no existe ahí, o falla la descarga, seguimos tranquilamente con los datos ya cargados
    (lo guardado en este navegador, o la foto de fábrica) — nada se rompe. */
+
+/* ================= PLANES (HFC / Portabilidad / Alta Nueva / Alta Pre / Prepago Chip / Migración) ================= */
+const EXCEL_PLANES_REMOTO = 'VENTAS MULTIMARCA JULIO-AGOSTO.xlsx';
+const LS_PLANES_KEY = 'blazel_mm_planes_data_v1';
+let planesCargando = false;
+let DATA_PLANES = null;
+let planesMesSel = null;
+const MESES_ES_PLANES = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Setiembre','Octubre','Noviembre','Diciembre'];
+const CATS_PLANES = [
+  {clave:'FIJA', etiqueta:'HFC', chip:'ch-rojo'},
+  {clave:'PORTABILIDAD', etiqueta:'Portabilidad', chip:'ch-negro'},
+  {clave:'ALTA NUEVA', etiqueta:'Alta Nueva', chip:'ch-verde'},
+  {clave:'ALTA PRE', etiqueta:'Alta Pre', chip:'ch-gris'},
+  {clave:'PREPAGO CHIP', etiqueta:'Prepago Chip', chip:'ch-rojo'},
+  {clave:'MIGRACIÓN', etiqueta:'Migración', chip:'ch-negro'},
+];
+const normVendPlanes = s => String(s||'').trim().replace(/\s+/g,' ').toUpperCase();
+const MAPEO_VENDEDOR_PLANES = {
+  'ALBERTO': 'ALBERTO ROJAS MENDOZA', 'ALBERTO ROJAS': 'ALBERTO ROJAS MENDOZA',
+  'AMPARO': 'AMPARO SUAREZ ACEVEDO',
+  'ANGELA': 'ANGELA ROJAS BOBBIO', 'ANGELA ROJAS': 'ANGELA ROJAS BOBBIO',
+  'FERNANDO': 'LUIS FERNANDO ROSADO', 'FERNANDO ROSADO': 'LUIS FERNANDO ROSADO',
+  'JAVIER': 'JAVIER CASTELO JESÚS', 'JAVIER CASTELO': 'JAVIER CASTELO JESÚS',
+  'JESUS': 'JESUS CRUZ ACUÑA', 'JESUS CRUZ': 'JESUS CRUZ ACUÑA',
+  'RIGOBERTO': 'RIGOBERTO JUNIOR TERRANOVA GARCIA', 'RIGOBERTO TERRANOVA': 'RIGOBERTO JUNIOR TERRANOVA GARCIA',
+  'MARIO GALVEZ': 'MARIO RAÚL GÁLVEZ MINAYA',
+};
+/* La columna "PLAN - CARGO FIJO" viene sucia: a veces un número limpio (89),
+   a veces texto con el precio al final ("MAX 29.90", "MAX NEGOCIOS + 55.90"),
+   a veces "-" o vacío (prepago sin cargo fijo). Se intenta como número directo;
+   si no, se prueba con el último "trozo" separado por espacios; si tampoco,
+   se cuenta como 0. */
+function cargoFijoNum(v){
+  if(v==null) return 0;
+  if(typeof v==='number' && isFinite(v)) return v;
+  const s = String(v).trim();
+  if(s==='' || s==='-') return 0;
+  const directo = parseFloat(s.replace(',', '.'));
+  if(!isNaN(directo) && /^-?\d+([.,]\d+)?$/.test(s)) return directo;
+  const partes = s.split(/\s+/);
+  const ultimo = partes[partes.length-1].replace(',', '.');
+  const n = parseFloat(ultimo);
+  return !isNaN(n) && /^-?\d+([.,]\d+)?$/.test(partes[partes.length-1]) ? n : 0;
+}
+/* Recorre TODAS las hojas del libro buscando una fila de encabezado con
+   FECHA + ASESOR + CAMPAÑA (no importa el orden de columnas ni el nombre
+   de la hoja) — así, si Julio agrega una hoja nueva cada mes, no hace
+   falta tocar este código. Si además encuentra una columna de "cargo fijo"
+   (el precio del plan), suma su monto por vendedor y mes en la clave _CF. */
+function parsePlanesWB(wb){
+  const porMes = {}; // 'Junio 2026' -> { vendedor: { CLAVE: cuenta, ..., _CF: monto } }
+  const mesesSet = {};
+  wb.SheetNames.forEach(function(sn){
+    const sh = wb.Sheets[sn];
+    if(!sh || !sh['!ref']) return;
+    const range = XLSX.utils.decode_range(sh['!ref']);
+    let headerRow = -1, cFecha=-1, cAsesor=-1, cCampana=-1, cCargoFijo=-1;
+    for(let r=range.s.r; r<=Math.min(range.s.r+9, range.e.r); r++){
+      let fFecha=-1, fAsesor=-1, fCampana=-1, fCargoFijo=-1;
+      for(let c=range.s.c; c<=range.e.c; c++){
+        const cell = sh[XLSX.utils.encode_cell({r:r,c:c})];
+        const v = cell && cell.v!=null ? String(cell.v).trim().toUpperCase() : '';
+        if(v==='FECHA') fFecha=c;
+        else if(v==='ASESOR') fAsesor=c;
+        else if(v==='CAMPAÑA' || v==='CAMPANA') fCampana=c;
+        else if(v.indexOf('CARGO FIJO')>=0) fCargoFijo=c;
+      }
+      if(fFecha>=0 && fAsesor>=0 && fCampana>=0){ headerRow=r; cFecha=fFecha; cAsesor=fAsesor; cCampana=fCampana; cCargoFijo=fCargoFijo; break; }
+    }
+    if(headerRow<0) return;
+    for(let r=headerRow+1; r<=range.e.r; r++){
+      const fCell = sh[XLSX.utils.encode_cell({r:r,c:cFecha})];
+      const aCell = sh[XLSX.utils.encode_cell({r:r,c:cAsesor})];
+      const kCell = sh[XLSX.utils.encode_cell({r:r,c:cCampana})];
+      const fv = fCell && fCell.v;
+      if(!(fv instanceof Date) || isNaN(fv)) continue;
+      const asesorRaw = aCell && aCell.v!=null ? normVendPlanes(aCell.v) : '';
+      const campanaRaw = kCell && kCell.v!=null ? normVendPlanes(kCell.v) : '';
+      if(!asesorRaw || !campanaRaw) continue;
+      const asesor = MAPEO_VENDEDOR_PLANES[asesorRaw] || asesorRaw;
+      const cat = CATS_PLANES.find(function(c){ return normVendPlanes(c.clave)===campanaRaw || (c.clave==='MIGRACIÓN' && campanaRaw==='MIGRACION'); });
+      const claveCat = cat ? cat.clave : 'OTROS';
+      const mesLbl = MESES_ES_PLANES[fv.getUTCMonth()+1] + ' ' + fv.getUTCFullYear();
+      mesesSet[mesLbl] = fv.getUTCFullYear()*100 + (fv.getUTCMonth()+1);
+      if(!porMes[mesLbl]) porMes[mesLbl] = {};
+      if(!porMes[mesLbl][asesor]) porMes[mesLbl][asesor] = {};
+      porMes[mesLbl][asesor][claveCat] = (porMes[mesLbl][asesor][claveCat]||0) + 1;
+      if(cCargoFijo>=0){
+        const cfCell = sh[XLSX.utils.encode_cell({r:r,c:cCargoFijo})];
+        const cfVal = cargoFijoNum(cfCell && cfCell.v);
+        porMes[mesLbl][asesor]['_CF'] = (porMes[mesLbl][asesor]['_CF']||0) + cfVal;
+      }
+    }
+  });
+  const meses = Object.keys(mesesSet).sort(function(a,b){ return mesesSet[a]-mesesSet[b]; });
+  return { porMes:porMes, meses:meses };
+}
+
+function rPlanes(){
+  const el = document.getElementById('tab-planes');
+  const P = DATA_PLANES;
+  if(!P || !P.meses || !P.meses.length){
+    el.innerHTML = `<h2>Planes <span class="tag">HFC, Portabilidad, Alta Nueva, Alta Pre, Prepago Chip, Migración</span></h2><div class="card">No se encontró ${escAttr(EXCEL_PLANES_REMOTO)} en el repositorio todavía.</div>`;
+    return;
+  }
+  if(!planesMesSel || P.meses.indexOf(planesMesSel)<0) planesMesSel = P.meses[P.meses.length-1];
+  const idxSel = P.meses.indexOf(planesMesSel);
+  const mesAntLbl = idxSel>0 ? P.meses[idxSel-1] : null;
+  const datosMes = P.porMes[planesMesSel] || {};
+  const datosMesAnt = mesAntLbl ? (P.porMes[mesAntLbl] || {}) : {};
+
+  const vendedores = Object.keys(datosMes);
+  const totalesPorCat = {};
+  CATS_PLANES.forEach(function(c){ totalesPorCat[c.clave] = 0; });
+  let totalGeneral = 0;
+  let cargoFijoGeneral = 0;
+  vendedores.forEach(function(v){
+    CATS_PLANES.forEach(function(c){ const n = datosMes[v][c.clave]||0; totalesPorCat[c.clave]+=n; totalGeneral+=n; });
+    cargoFijoGeneral += datosMes[v]['_CF']||0;
+  });
+  const totalAntPorCat = {};
+  CATS_PLANES.forEach(function(c){
+    totalAntPorCat[c.clave] = Object.keys(datosMesAnt).reduce(function(s,v){ return s+(datosMesAnt[v][c.clave]||0); }, 0);
+  });
+  const fmtSoles = n => 'S/ '+n.toLocaleString('es-PE',{minimumFractionDigits:2, maximumFractionDigits:2});
+
+  const segHTML = `<div class="segRow" id="selPlanesMes">${P.meses.map(m=>`<button class="segBtn ${m===planesMesSel?'on':''}" data-m="${escAttr(m)}">${m}</button>`).join('')}</div>`;
+
+  const kpiCard = c => {
+    const n = totalesPorCat[c.clave]||0;
+    const nAnt = totalAntPorCat[c.clave]||0;
+    const dif = mesAntLbl ? (n-nAnt) : null;
+    return `<div class="card kpi"><div class="chip ${c.chip}">${ICO.rayo}</div><div>
+        <div class="lbl">${c.etiqueta}</div>
+        <div class="val num">${fN(n)}</div>
+        ${dif!=null ? `<div class="vs ${dif>0?'up':dif<0?'dn':'eq'}" style="${dif>0?'background:var(--verde-bg);color:var(--verde)':dif<0?'background:var(--rojo-bg);color:var(--rojo)':''}">${dif>0?'+':''}${dif} vs ${mesAntLbl}</div>` : ''}
+      </div></div>`;
+  };
+
+  el.innerHTML = `
+  <h2>Planes <span class="tag">HFC, Portabilidad, Alta Nueva, Alta Pre, Prepago Chip, Migración — por asesor y por mes</span></h2>
+  <div class="card" style="margin-bottom:14px">${segHTML}</div>
+  <div class="grid kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px">
+    ${CATS_PLANES.map(kpiCard).join('')}
+  </div>
+  <div class="grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:14px">
+    <div class="card">
+      <div class="lbl">Total activaciones ${planesMesSel}</div>
+      <div class="val num" style="font-size:34px">${fN(totalGeneral)}</div>
+    </div>
+    <div class="card">
+      <div class="lbl">Cargo fijo total (CF) ${planesMesSel}</div>
+      <div class="val num" style="font-size:34px">${fmtSoles(cargoFijoGeneral)}</div>
+    </div>
+  </div>
+  <h3 style="font-family:'Barlow Condensed';font-weight:700;font-size:16px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink);margin:18px 0 10px">Por asesor</h3>
+  <div id="planesVend"></div>
+  <p class="note" style="margin-top:10px">Todavía no hay meta/cuota cargada para estos planes — se muestra el avance y la comparación contra el mes anterior. Ordenado de mayor a menor total.</p>`;
+
+  document.querySelectorAll('#selPlanesMes .segBtn').forEach(function(b){
+    b.onclick = function(){ planesMesSel = b.dataset.m; rPlanes(); };
+  });
+
+  const lista = vendedores.map(function(v){
+    const d = datosMes[v];
+    const dAnt = datosMesAnt[v] || {};
+    const tot = CATS_PLANES.reduce(function(s,c){ return s+(d[c.clave]||0); }, 0) + (d['OTROS']||0);
+    return { vendedor:v, d:d, dAnt:dAnt, tot:tot };
+  }).sort(function(a,b){ return b.tot-a.tot; });
+
+  const miniStat = (c,d,dAnt) => {
+    const n = d[c.clave]||0, nAnt = dAnt[c.clave]||0;
+    const dif = mesAntLbl ? (n-nAnt) : null;
+    return `<div><div class="vMiniNum">${fN(n)}</div><div class="vMiniLbl">${c.etiqueta}${dif!=null?` (${dif>0?'+':''}${dif})`:''}</div></div>`;
+  };
+  const miniStatCF = (d) => {
+    const n = d['_CF']||0;
+    return `<div><div class="vMiniNum">${fmtSoles(n)}</div><div class="vMiniLbl">Cargo fijo (CF)</div></div>`;
+  };
+  const bloqueVend = (x,i) => {
+    const idc = 'pv'+i;
+    return `<div class="card" style="margin-bottom:12px">
+      <div class="vHead" data-idc="${idc}" onclick="toggleDistrito(this)">
+        <div>
+          <div style="font-family:'Barlow Condensed';font-weight:700;font-size:19px">${x.vendedor}</div>
+          <div style="color:var(--ink2);font-size:12px">${planesMesSel}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap">
+          <div class="vStat"><div class="vStatLbl">Total</div><div class="vStatNum">${fN(x.tot)}</div></div>
+          <span class="vChev" id="${idc}chev">▾</span>
+        </div>
+      </div>
+      <div id="${idc}" class="vcbody">
+        <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:14px">
+          ${CATS_PLANES.map(c=>miniStat(c,x.d,x.dAnt)).join('')}
+          ${miniStatCF(x.d)}
+        </div>
+      </div>
+    </div>`;
+  };
+  document.getElementById('planesVend').innerHTML = lista.length
+    ? lista.map(bloqueVend).join('')
+    : `<div class="card">Nadie tiene activaciones registradas en ${planesMesSel}.</div>`;
+}
+
+function cargarExcelPlanes(){
+  if(planesCargando) return;
+  planesCargando = true;
+  try{
+    const saved = localStorage.getItem(LS_PLANES_KEY);
+    if(saved){ const d = JSON.parse(saved); if(d && d.meses){ DATA_PLANES = d; rPlanes(); } }
+  }catch(e){}
+  fetch(encodeURI(EXCEL_PLANES_REMOTO) + '?t=' + Date.now(), {cache:'no-store'})
+    .then(r => { if(!r.ok) throw new Error('HTTP '+r.status); return r.arrayBuffer(); })
+    .then(buf => {
+      const wb = XLSX.read(new Uint8Array(buf), {type:'array', cellDates:true});
+      DATA_PLANES = parsePlanesWB(wb);
+      try{ localStorage.setItem(LS_PLANES_KEY, JSON.stringify(DATA_PLANES)); }catch(e){}
+      planesCargando = false;
+      rPlanes();
+    })
+    .catch(err => { planesCargando = false; console.log('planes no disponible todavía:', err); });
+}
+
 const EXCEL_REMOTO = 'CONTROL_MULTIMARCA_BLAZEL.xlsx';
 function cargarExcelRemoto(){
   fetch(EXCEL_REMOTO + '?t=' + Date.now(), {cache:'no-store'})
@@ -1267,6 +1493,7 @@ tabs();
 renderAll();
 actualizarIndicador();
 cargarExcelRemoto();
+cargarExcelPlanes();
 
 /* ===== Login multimarca ===== */
 const USUARIOS_MM = {
