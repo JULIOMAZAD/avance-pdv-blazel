@@ -1249,11 +1249,16 @@ function actualizarIndicador(){
    no existe ahí, o falla la descarga, seguimos tranquilamente con los datos ya cargados
    (lo guardado en este navegador, o la foto de fábrica) — nada se rompe. */
 
-/* ================= PLANES (HFC / Portabilidad / Alta Nueva / Alta Pre / Prepago Chip / Migración) =================
+/* ================= PLANES (HFC / Portabilidad / Alta Post / Alta Pre / Migración) =================
    Vive DENTRO de CONTROL_MULTIMARCA_BLAZEL.xlsx (el mismo Excel de arriba), en una
    pestaña adicional con columnas FECHA/ASESOR/CAMPAÑA/PLAN - CARGO FIJO — no hace
    falta un segundo archivo. Se lee del mismo workbook ya descargado por
-   cargarExcelRemoto(), así que no se duplica la descarga del archivo grande. */
+   cargarExcelRemoto(), así que no se duplica la descarga del archivo grande.
+   NOTA (set-2026): Julio unificó categorías — "Prepago Chip" ya no se muestra
+   aparte, se cuenta dentro de "Alta Pre"; y lo que antes salía como "Alta
+   Nueva" ahora se muestra con la etiqueta "Alta Post". Aplica a TODOS los
+   meses (ver los alias en parsePlanesWB para las hojas viejas que todavía
+   dicen literalmente "PREPAGO CHIP" o "ALTA NUEVA"). */
 const LS_PLANES_KEY = 'blazel_mm_planes_data_v1';
 let DATA_PLANES = null;
 let planesMesSel = null;
@@ -1261,9 +1266,8 @@ const MESES_ES_PLANES = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Ju
 const CATS_PLANES = [
   {clave:'FIJA', etiqueta:'HFC', chip:'ch-rojo'},
   {clave:'PORTABILIDAD', etiqueta:'Portabilidad', chip:'ch-negro'},
-  {clave:'ALTA NUEVA', etiqueta:'Alta Nueva', chip:'ch-verde'},
+  {clave:'ALTA NUEVA', etiqueta:'Alta Post', chip:'ch-verde'},
   {clave:'ALTA PRE', etiqueta:'Alta Pre', chip:'ch-gris'},
-  {clave:'PREPAGO CHIP', etiqueta:'Prepago Chip', chip:'ch-rojo'},
   {clave:'MIGRACIÓN', etiqueta:'Migración', chip:'ch-negro'},
 ];
 const normVendPlanes = s => String(s||'').trim().replace(/\s+/g,' ').toUpperCase();
@@ -1336,7 +1340,8 @@ function parsePlanesWB(wb){
       const cat = CATS_PLANES.find(function(c){
         return normVendPlanes(c.clave)===campanaRaw
           || (c.clave==='MIGRACIÓN' && campanaRaw==='MIGRACION')
-          || (c.clave==='ALTA NUEVA' && campanaRaw==='ALTA POST'); // Julio renombró "Alta Nueva" (postpago) a "Alta Post" en set-2026
+          || (c.clave==='ALTA NUEVA' && campanaRaw==='ALTA POST') // "Alta Nueva" ahora se muestra como "Alta Post" (mismo balde, set-2026)
+          || (c.clave==='ALTA PRE' && campanaRaw==='PREPAGO CHIP'); // Julio unificó: "Prepago Chip" ya no va aparte, cuenta como "Alta Pre" (set-2026)
       });
       const claveCat = cat ? cat.clave : 'OTROS';
       const mesLbl = MESES_ES_PLANES[fv.getUTCMonth()+1] + ' ' + fv.getUTCFullYear();
@@ -1359,7 +1364,7 @@ function rPlanes(){
   const el = document.getElementById('tab-planes');
   const P = DATA_PLANES;
   if(!P || !P.meses || !P.meses.length){
-    el.innerHTML = `<h2>Planes <span class="tag">HFC, Portabilidad, Alta Nueva, Alta Pre, Prepago Chip, Migración</span></h2><div class="card">Todavía no encuentro una pestaña de Planes (con columnas FECHA/ASESOR/CAMPAÑA) dentro de ${escAttr(EXCEL_REMOTO)}.</div>`;
+    el.innerHTML = `<h2>Planes <span class="tag">HFC, Portabilidad, Alta Post, Alta Pre, Migración</span></h2><div class="card">Todavía no encuentro una pestaña de Planes (con columnas FECHA/ASESOR/CAMPAÑA) dentro de ${escAttr(EXCEL_REMOTO)}.</div>`;
     return;
   }
   if(!planesMesSel || P.meses.indexOf(planesMesSel)<0) planesMesSel = P.meses[P.meses.length-1];
@@ -1401,7 +1406,7 @@ function rPlanes(){
   };
 
   el.innerHTML = `
-  <h2>Planes <span class="tag">HFC, Portabilidad, Alta Nueva, Alta Pre, Prepago Chip, Migración — por asesor y por mes</span></h2>
+  <h2>Planes <span class="tag">HFC, Portabilidad, Alta Post, Alta Pre, Migración — por asesor y por mes</span></h2>
   <div class="card" style="margin-bottom:14px">${segHTML}</div>
   <div class="grid kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px">
     ${CATS_PLANES.map(kpiCard).join('')}

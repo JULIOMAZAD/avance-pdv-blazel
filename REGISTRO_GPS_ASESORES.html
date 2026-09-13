@@ -842,7 +842,7 @@
   // Excel de "Mi Avance"/Multimarca, subido a GitHub junto a este archivo),
   // en una pestaña adicional con columnas FECHA/ASESOR/CAMPAÑA/PLAN - CARGO
   // FIJO. Muestra, por mes, cuánto activó el vendedor en cada tipo de plan
-  // (HFC, Portabilidad, Alta Nueva, Alta Pre, Prepago Chip, Migración) y el
+  // (HFC, Portabilidad, Alta Post, Alta Pre, Migración) y el
   // total de Cargo Fijo. Se desglosa por MES (no por día) con los chips de
   // arriba. Julio puede ir agregando filas a esa pestaña cada mes, o crear
   // una pestaña nueva — este código busca solo las hojas que tengan columnas
@@ -850,6 +850,12 @@
   // falta tocar código si cambia el nombre de la pestaña. Se lee del MISMO
   // archivo ya descargado para "Mi Avance" (EXCEL_REMOTO_MM) — no hace falta
   // subir/descargar un segundo archivo aparte.
+  // NOTA (set-2026): Julio unificó categorías — "Prepago Chip" ya no se
+  // muestra aparte, se cuenta dentro de "Alta Pre"; y lo que antes salía
+  // como "Alta Nueva" ahora se muestra con la etiqueta "Alta Post". Esto
+  // aplica a TODOS los meses (los meses viejos que en el Excel dicen
+  // literalmente "PREPAGO CHIP" o "ALTA NUEVA" también se unifican, ver
+  // los alias en parsePlanesWB).
   // ======================================================================
   const LS_PLANES_KEY = 'bz_planes_mm_data_v1';
   let DATA_PLANES = null;
@@ -860,9 +866,8 @@
   const CATS_PLANES = [
     {clave:'FIJA', etiqueta:'HFC', color:'#E6A817'},
     {clave:'PORTABILIDAD', etiqueta:'Portabilidad', color:'#0E7C7B'},
-    {clave:'ALTA NUEVA', etiqueta:'Alta Nueva', color:'#3B82F6'},
+    {clave:'ALTA NUEVA', etiqueta:'Alta Post', color:'#3B82F6'},
     {clave:'ALTA PRE', etiqueta:'Alta Pre', color:'#8E44AD'},
-    {clave:'PREPAGO CHIP', etiqueta:'Prepago Chip', color:'#13A05F'},
     {clave:'MIGRACIÓN', etiqueta:'Migración', color:'#C77D17'},
   ];
   // Mismo tipo de cruce que arriba, pero contra el nombre de ASESOR tal cual viene
@@ -937,7 +942,8 @@
         const cat = CATS_PLANES.find(function(c){
           return normVend(c.clave)===campanaRaw
             || (c.clave==='MIGRACIÓN' && campanaRaw==='MIGRACION')
-            || (c.clave==='ALTA NUEVA' && campanaRaw==='ALTA POST'); // Julio renombró "Alta Nueva" (postpago) a "Alta Post" en set-2026
+            || (c.clave==='ALTA NUEVA' && campanaRaw==='ALTA POST') // "Alta Nueva" ahora se muestra como "Alta Post" (mismo balde, set-2026)
+            || (c.clave==='ALTA PRE' && campanaRaw==='PREPAGO CHIP'); // Julio unificó: "Prepago Chip" ya no va aparte, cuenta como "Alta Pre" (set-2026)
         });
         const claveCat = cat ? cat.clave : 'OTROS';
         const mesLbl = MESES_ES_PLANES[fv.getUTCMonth()+1] + ' ' + fv.getUTCFullYear();
@@ -1546,7 +1552,7 @@
     const meses = DATA_PLANES.meses || [];
     const mesesConDatos = meses.filter(function(m){ return DATA_PLANES.porMes[m] && DATA_PLANES.porMes[m][vendedorCanonico]; });
     if(!mesesConDatos.length){
-      el.innerHTML = '<div class="note" style="margin:0">Todavía no hay planes (HFC, Portabilidad, Alta Nueva, Alta Pre, Prepago Chip, Migración) registrados para tu usuario. Si crees que es un error, avisa a Julio.</div>';
+      el.innerHTML = '<div class="note" style="margin:0">Todavía no hay planes (HFC, Portabilidad, Alta Post, Alta Pre, Migración) registrados para tu usuario. Si crees que es un error, avisa a Julio.</div>';
       return;
     }
     let mesSel = _planesMesSel[vendedorCanonico];
