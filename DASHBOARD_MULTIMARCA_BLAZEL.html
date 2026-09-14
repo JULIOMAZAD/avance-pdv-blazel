@@ -484,6 +484,12 @@ function toast(msg, ok=true){
 function getMMArchivo(){
   try{ return JSON.parse(localStorage.getItem(LS_MM_HIST_KEY) || '{}'); }catch(e){ return {}; }
 }
+/* Meses cerrados que vienen de la hoja HISTORICO DE CUOTA del Excel (meta real + venta real
+   ya cruzadas en parseWB) — más confiable que el respaldo local porque viene del propio Excel
+   y es igual para cualquiera que abra el tablero, no solo en este navegador. */
+function getMMArchivoExcel(){
+  return (DATA && DATA.multimarcaArchivoExcel) || {};
+}
 function mesActualMM(){
   return DATA.multimarca && DATA.multimarca.titulo ? DATA.multimarca.titulo.replace('Canal Multimarca — ','').trim() : '';
 }
@@ -494,19 +500,24 @@ function diasDelMesMM(mesLbl){
 }
 function mesesMMDisponibles(){
   const arch = getMMArchivo();
-  const keys = Object.keys(arch);
+  const archX = getMMArchivoExcel();
+  const keys = new Set([...Object.keys(arch), ...Object.keys(archX)]);
   const cur = mesActualMM();
-  if(cur && keys.indexOf(cur)<0) keys.push(cur);
-  return keys.sort((a,b)=> mesCodigo(a).localeCompare(mesCodigo(b)));
+  if(cur) keys.add(cur);
+  return [...keys].sort((a,b)=> mesCodigo(a).localeCompare(mesCodigo(b)));
 }
-/* Devuelve el objeto "mm" a mostrar según mmMesSel: el mes en vivo (DATA.multimarca) o una
-   foto guardada de un mes anterior. esActual:false marca que es una foto (no se actualiza sola). */
+/* Devuelve el objeto "mm" a mostrar según mmMesSel: el mes en vivo (DATA.multimarca), el cierre
+   de un mes anterior tomado de la hoja HISTORICO DE CUOTA del Excel, o — si ese mes todavía no
+   está en el Excel — una foto guardada en este navegador (respaldo, ver LS_MM_HIST_KEY).
+   origen: 'vivo' | 'excel' (cierre real) | 'local' (foto guardada, puede estar incompleta). */
 function mmActivo(){
   const cur = mesActualMM();
-  if(!mmMesSel || mmMesSel===cur) return {mes:cur, mm:DATA.multimarca, esActual:true, guardadoEn:null};
+  if(!mmMesSel || mmMesSel===cur) return {mes:cur, mm:DATA.multimarca, origen:'vivo', esActual:true, guardadoEn:null};
+  const archX = getMMArchivoExcel();
+  if(archX[mmMesSel]) return {mes:mmMesSel, mm:archX[mmMesSel], origen:'excel', esActual:false, guardadoEn:null};
   const snap = getMMArchivo()[mmMesSel];
-  if(snap && snap.mm) return {mes:mmMesSel, mm:snap.mm, esActual:false, guardadoEn:snap.guardadoEn};
-  return {mes:cur, mm:DATA.multimarca, esActual:true, guardadoEn:null};
+  if(snap && snap.mm) return {mes:mmMesSel, mm:snap.mm, origen:'local', esActual:false, guardadoEn:snap.guardadoEn};
+  return {mes:cur, mm:DATA.multimarca, origen:'vivo', esActual:true, guardadoEn:null};
 }
 function selectorMesesMM(idPrefix, onPick){
   const meses = mesesMMDisponibles();
@@ -533,44 +544,51 @@ function rMultimarca(){
   }
   const tit = mm.titulo || 'Canal Multimarca';
   const hayAvance = mm.distritos.some(d=>d.ava_pre!=null||d.ava_cap_pre!=null||d.ava_chip_post!=null||d.ava_cap_post!=null);
+  const esProyeccion = activo.origen!=='excel'; // vivo/local: se muestra % proyectado; excel: cierre real ya definitivo
   const donaIds = mm.indicadores.map((x,i)=>'dnMM'+i);
-  const cards = mm.indicadores.map((x,i)=>{
+  const calcPrincipal = x => {
     const meta = x.cuota, av = x.act, proy = x.proy;
-    const pProy = (meta && proy!=null) ? proy/meta : null;   // % proyectado al cierre del mes (lo que se ve en el aro)
-    const pReal = meta ? (av||0)/meta : null;                 // % de avance real hoy
+    const pProy = (meta && proy!=null) ? proy/meta : null;
+    const pReal = meta ? (av||0)/meta : null;
+    return {pPrincipal: esProyeccion?pProy:pReal, pReal, etiqueta: esProyeccion?'proyectado':'cierre'};
+  };
+  const cards = mm.indicadores.map((x,i)=>{
+    const meta = x.cuota, av = x.act;
+    const {pPrincipal, pReal, etiqueta} = calcPrincipal(x);
     const falta = Math.max(0, (meta||0)-(av||0));
-    const colorGauge = semColorMM(pProy);
+    const colorGauge = semColorMM(pPrincipal);
     return `<div class="card dona">
       <div class="dch"><canvas id="${donaIds[i]}"></canvas></div>
       <div class="info">
         <div class="t">${x.n}</div>
-        <div class="big" style="color:${colorGauge}">${pProy==null?'—':(pProy*100).toFixed(1)+'%'} <span style="font-size:13px;color:var(--ink2);font-weight:600">proyectado</span></div>
+        <div class="big" style="color:${colorGauge}">${pPrincipal==null?'—':(pPrincipal*100).toFixed(1)+'%'} <span style="font-size:13px;color:var(--ink2);font-weight:600">${etiqueta}</span></div>
         <div class="stats">
           <div class="s"><div class="sl">Meta</div><div class="sv num">${fN(meta)}</div></div>
           <div class="s"><div class="sl">Avance</div><div class="sv num" style="color:var(--rojo)">${fN(av)}</div></div>
           <div class="s"><div class="sl">${falta>0?'Falta':'Meta cubierta'}</div><div class="sv num" style="color:${falta>0?'var(--rojo)':'var(--verde)'}">${falta>0?fN(falta):'✓'}</div></div>
         </div>
-        <div class="vs ${pReal==null?'eq':pReal>=1?'up':'dn'}" style="${pReal==null?'':pReal>=1?'background:var(--verde-bg);color:var(--verde)':'background:var(--rojo-bg);color:var(--rojo)'}">${pReal==null?'—':fP(pReal)} avance real de la meta</div>
+        ${esProyeccion?`<div class="vs ${pReal==null?'eq':pReal>=1?'up':'dn'}" style="${pReal==null?'':pReal>=1?'background:var(--verde-bg);color:var(--verde)':'background:var(--rojo-bg);color:var(--rojo)'}">${pReal==null?'—':fP(pReal)} avance real de la meta</div>`:''}
       </div>
     </div>`;
   }).join('');
   const diasTotMM = diasDelMesMM(tit.replace('Canal Multimarca — ',''));
-  const infoCard = activo.esActual
+  const infoCard = activo.origen==='vivo'
     ? (window._diaAvanceMM ? `<div class="card" style="margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><b>Avance:</b> <span style="color:var(--ink2)">Día ${window._diaAvanceMM}${diasTotMM?' de '+diasTotMM:''}</span></div>` : '')
-    : `<div class="card" style="margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-left:4px solid var(--gris)"><b>Mes archivado.</b> <span style="color:var(--ink2)">${activo.guardadoEn?('Datos guardados el '+new Date(activo.guardadoEn).toLocaleDateString('es-PE')):'Datos guardados'} — no se actualiza solo.</span></div>`;
+    : activo.origen==='excel'
+      ? `<div class="card" style="margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-left:4px solid var(--verde)"><b>Mes cerrado.</b> <span style="color:var(--ink2)">Así cerró ${tit.replace('Canal Multimarca — ','')} — resultado final, no cambia.</span></div>`
+      : `<div class="card" style="margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-left:4px solid var(--gris)"><b>Mes archivado.</b> <span style="color:var(--ink2)">${activo.guardadoEn?('Datos guardados el '+new Date(activo.guardadoEn).toLocaleDateString('es-PE')):'Datos guardados'} — no se actualiza solo.</span></div>`;
   const selectorHtml = selectorMesesMM('selMesMM', ()=>{ rMultimarca(); rCuotas(); });
   el.innerHTML = `
   <h2>${tit} <span class="tag">meta vs avance del canal multimarca</span></h2>
   ${selectorHtml}
   ${infoCard}
-  ${(activo.esActual && !hayAvance)?'<div class="card" style="border-left:4px solid var(--ambar);margin-bottom:14px"><b>Avance aún en 0.</b> Llena las columnas de avance en CUOTA_MES conforme sumes activaciones y el % se calculará solo.</div>':''}
+  ${(activo.origen==='vivo' && !hayAvance)?'<div class="card" style="border-left:4px solid var(--ambar);margin-bottom:14px"><b>Avance aún en 0.</b> Llena las columnas de avance en CUOTA_MES conforme sumes activaciones y el % se calculará solo.</div>':''}
   <div class="grid donas">${cards}</div>
   <div class="chartbox"><div class="ch"><canvas id="chMM"></canvas></div></div>
   <p class="note" style="margin-top:14px">¿Quieres el detalle por distrito (meta, avance y lo que falta)? Está en la pestaña <a href="#" onclick="document.getElementById('navBtnCuotas').click();return false" style="color:var(--rojo);font-weight:700;text-decoration:none">Cuotas</a>.</p>`;
   mm.indicadores.forEach((x,i)=>{
-    const meta = x.cuota, proy = x.proy;
-    const pProy = (meta && proy!=null) ? proy/meta : null;
-    dona(donaIds[i], pProy, semColorMM(pProy), pProy==null?'—':(pProy*100).toFixed(1)+'%', 'proyectado');
+    const {pPrincipal, etiqueta} = calcPrincipal(x);
+    dona(donaIds[i], pPrincipal, semColorMM(pPrincipal), pPrincipal==null?'—':(pPrincipal*100).toFixed(1)+'%', etiqueta);
   });
   mkChart('chMM',{type:'bar',data:{labels:mm.indicadores.map(x=>x.n),datasets:[
     {label:'Meta',data:mm.indicadores.map(x=>x.cuota),backgroundColor:'#D9DCE1',borderRadius:5,labelColor:'#6B7077'},
@@ -607,8 +625,10 @@ function rCuotas(){
   const totRec = mm.total ? conDatos(mm.total) : null;
   const subt = mm.titulo ? mm.titulo.replace('Canal Multimarca — ','') : '';
   const selectorHtml = selectorMesesMM('selMesCuotas', ()=>{ rCuotas(); rMultimarca(); });
-  const archivadoBadge = activo.esActual ? '' :
-    `<div class="card" style="margin-bottom:14px;border-left:4px solid var(--gris)"><b>Mes archivado.</b> <span style="color:var(--ink2)">${activo.guardadoEn?('Datos guardados el '+new Date(activo.guardadoEn).toLocaleDateString('es-PE')):'Datos guardados'} — no se actualiza solo.</span></div>`;
+  const archivadoBadge = activo.origen==='vivo' ? '' :
+    activo.origen==='excel'
+      ? `<div class="card" style="margin-bottom:14px;border-left:4px solid var(--verde)"><b>Mes cerrado.</b> <span style="color:var(--ink2)">Resultado final — no se actualiza solo.</span></div>`
+      : `<div class="card" style="margin-bottom:14px;border-left:4px solid var(--gris)"><b>Mes archivado.</b> <span style="color:var(--ink2)">${activo.guardadoEn?('Datos guardados el '+new Date(activo.guardadoEn).toLocaleDateString('es-PE')):'Datos guardados'} — no se actualiza solo.</span></div>`;
 
   el.innerHTML = `
   <h2>Cuotas por distrito <span class="tag">meta, avance y lo que falta${subt?' · '+subt:''}</span></h2>
@@ -1161,6 +1181,73 @@ function renderAll(){
 /* ================= drag & drop / parser SheetJS ================= */
 const num = v => (typeof v==='number' && isFinite(v)) ? v : null;
 
+/* Hoja opcional "HISTORICO DE CUOTA": Julio la agregó a mano para guardar, mes a mes, la cuota
+   que se fijó para cada distrito (a diferencia de CUOTA_MES, que solo trae la del mes en curso).
+   Cada bloque de mes trae un título tipo "BLAZEL - CANAL MULTIMARCA - JUNIO 2026" y, debajo, una
+   tabla de cuota por distrito. El acomodo de columnas cambia un poco de bloque a bloque (a veces
+   trae ZONA/RESPONSABLE, a veces no, y en algún bloque el nombre del distrito quedó tipeado una
+   columna corrida) así que, igual que en el resto de este parser, las columnas se ubican por el
+   nombre de cada encabezado en vez de por posición fija, y el nombre del distrito se toma de la
+   primera celda con texto antes de donde empiezan las columnas numéricas de cada fila. */
+function parseHistoricoCuotaWB(wb){
+  const norm = s => String(s==null?'':s).toUpperCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ').trim();
+  const sheetName = wb.SheetNames.find(n => { const u=norm(n); return u.includes('HISTORICO') && u.includes('CUOTA'); });
+  if(!sheetName) return [];
+  const sh = wb.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json(sh,{header:1,raw:true,defval:null});
+  const bloques = [];
+  for(let i=0;i<rows.length;i++){
+    const r = rows[i]; if(!r) continue;
+    const celdaTit = r.find(c=> c!=null && norm(c).includes('CANAL MULTIMARCA'));
+    if(celdaTit==null) continue;
+    const txt = String(celdaTit).replace(/\n/g,' ').replace(/\s+/g,' ').trim();
+    const partes = txt.split('-');
+    const mesRaw = partes[partes.length-1].trim();
+    if(!mesRaw) continue;
+    const mes = mesRaw.toLowerCase().replace(/\b\w/g, c=>c.toUpperCase());
+    let hdrRow = -1, colMap = null;
+    for(let j=i+1;j<Math.min(rows.length,i+16);j++){
+      const hr = rows[j]; if(!hr) continue;
+      if(hr.some(c=>norm(c)==='DISTRITOS')){
+        hdrRow = j;
+        colMap = {chips_pre:-1, chips_post:-1, cap_pre:-1, cap_post:-1};
+        hr.forEach((c,ci)=>{
+          const u = norm(c); if(!u) return;
+          if(u.includes('CAPILARIDAD')){
+            if(u.includes('POST')) colMap.cap_post = ci; else if(u.includes('PRE')) colMap.cap_pre = ci;
+          } else if(u.includes('POSTPAGO')){ colMap.chips_post = ci; }
+          else if(u.includes('PREPAGO')){ colMap.chips_pre = ci; }
+        });
+        break;
+      }
+    }
+    if(hdrRow<0 || colMap.chips_pre<0) continue;
+    const numCols = [colMap.chips_pre, colMap.chips_post, colMap.cap_pre, colMap.cap_post].filter(c=>c>=0);
+    const primeraColNum = Math.min(...numCols);
+    const distritos = [];
+    for(let j=hdrRow+1;j<rows.length;j++){
+      const r2 = rows[j];
+      if(!r2) break;
+      if(r2.some(c=>c!=null && norm(c).includes('CANAL MULTIMARCA'))) break; // arrancó el siguiente bloque
+      let nombre = '';
+      for(let ci=0; ci<primeraColNum; ci++){
+        if(r2[ci]!=null && String(r2[ci]).trim()!==''){ nombre = String(r2[ci]).trim(); break; }
+      }
+      if(!nombre) break; // fila TOTAL o fila en blanco = fin de la tabla de este mes
+      distritos.push({
+        d: nombre,
+        chips_pre: num(r2[colMap.chips_pre]) || 0,
+        chips_post: colMap.chips_post>=0 ? (num(r2[colMap.chips_post])||0) : 0,
+        cap_pre: colMap.cap_pre>=0 ? (num(r2[colMap.cap_pre])||0) : 0,
+        cap_post: colMap.cap_post>=0 ? (num(r2[colMap.cap_post])||0) : 0
+      });
+    }
+    if(distritos.length) bloques.push({mes, distritos});
+  }
+  return bloques;
+}
+
 function parseWB(wb){
   const out = { multimarca:null, multimarcaHistorico:[], comparativo:[], diaadia:null, corte:'' };
   /* Normaliza un DNI para poder cruzar hojas donde a veces viene como texto (con ceros a la
@@ -1246,6 +1333,67 @@ function parseWB(wb){
       }
     }
     out.multimarcaHistorico = [...byMes.values()].filter(b=> b.total && ((b.total.venta_pre||0)+(b.total.venta_post||0)+(b.total.cap_pre||0)+(b.total.cap_post||0) > 0));
+  }
+
+  /* Cruce HISTORICO DE CUOTA (meta por distrito de meses ya cerrados) + HISTORIAL_Y_CAPILARIDAD
+     (venta/capilaridad real ya parseada arriba) => una foto "mm" por mes, con la misma forma que
+     DATA.multimarca en vivo, para que mmActivo()/rMultimarca()/rCuotas() la puedan mostrar sin
+     cambios. El mes en curso (el mismo que ya muestra CUOTA_MES) se descarta aquí a propósito,
+     para no duplicar su chip en el selector con datos parciales. */
+  const histCuota = parseHistoricoCuotaWB(wb);
+  if(histCuota.length){
+    const normD = s => String(s||'').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ').trim();
+    const codActual = out.multimarca ? mesCodigo(String(out.multimarca.titulo||'').replace('Canal Multimarca — ','')) : '';
+    const porMesCod = {};
+    (out.multimarcaHistorico||[]).forEach(b=> porMesCod[mesCodigo(b.mes)] = b);
+    const archivo = {};
+    histCuota.forEach(bloque=>{
+      const cod = mesCodigo(bloque.mes);
+      if(!cod || cod===codActual) return;
+      const real = porMesCod[cod] || null;
+      const distritos = bloque.distritos.map(qd=>{
+        const rd = real ? real.distritos.find(x=>normD(x.d)===normD(qd.d)) : null;
+        return {
+          d: qd.d, resp:'',
+          chips_pre:qd.chips_pre, ava_pre: rd?rd.venta_pre:null, proy_pre:null,
+          chips_post:qd.chips_post, ava_chip_post: rd?rd.venta_post:null, proy_post:null,
+          cap_pre:qd.cap_pre, ava_cap_pre: rd?rd.cap_pre:null, proy_cap_pre:null,
+          cap_post:qd.cap_post, ava_cap_post: rd?rd.cap_post:null, proy_cap_post:null
+        };
+      });
+      /* Distritos que solo aparecen en la venta real (p.ej. "ASIGNAR") y no tienen fila de
+         cuota propia: se agregan con meta 0, igual que ya hace CUOTA_MES en vivo, para que el
+         TOTAL del mes sume toda la venta real y no se quede corto. */
+      if(real){
+        real.distritos.forEach(rd=>{
+          if(!distritos.some(d=>normD(d.d)===normD(rd.d))){
+            distritos.push({
+              d:rd.d, resp:'',
+              chips_pre:0, ava_pre:rd.venta_pre, proy_pre:null,
+              chips_post:0, ava_chip_post:rd.venta_post, proy_post:null,
+              cap_pre:0, ava_cap_pre:rd.cap_pre, proy_cap_pre:null,
+              cap_post:0, ava_cap_post:rd.cap_post, proy_cap_post:null
+            });
+          }
+        });
+      }
+      const sumaCampo = campo => distritos.reduce((s,d)=>s+(d[campo]||0),0);
+      const total = {
+        d:'TOTAL', resp:'',
+        chips_pre:sumaCampo('chips_pre'), ava_pre:sumaCampo('ava_pre'), proy_pre:null,
+        chips_post:sumaCampo('chips_post'), ava_chip_post:sumaCampo('ava_chip_post'), proy_post:null,
+        cap_pre:sumaCampo('cap_pre'), ava_cap_pre:sumaCampo('ava_cap_pre'), proy_cap_pre:null,
+        cap_post:sumaCampo('cap_post'), ava_cap_post:sumaCampo('ava_cap_post'), proy_cap_post:null
+      };
+      const indicadores = [
+        {n:'Activacion Prepago', cuota:total.chips_pre, act:total.ava_pre, proy:null},
+        {n:'Activacion Postpago', cuota:total.chips_post, act:total.ava_chip_post, proy:null},
+        {n:'Capilaridad Prepago', cuota:total.cap_pre, act:total.ava_cap_pre, proy:null},
+        {n:'Capilaridad Postpago', cuota:total.cap_post, act:total.ava_cap_post, proy:null}
+      ];
+      archivo[bloque.mes] = {titulo:'Canal Multimarca — '+bloque.mes, indicadores, distritos, total};
+    });
+    if(Object.keys(archivo).length) out.multimarcaArchivoExcel = archivo;
   }
 
   const rc = wb.Sheets['REPORTE_POR_CLIENTE'];
