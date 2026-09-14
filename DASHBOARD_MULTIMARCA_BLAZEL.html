@@ -510,7 +510,7 @@ function mmActivo(){
 }
 function selectorMesesMM(idPrefix, onPick){
   const meses = mesesMMDisponibles();
-  if(meses.length<2) return '';
+  if(!meses.length) return '';
   const cur = mesActualMM();
   const sel = mmMesSel || cur;
   const chips = meses.map(m=>`<button class="segBtn ${m===sel?'on':''}" data-m="${escAttr(m)}">${m}${m===cur?' (actual)':''}</button>`).join('');
@@ -519,7 +519,8 @@ function selectorMesesMM(idPrefix, onPick){
       b.onclick = ()=>{ mmMesSel = (b.dataset.m===cur) ? null : b.dataset.m; onPick(); };
     });
   },0);
-  return `<div class="segRow" id="${idPrefix}">${chips}</div>`;
+  const nota = meses.length<2 ? `<p class="note" style="margin:-6px 0 14px">Cada mes que subas un Excel nuevo se va a ir guardando aquí, para que puedas repasar los meses anteriores.</p>` : '';
+  return `<div class="segRow" id="${idPrefix}">${chips}</div>${nota}`;
 }
 
 function rMultimarca(){
