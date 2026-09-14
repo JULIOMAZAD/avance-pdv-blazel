@@ -52,6 +52,17 @@ main{max-width:1180px;margin:0 auto;padding:20px 16px 60px}
 .vs.dn{background:var(--rojo-bg);color:var(--rojo)}
 .vs.eq{background:#DCDFE5;color:#33333B}
 
+/* fila de "donas" (medidores circulares) — mismo estilo que el tablero de Recarga */
+.donas{grid-template-columns:repeat(auto-fit,minmax(230px,1fr));margin-bottom:14px}
+.dona{display:flex;gap:16px;align-items:center}
+.dona .dch{position:relative;width:112px;height:112px;flex-shrink:0}
+.dona .info .t{font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--ink2);font-weight:700}
+.dona .info .big{font-family:'Barlow Condensed';font-weight:700;font-size:30px;line-height:1.05;margin-top:1px}
+.dona .stats{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px}
+.dona .stats .s .sl{font-size:9.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--ink2);font-weight:700}
+.dona .stats .s .sv{font-family:'Barlow Condensed';font-weight:700;font-size:18px;line-height:1.1}
+@media (max-width:480px){ .dona{gap:12px} .dona .dch{width:96px;height:96px} .dona .info .big{font-size:25px} }
+
 h2{font-family:'Barlow Condensed';font-weight:600;font-size:20px;letter-spacing:.5px;text-transform:uppercase;margin:18px 0 10px;color:var(--ink);border-left:4px solid var(--rojo);padding-left:10px}
 h2 .tag{font-size:12px;color:var(--ink2);font-family:'Inter';font-weight:500;text-transform:none;letter-spacing:0}
 
@@ -215,7 +226,21 @@ const barLabels = {
     ctx.restore();
   }
 };
-Chart.register(barLabels);
+const donaCentro = {
+  id:'donaCentro',
+  afterDraw(chart){
+    const o = chart.options.plugins.donaCentro;
+    if(!o || !o.texto) return;
+    const {ctx, chartArea:{width,height,left,top}} = chart;
+    ctx.save();
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.font='700 22px Barlow Condensed'; ctx.fillStyle=o.color||'#1B1B1F';
+    ctx.fillText(o.texto, left+width/2, top+height/2 - (o.sub?6:0));
+    if(o.sub){ ctx.font='600 9px Inter'; ctx.fillStyle='#6B7077'; ctx.fillText(o.sub, left+width/2, top+height/2+11); }
+    ctx.restore();
+  }
+};
+Chart.register(barLabels, donaCentro);
 Chart.defaults.animation = false;
 Chart.defaults.font.family = 'Inter, sans-serif';
 
@@ -425,6 +450,13 @@ const ICO = {
 };
 function killChart(id){ if(charts[id]){charts[id].destroy(); delete charts[id];} }
 function mkChart(id, cfg){ killChart(id); const el=document.getElementById(id); if(el) charts[id]=new Chart(el,cfg); }
+/* Medidor circular (dona) con % en el centro — mismo look que el tablero de Recarga. frac: 0..1 */
+const semColorMM = p => p==null ? '#9AA3B0' : p>=1 ? '#13A05F' : p>=0.85 ? '#E6A817' : '#D81F26';
+function dona(id, frac, color, texto, sub){
+  const v = Math.max(0, Math.min(1, frac==null?0:frac));
+  mkChart(id,{type:'doughnut',data:{datasets:[{data:[v,1-v],backgroundColor:[color,'#ECEDF0'],borderWidth:0,borderRadius:6}]},
+    options:{cutout:'72%',maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{enabled:false},donaCentro:{texto,sub,color}}}});
+}
 function tabs(){
   document.querySelectorAll('nav button').forEach(bt=>bt.onclick=()=>{
     document.querySelectorAll('nav button').forEach(x=>x.classList.remove('on'));
@@ -449,29 +481,27 @@ function rMultimarca(){
     return;
   }
   const tit = mm.titulo || 'Canal Multimarca';
-  const sumaAva = {
-    'Activacion Prepago': mm.distritos.reduce((s,d)=>s+(d.ava_pre||0),0),
-    'Capilaridad Prepago': mm.distritos.reduce((s,d)=>s+(d.ava_cap_pre||0),0),
-    'Activacion Postpago': mm.distritos.reduce((s,d)=>s+(d.ava_chip_post||0),0),
-    'Capilaridad Postpago': mm.distritos.reduce((s,d)=>s+(d.ava_cap_post||0),0)
-  };
-  const avanceDe = nombre => {
-    const k = Object.keys(sumaAva).find(x=>x.toUpperCase()===nombre.toUpperCase());
-    return k ? sumaAva[k] : 0;
-  };
   const hayAvance = mm.distritos.some(d=>d.ava_pre!=null||d.ava_cap_pre!=null||d.ava_chip_post!=null||d.ava_cap_post!=null);
-  const chips = ['ch-rojo','ch-negro','ch-rojo','ch-negro'];
-  const kpis = mm.indicadores.map((x,i)=>{
-    const meta = x.cuota;
-    const av = avanceDe(x.n);
-    const p = meta ? av/meta : null;
-    const pp = (x.proy!=null && meta) ? x.proy/meta : null;
-    return `<div class="card kpi"><div class="chip ${chips[i%4]}">${ICO.rayo}</div><div>
-      <div class="lbl">${x.n}</div>
-      <div class="val num">${fN(av)} <small>/ ${fN(meta)}</small></div>
-      <div class="vs ${p==null?'eq':p>=1?'up':'dn'}" style="${p==null?'':p>=1?'background:var(--verde-bg);color:var(--verde)':'background:var(--rojo-bg);color:var(--rojo)'}">${p==null?'—':fP(p)} de la meta</div>
-      ${x.proy!=null?`<div style="margin-top:6px;font-size:11.5px;color:var(--ink2)">Proyección de cierre: <b class="num" style="color:${pp==null?'var(--ink2)':pp>=1?'var(--verde)':'var(--rojo)'}">${fN(x.proy)}</b>${pp!=null?' <span style="color:var(--ink2)">('+fP(pp)+' de la meta)</span>':''}</div>`:''}
-    </div></div>`;
+  const donaIds = mm.indicadores.map((x,i)=>'dnMM'+i);
+  const cards = mm.indicadores.map((x,i)=>{
+    const meta = x.cuota, av = x.act, proy = x.proy;
+    const pProy = (meta && proy!=null) ? proy/meta : null;   // % proyectado al cierre del mes (lo que se ve en el aro)
+    const pReal = meta ? (av||0)/meta : null;                 // % de avance real hoy
+    const falta = Math.max(0, (meta||0)-(av||0));
+    const colorGauge = semColorMM(pProy);
+    return `<div class="card dona">
+      <div class="dch"><canvas id="${donaIds[i]}"></canvas></div>
+      <div class="info">
+        <div class="t">${x.n}</div>
+        <div class="big" style="color:${colorGauge}">${pProy==null?'—':(pProy*100).toFixed(1)+'%'} <span style="font-size:13px;color:var(--ink2);font-weight:600">proyectado</span></div>
+        <div class="stats">
+          <div class="s"><div class="sl">Meta</div><div class="sv num">${fN(meta)}</div></div>
+          <div class="s"><div class="sl">Avance</div><div class="sv num" style="color:var(--rojo)">${fN(av)}</div></div>
+          <div class="s"><div class="sl">${falta>0?'Falta':'Meta cubierta'}</div><div class="sv num" style="color:${falta>0?'var(--rojo)':'var(--verde)'}">${falta>0?fN(falta):'✓'}</div></div>
+        </div>
+        <div class="vs ${pReal==null?'eq':pReal>=1?'up':'dn'}" style="${pReal==null?'':pReal>=1?'background:var(--verde-bg);color:var(--verde)':'background:var(--rojo-bg);color:var(--rojo)'}">${pReal==null?'—':fP(pReal)} avance real de la meta</div>
+      </div>
+    </div>`;
   }).join('');
   const diaAvHtml = window._diaAvanceMM
     ? `<span style="color:var(--ink2)">Día ${window._diaAvanceMM} <span style="color:var(--ink2);font-weight:400">(según la hoja COMPARATIVO_DIA_A_DIA del Excel)</span></span>`
@@ -482,12 +512,17 @@ function rMultimarca(){
     <b>Día de avance:</b> ${diaAvHtml}
   </div>
   ${!hayAvance?'<div class="card" style="border-left:4px solid var(--ambar);margin-bottom:14px"><b>Avance aún en 0.</b> Llena las columnas de avance en CUOTA_MES conforme sumes activaciones y el % se calculará solo.</div>':''}
-  <div class="grid kpis">${kpis}</div>
+  <div class="grid donas">${cards}</div>
   <div class="chartbox"><div class="ch"><canvas id="chMM"></canvas></div></div>
   <p class="note" style="margin-top:14px">¿Quieres el detalle por distrito (meta, avance y lo que falta)? Está en la pestaña <a href="#" onclick="document.getElementById('navBtnCuotas').click();return false" style="color:var(--rojo);font-weight:700;text-decoration:none">Cuotas</a>.</p>`;
+  mm.indicadores.forEach((x,i)=>{
+    const meta = x.cuota, proy = x.proy;
+    const pProy = (meta && proy!=null) ? proy/meta : null;
+    dona(donaIds[i], pProy, semColorMM(pProy), pProy==null?'—':(pProy*100).toFixed(1)+'%', 'proyectado');
+  });
   mkChart('chMM',{type:'bar',data:{labels:mm.indicadores.map(x=>x.n),datasets:[
     {label:'Meta',data:mm.indicadores.map(x=>x.cuota),backgroundColor:'#D9DCE1',borderRadius:5,labelColor:'#6B7077'},
-    {label:'Avance',data:mm.indicadores.map(x=>avanceDe(x.n)),backgroundColor:'#D81F26',borderRadius:5,labelColor:'#1B1B1F'}
+    {label:'Avance',data:mm.indicadores.map(x=>x.act),backgroundColor:'#D81F26',borderRadius:5,labelColor:'#1B1B1F'}
   ]},options:{maintainAspectRatio:false,animation:false,layout:{padding:{top:18}},
     plugins:{legend:{position:'bottom'},barLabels:{on:true,fmt:'n'}},scales:{y:{grace:'10%'}}}});
 }
@@ -1104,6 +1139,34 @@ function parseWB(wb){
         mm.distritos.push(rec);
         i++;
       }
+    }
+    /* Julio reportó que a veces la cuota de "Resumen general" (arriba, en CUOTA_MES) no
+       cuadra con la fila TOTAL del "Desglose por distrito" (abajo) — son dos celdas
+       separadas en el Excel y pueden desincronizarse si se edita una sin la otra. Para que
+       el tablero de Multimarca y la pestaña Cuotas SIEMPRE muestren el mismo número, se
+       recalcula el TOTAL sumando los distritos (fuente más confiable y detallada) y se usa
+       ese mismo total tanto para la fila TOTAL de Cuotas como para las tarjetas de arriba
+       en Multimarca, en vez de confiar en celdas de totales sueltas del Excel. */
+    if(mm.distritos.length){
+      const sumaCampo = campo => mm.distritos.reduce((s,d)=>s+(d[campo]||0),0);
+      const totalCalc = {
+        d:'TOTAL', resp:'',
+        chips_pre:sumaCampo('chips_pre'), ava_pre:sumaCampo('ava_pre'), proy_pre:sumaCampo('proy_pre'),
+        chips_post:sumaCampo('chips_post'), ava_chip_post:sumaCampo('ava_chip_post'), proy_post:sumaCampo('proy_post'),
+        cap_pre:sumaCampo('cap_pre'), ava_cap_pre:sumaCampo('ava_cap_pre'), proy_cap_pre:sumaCampo('proy_cap_pre'),
+        cap_post:sumaCampo('cap_post'), ava_cap_post:sumaCampo('ava_cap_post'), proy_cap_post:sumaCampo('proy_cap_post')
+      };
+      mm.total = totalCalc;
+      const MAP_IND = {
+        'ACTIVACION PREPAGO': {cuota:'chips_pre', act:'ava_pre', proy:'proy_pre'},
+        'ACTIVACION POSTPAGO': {cuota:'chips_post', act:'ava_chip_post', proy:'proy_post'},
+        'CAPILARIDAD PREPAGO': {cuota:'cap_pre', act:'ava_cap_pre', proy:'proy_cap_pre'},
+        'CAPILARIDAD POSTPAGO': {cuota:'cap_post', act:'ava_cap_post', proy:'proy_cap_post'}
+      };
+      mm.indicadores.forEach(x=>{
+        const map = MAP_IND[String(x.n).trim().toUpperCase()];
+        if(map){ x.cuota = totalCalc[map.cuota]; x.act = totalCalc[map.act]; x.proy = totalCalc[map.proy]; }
+      });
     }
     if(mm.indicadores.length || mm.distritos.length) out.multimarca = mm;
   }
