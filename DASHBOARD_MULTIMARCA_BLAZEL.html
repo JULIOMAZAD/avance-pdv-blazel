@@ -930,14 +930,16 @@ function rComparativo(){
     if(idxMes >= 0) diasDelMesActual = new Date(anio, idxMes+1, 0).getDate();
   }
   const proy = v => (diaAv>0 && diasDelMesActual>0) ? Math.round(v/diaAv*diasDelMesActual) : null;
+  const bioDe = c => (DATA.bioMap && DATA.bioMap[normDni(c.dni)]) || '';
   const fila = c=>{
     const pres = ult3.map(m=>getPre(c,m)), posts = ult3.map(m=>getPost(c,m));
     const tots = ult3.map((m,i)=>pres[i]+posts[i]);
     const dPre = pres.length>1 ? arrow(pres[pres.length-1]-pres[pres.length-2]) : '';
     const dPost = posts.length>1 ? arrow(posts[posts.length-1]-posts[posts.length-2]) : '';
     const dTot = tots.length>1 ? arrow(tots[tots.length-1]-tots[tots.length-2]) : '';
+    const bio = bioDe(c);
     return `<tr>
-      <td><b>${c.nombre||'—'}</b><div style="color:var(--ink2);font-size:11px">DNI ${c.dni} · ${c.distrito||''}${c.vendedor?' · '+c.vendedor:''}</div></td>
+      <td><b>${c.nombre||'—'}</b><div style="color:var(--ink2);font-size:11px">DNI ${c.dni} · ${c.distrito||''}${c.vendedor?' · '+c.vendedor:''}${bio?' · Biométrico '+bio:''}</div></td>
       ${pres.map((v,i)=>`<td class="num b-tint-pre${i===0?' b-start':''}">${fN(v)}</td>`).join('')}<td class="num b-tint-pre">${dPre}</td>
       ${posts.map((v,i)=>`<td class="num b-tint-post${i===0?' b-start':''}">${fN(v)}</td>`).join('')}<td class="num b-tint-post">${dPost}</td>
       ${tots.map((v,i)=>`<td class="num b-tint-tot${i===0?' b-start':''}"><b>${fN(v)}</b></td>`).join('')}<td class="num b-tint-tot">${dTot}</td></tr>`;
@@ -964,9 +966,13 @@ function rComparativo(){
     const avisoDiaHtml = diaAv>0
       ? `<span style="display:inline-block;background:#FFF3CD;color:#8A6100;font-weight:800;font-size:13px;padding:4px 12px;border-radius:20px;margin-left:8px">AVANZA AL DÍA ${diaAv} DE ${diasDelMesActual}</span>`
       : `<span style="display:inline-block;background:#FDECEA;color:#B5302E;font-weight:800;font-size:13px;padding:4px 12px;border-radius:20px;margin-left:8px">FALTA EL DÍA DE AVANCE</span>`;
+    const bio = bioDe(c);
+    const bioHtml = bio
+      ? `<span style="display:inline-block;background:#E6F4EC;color:#1F8A55;font-weight:800;font-size:13px;padding:4px 12px;border-radius:20px;margin-left:8px">BIOMÉTRICO ${escAttr(bio)}</span>`
+      : `<span style="display:inline-block;background:#EEEFF2;color:var(--ink2);font-weight:700;font-size:13px;padding:4px 12px;border-radius:20px;margin-left:8px">SIN BIOMÉTRICO ASIGNADO</span>`;
     return `<div class="card" style="margin-top:10px;margin-bottom:14px">
       <div style="font-weight:700;margin-bottom:12px;display:flex;align-items:center;flex-wrap:wrap;gap:4px">
-        ${c.nombre||'—'} <span style="font-weight:400;color:var(--ink2);font-size:12px">· Proyección de cierre ${cabMes(ult3[ult3.length-1])}</span>${avisoDiaHtml}
+        ${c.nombre||'—'} <span style="font-weight:400;color:var(--ink2);font-size:12px">· Proyección de cierre ${cabMes(ult3[ult3.length-1])}</span>${avisoDiaHtml}${bioHtml}
       </div>
       <div style="display:flex;gap:12px;flex-wrap:wrap">
         ${bloque('PREPAGO', valPre, '#3B4252')}
@@ -1180,6 +1186,10 @@ function renderAll(){
 
 /* ================= drag & drop / parser SheetJS ================= */
 const num = v => (typeof v==='number' && isFinite(v)) ? v : null;
+/* Normaliza un DNI para poder cruzar hojas donde a veces viene como texto (con ceros a la
+   izquierda) y otras como número — igual que hace VALUE() en las fórmulas del Excel. Se usa
+   tanto al parsear el Excel (parseWB) como al pintar pantallas que cruzan DNIs (rComparativo). */
+const normDni = v => { const s=String(v==null?'':v).trim(); if(!s) return ''; const n=parseInt(s,10); return isNaN(n) ? s : String(n); };
 
 /* Hoja opcional "HISTORICO DE CUOTA": Julio la agregó a mano para guardar, mes a mes, la cuota
    que se fijó para cada distrito (a diferencia de CUOTA_MES, que solo trae la del mes en curso).
@@ -1250,9 +1260,6 @@ function parseHistoricoCuotaWB(wb){
 
 function parseWB(wb){
   const out = { multimarca:null, multimarcaHistorico:[], comparativo:[], diaadia:null, corte:'' };
-  /* Normaliza un DNI para poder cruzar hojas donde a veces viene como texto (con ceros a la
-     izquierda) y otras como número — igual que hace VALUE() en las fórmulas del Excel. */
-  const normDni = v => { const s=String(v==null?'':v).trim(); if(!s) return ''; const n=parseInt(s,10); return isNaN(n) ? s : String(n); };
 
   const cq = wb.Sheets['CUOTA_MES'];
   if(cq){
@@ -1457,6 +1464,7 @@ function parseWB(wb){
      dos meses que realmente se usan (mes actual y mes anterior), para no inflar el archivo. */
   out.ventasDiarias = [];
   out.vendMap = {};
+  out.bioMap = {};
   const mm2 = wb.Sheets['MAESTRO_MM'];
   if(mm2){
     const rows = XLSX.utils.sheet_to_json(mm2,{header:1,raw:true,defval:null});
@@ -1465,9 +1473,15 @@ function parseWB(wb){
       const hdrRow = rows[hdrI];
       const cDni = hdrRow.findIndex(c=>String(c||'').trim().toUpperCase()==='DNI');
       const cVend = hdrRow.findIndex(c=>String(c||'').trim().toUpperCase()==='VENDEDOR');
+      /* Columna del número de biométrico asignado al cliente (a veces "Biométrico", a veces
+         "Bioetrico" u otra variante mal tipeada) — se ubica por contener "BIO" en el nombre
+         del encabezado, no por su posición exacta. */
+      const cBio = hdrRow.findIndex(c=>String(c||'').trim().toUpperCase().indexOf('BIO')>=0);
       for(let i=hdrI+1;i<rows.length;i++){
         const r=rows[i]; if(!r || r[cDni]==null || r[cDni]==='') continue;
-        out.vendMap[normDni(r[cDni])] = (cVend>=0 && r[cVend]) ? String(r[cVend]).trim() : 'BLAZEL';
+        const dniN = normDni(r[cDni]);
+        out.vendMap[dniN] = (cVend>=0 && r[cVend]) ? String(r[cVend]).trim() : 'BLAZEL';
+        if(cBio>=0 && r[cBio]!=null && String(r[cBio]).trim()!=='') out.bioMap[dniN] = String(r[cBio]).trim();
       }
     }
   }
