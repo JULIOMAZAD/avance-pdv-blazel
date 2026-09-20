@@ -1600,8 +1600,17 @@ function parsePlanesWB(wb){
       const fCell = sh[XLSX.utils.encode_cell({r:r,c:cFecha})];
       const aCell = sh[XLSX.utils.encode_cell({r:r,c:cAsesor})];
       const kCell = sh[XLSX.utils.encode_cell({r:r,c:cCampana})];
-      const fv = fCell && fCell.v;
-      if(!(fv instanceof Date) || isNaN(fv)) continue;
+      let fv = fCell && fCell.v;
+      if(fv instanceof Date){
+        if(isNaN(fv)) continue;
+      } else if(typeof fv==='number' && isFinite(fv) && fv>0){
+        /* Algunas filas quedan con la columna FECHA sin formato de fecha en el Excel
+           (se ve como "46276" en vez de "11/09/2026"), normalmente porque se pegaron o
+           tipearon distinto a las demás. Antes esas filas se perdían por completo (no
+           entraban a ningún mes); ahora se convierte igual el número de serie de fecha
+           de Excel a una fecha real, para no perder ventas por un tema de formato. */
+        fv = new Date(Date.UTC(1899,11,30) + Math.round(fv)*86400000);
+      } else { continue; }
       const asesorRaw = aCell && aCell.v!=null ? normVendPlanes(aCell.v) : '';
       const campanaRaw = kCell && kCell.v!=null ? normVendPlanes(kCell.v) : '';
       if(!asesorRaw || !campanaRaw) continue;
