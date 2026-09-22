@@ -165,6 +165,7 @@ tr.tot td{font-weight:700;background:#FAFAFB;border-top:2px solid var(--line)}
   <button data-t="comparativo">Comparativo</button>
   <button data-t="diaadia">Día a día</button>
   <button data-t="vendedor">Por Vendedor</button>
+  <button data-t="otrodist">Otro Distribuidor</button>
   <button data-t="planes">Planes</button>
 </nav>
 
@@ -175,6 +176,7 @@ tr.tot td{font-weight:700;background:#FAFAFB;border-top:2px solid var(--line)}
   <section class="tab" id="tab-comparativo"></section>
   <section class="tab" id="tab-diaadia"></section>
   <section class="tab" id="tab-vendedor"></section>
+  <section class="tab" id="tab-otrodist"></section>
   <section class="tab" id="tab-planes"></section>
 </main>
 
@@ -470,6 +472,7 @@ function tabs(){
     document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
     bt.classList.add('on');
     document.getElementById('tab-'+bt.dataset.t).classList.add('on');
+    if(bt.dataset.t==='otrodist'){ try{ rOtroDistribuidor(); }catch(e){} }
     requestAnimationFrame(()=>Object.values(charts).forEach(c=>{try{c.resize();c.draw();}catch(e){}}));
   });
 }
@@ -1180,7 +1183,7 @@ function setGlobals(){
 }
 function renderAll(){
   setGlobals();
-  rMultimarca(); rCuotas(); rHistorico(); rComparativo(); rDiaADia(); rPorVendedor(); rPlanes();
+  rMultimarca(); rCuotas(); rHistorico(); rComparativo(); rDiaADia(); rPorVendedor(); rOtroDistribuidor(); rPlanes();
   requestAnimationFrame(()=>Object.values(charts).forEach(c=>{try{c.resize();c.draw();}catch(e){}}));
 }
 
@@ -1514,6 +1517,74 @@ function parseWB(wb){
     }
   }
 
+  /* Hoja "OTROS" (antes "RESUMEN_BIOMETRICO"): % de activaciones con biométrico+chip propio
+     (Blazel) vs de otro distribuidor, mes a mes, con detalle de qué distribuidor y qué
+     cliente/bodega (DNI) está usando otro distribuidor. Se busca por nombre de hoja (con
+     alias, por si Julio la vuelve a renombrar) y por encabezado, no por fila fija. */
+  out.otroDistribuidor = null;
+  {
+    const odSheetName = wb.SheetNames.find(n => n==='OTROS' || n==='RESUMEN_BIOMETRICO');
+    const od = odSheetName ? wb.Sheets[odSheetName] : null;
+    if(od){
+      const rows = XLSX.utils.sheet_to_json(od,{header:1,raw:true,defval:null});
+      const norm = s => String(s==null?'':s).trim();
+      const result = {mensual:[], distribuidores:[], clientes:[]};
+
+      // Sección 1: resumen mensual
+      const hdr1 = rows.findIndex(r=>r && norm(r[1])==='Mes' && norm(r[2])==='Total ventas');
+      if(hdr1>=0){
+        let i=hdr1+1;
+        while(i<rows.length && rows[i] && rows[i][0] && !norm(rows[i][0]).toUpperCase().startsWith('TOTAL')){
+          const r=rows[i];
+          result.mensual.push({
+            codigo: norm(r[0]), mes: norm(r[1]),
+            total: num(r[2]), propio: num(r[3]), pctPropio: num(r[4]),
+            otro: num(r[5]), pctOtro: num(r[6]), sinReg: num(r[7]), pctSinReg: num(r[8])
+          });
+          i++;
+        }
+      }
+
+      // Sección 2: qué distribuidor cubre el resto
+      const hdr2 = rows.findIndex(r=>r && norm(r[0])==='Distribuidor');
+      if(hdr2>=0){
+        let i=hdr2+1;
+        while(i<rows.length && rows[i] && rows[i][0] && !norm(rows[i][0]).toUpperCase().startsWith('TOTAL')){
+          const r=rows[i];
+          result.distribuidores.push({
+            nombre: norm(r[0]),
+            meses: [1,2,3,4,5,6,7].map(c=>num(r[c])),
+            total: num(r[8]), pct: num(r[9])
+          });
+          i++;
+        }
+      }
+
+      // Sección 3: detalle por cliente/bodega (DNI)
+      const hdr3 = rows.findIndex(r=>r && norm(r[0])==='DNI Multimarca');
+      if(hdr3>=0){
+        const hdrRow = rows[hdr3];
+        const distribNames = [];
+        for(let c=8; c<hdrRow.length; c++){ if(hdrRow[c]) distribNames.push(norm(hdrRow[c])); else break; }
+        let i=hdr3+1;
+        while(i<rows.length && rows[i] && rows[i][0]!=null && norm(rows[i][0]).toUpperCase()!=='TOTAL'){
+          const r=rows[i];
+          const distribs = {};
+          distribNames.forEach((nombre,idx)=>{ distribs[nombre] = num(r[8+idx]) || 0; });
+          result.clientes.push({
+            dni: normDni(r[0]), nombre: norm(r[1]), distrito: norm(r[2]), vendedor: norm(r[3]),
+            otro: num(r[4])||0, propio: num(r[5])||0, pctOtro: num(r[6]),
+            distribPrincipal: norm(r[7]), distribs
+          });
+          i++;
+        }
+        result.clientes.sort((a,b)=>b.otro-a.otro);
+      }
+
+      if(result.mensual.length || result.clientes.length) out.otroDistribuidor = result;
+    }
+  }
+
   if(!out.multimarca && !out.comparativo.length && !out.multimarcaHistorico.length && !out.diaadia){
     throw 'No encuentro las hojas del CONTROL_MULTIMARCA_BLAZEL.xlsx (CUOTA_MES, REPORTE_POR_CLIENTE, HISTORIAL_Y_CAPILARIDAD, COMPARATIVO_DIA_A_DIA). ¿Es el archivo correcto?';
   }
@@ -1650,6 +1721,96 @@ function parsePlanesWB(wb){
   });
   const meses = Object.keys(mesesSet).sort(function(a,b){ return mesesSet[a]-mesesSet[b]; });
   return { porMes:porMes, meses:meses };
+}
+
+/* ================= OTRO DISTRIBUIDOR (biométrico + chip propio vs otro distribuidor) ================= */
+function rOtroDistribuidor(){
+  const el = document.getElementById('tab-otrodist');
+  if(!el) return;
+  const od = DATA.otroDistribuidor;
+  if(!od || !od.mensual.length){
+    el.innerHTML = `<h2>Otro distribuidor</h2><div class="card">Todavía no encuentro la hoja "OTROS" (antes "RESUMEN_BIOMETRICO") en el Excel, o no tiene datos. Verifica que el Excel subido a GitHub sea el que tiene esa pestaña.</div>`;
+    return;
+  }
+  const meses = od.mensual;
+  const conDato = meses.filter(m=>m.total>0);
+  const actual = conDato.length ? conDato[conDato.length-1] : meses[meses.length-1];
+
+  const filaMensual = m => `<tr><td>${m.mes}</td><td class="num">${fN(m.total)}</td>
+    <td class="num">${fN(m.propio)}</td><td class="num">${fP(m.pctPropio)}</td>
+    <td class="num">${fN(m.otro)}</td><td class="num">${fP(m.pctOtro)}</td>
+    <td class="num">${fN(m.sinReg)}</td><td class="num">${fP(m.pctSinReg)}</td></tr>`;
+
+  const filaDistrib = d => `<tr><td>${d.nombre}</td>${d.meses.map(v=>`<td class="num">${v?fN(v):'—'}</td>`).join('')}<td class="num">${fN(d.total)}</td><td class="num">${fP(d.pct)}</td></tr>`;
+
+  const filaCliente = c => `<tr data-buscar="${(c.nombre+' '+c.distrito+' '+c.vendedor+' '+c.dni).toLowerCase()}">
+    <td>${c.dni}</td><td>${c.nombre}</td><td>${c.distrito}</td><td>${c.vendedor}</td>
+    <td class="num" style="color:var(--rojo);font-weight:700">${fN(c.otro)}</td>
+    <td class="num">${fN(c.propio)}</td>
+    <td class="num">${fP(c.pctOtro)}</td>
+    <td>${c.distribPrincipal}</td></tr>`;
+
+  el.innerHTML = `
+  <h2>Otro distribuidor <span class="tag">quién está usando biométrico/chip que no es de Blazel</span></h2>
+
+  <div class="grid donas">
+    <div class="card dona">
+      <div class="dch"><canvas id="dnPropio"></canvas></div>
+      <div class="info">
+        <div class="t">Biométrico + chip PROPIO · ${actual.mes}</div>
+        <div class="big" style="color:var(--verde)">${fP(actual.pctPropio)}</div>
+        <div class="stats"><div class="s"><div class="sl">Ventas</div><div class="sv num">${fN(actual.propio)}</div></div></div>
+      </div>
+    </div>
+    <div class="card dona">
+      <div class="dch"><canvas id="dnOtro"></canvas></div>
+      <div class="info">
+        <div class="t">Otro distribuidor · ${actual.mes}</div>
+        <div class="big" style="color:var(--rojo)">${fP(actual.pctOtro)}</div>
+        <div class="stats"><div class="s"><div class="sl">Ventas</div><div class="sv num">${fN(actual.otro)}</div></div></div>
+      </div>
+    </div>
+    <div class="card dona">
+      <div class="dch"><canvas id="dnSinReg"></canvas></div>
+      <div class="info">
+        <div class="t">Sin registro · ${actual.mes}</div>
+        <div class="big" style="color:var(--gris)">${fP(actual.pctSinReg)}</div>
+        <div class="stats"><div class="s"><div class="sl">Ventas</div><div class="sv num">${fN(actual.sinReg)}</div></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="note">"Sin registro" son ventas de meses donde tu app todavía no capturaba qué lector/chip se usó (histórico antes de agosto 2026).</div>
+
+  <h2>Mes a mes</h2>
+  <div class="twrap"><table>
+    <thead><tr><th>Mes</th><th>Total</th><th>Propio</th><th>%</th><th>Otro distribuidor</th><th>%</th><th>Sin registro</th><th>%</th></tr></thead>
+    <tbody>${meses.map(filaMensual).join('')}</tbody>
+  </table></div>
+
+  <h2>¿Qué distribuidor cubre el resto?</h2>
+  <div class="twrap"><table>
+    <thead><tr><th>Distribuidor</th><th>Jun</th><th>Jul</th><th>Ago</th><th>Set</th><th>Oct</th><th>Nov</th><th>Dic</th><th>Total</th><th>%</th></tr></thead>
+    <tbody>${od.distribuidores.map(filaDistrib).join('')}</tbody>
+  </table></div>
+
+  <h2>¿Qué cliente/bodega se está yendo con otro distribuidor?</h2>
+  <input id="buscarCliOD" type="text" placeholder="Buscar por nombre, distrito, vendedor o DNI..." style="width:100%;max-width:420px;padding:9px 14px;border:1px solid var(--line);border-radius:10px;font-size:13px;margin-bottom:10px;font-family:'Inter'">
+  <div class="twrap"><table id="tablaClientesOD">
+    <thead><tr><th>DNI</th><th>Nombre</th><th>Distrito</th><th>Vendedor</th><th>Ventas otro distrib.</th><th>Ventas propio</th><th>% otro</th><th>Distribuidor principal</th></tr></thead>
+    <tbody>${od.clientes.map(filaCliente).join('')}</tbody>
+  </table></div>
+  `;
+
+  document.getElementById('buscarCliOD').oninput = e=>{
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('#tablaClientesOD tbody tr').forEach(tr=>{
+      tr.style.display = (!q || tr.dataset.buscar.includes(q)) ? '' : 'none';
+    });
+  };
+
+  dona('dnPropio', actual.total ? actual.propio/actual.total : null, '#13A05F', fP(actual.total?actual.propio/actual.total:null), 'del total');
+  dona('dnOtro', actual.total ? actual.otro/actual.total : null, '#D81F26', fP(actual.total?actual.otro/actual.total:null), 'del total');
+  dona('dnSinReg', actual.total ? actual.sinReg/actual.total : null, '#9AA3B0', fP(actual.total?actual.sinReg/actual.total:null), 'del total');
 }
 
 function rPlanes(){
