@@ -165,6 +165,11 @@
     <div class="estado-carga">Cargando...</div>
   </div>
 
+  <div class="subtitulo" style="margin-top:32px;font-weight:700;color:var(--tinta);font-size:15px">📍 Visitas registradas (Multimarca / Recarga / Mixto)</div>
+  <div id="contenedorVisitas">
+    <div class="estado-carga">Selecciona una fecha y actualiza.</div>
+  </div>
+
   <div class="subtitulo" style="margin-top:32px;font-weight:700;color:var(--tinta);font-size:15px">Acumulado del mes</div>
   <div id="contenedorResumen">
     <div class="estado-carga">Cargando...</div>
@@ -559,10 +564,55 @@
       ultimoResumenPorNombre = resumenPorNombre;
       renderTabla();
       renderResumen();
+      cargarVisitasDia(fechaISO);
       document.getElementById('ultimaActualizacion').textContent = 'Actualizado ' + new Date().toLocaleTimeString('es-PE');
 
     } catch (err) {
       document.getElementById('contenedorTabla').innerHTML = '<div class="estado-carga">No se pudo cargar la información. Revisa que los links CSV sigan publicados. (' + err.message + ')</div>';
+    }
+  }
+
+  async function cargarVisitasDia(fechaISO){
+    const cont = document.getElementById('contenedorVisitas');
+    if(!cont) return;
+    cont.innerHTML = '<div class="estado-carga">Cargando visitas...</div>';
+    try {
+      const resp = await fetch(URL_SCRIPT + '?modo=visitas_dia&fecha=' + fechaISO);
+      const data = await resp.json();
+      const visitas = (data && data.ok && data.visitas) ? data.visitas : [];
+      if (visitas.length === 0){
+        cont.innerHTML = '<div class="estado-carga">Sin visitas marcadas este día.</div>';
+        return;
+      }
+      const porAsesor = {};
+      visitas.forEach(function(v){
+        if(!porAsesor[v.asesor]) porAsesor[v.asesor] = [];
+        porAsesor[v.asesor].push(v);
+      });
+      let html = '<table style="width:100%;border-collapse:collapse;font-size:13px">';
+      html += '<tr style="border-bottom:1.5px solid var(--borde);text-align:left">' +
+        '<th style="padding:6px 8px">Hora</th><th style="padding:6px 8px">Tipo</th>' +
+        '<th style="padding:6px 8px">Punto / Cliente</th><th style="padding:6px 8px">Distrito</th>' +
+        '<th style="padding:6px 8px">Ubicación</th></tr>';
+      Object.keys(porAsesor).sort().forEach(function(nombre){
+        const lista = porAsesor[nombre];
+        const conteo = { MULTIMARCA:0, RECARGA:0, MIXTO:0 };
+        lista.forEach(function(v){ if(conteo[v.tipo] !== undefined) conteo[v.tipo]++; });
+        html += '<tr><td colspan="5" style="padding:8px;background:var(--gris-claro);font-weight:700">' +
+          nombre + ' — ' + lista.length + ' visita(s)  ·  Multimarca: ' + conteo.MULTIMARCA +
+          '  ·  Recarga: ' + conteo.RECARGA + '  ·  Mixto: ' + conteo.MIXTO + '</td></tr>';
+        lista.forEach(function(v){
+          html += '<tr><td style="padding:6px 8px">' + (v.hora||'—') + '</td>' +
+            '<td style="padding:6px 8px">' + (v.tipo||'—') + '</td>' +
+            '<td style="padding:6px 8px">' + (v.punto||'—') + '</td>' +
+            '<td style="padding:6px 8px">' + (v.distrito||'—') + '</td>' +
+            '<td style="padding:6px 8px">' + (enlaceMapa(v.lat, v.lng) || '—') + '</td></tr>';
+        });
+      });
+      html += '</table>';
+      cont.innerHTML = html;
+    } catch (err) {
+      cont.innerHTML = '<div class="estado-carga">No se pudieron cargar las visitas. (' + err.message + ')</div>';
     }
   }
 
