@@ -216,7 +216,7 @@ const barLabels = {
     if(!o || !o.on) return;
     const {ctx} = chart;
     ctx.save();
-    ctx.font = '700 13px "Barlow Condensed", sans-serif';
+    ctx.font = '700 15px "Barlow Condensed", sans-serif';
     ctx.textAlign = o.horizontal ? 'left' : 'center';
     ctx.textBaseline = o.horizontal ? 'middle' : (o.inside ? 'middle' : 'bottom');
     const dss = chart.config.data.datasets;
