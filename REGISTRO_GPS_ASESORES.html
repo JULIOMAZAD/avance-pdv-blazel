@@ -91,6 +91,28 @@
     flex-direction:column;
     gap:12px;
   }
+  .tipoBtns{
+    display:flex;
+    gap:8px;
+    margin-bottom:14px;
+  }
+  .tipoBtn{
+    flex:1;
+    border:1.5px solid var(--borde);
+    border-radius:12px;
+    padding:12px 6px;
+    font-size:12.5px;
+    font-weight:700;
+    background:#fff;
+    color:var(--tinta);
+    cursor:pointer;
+    text-align:center;
+  }
+  .tipoBtn.activo{
+    background:var(--tinta);
+    color:#fff;
+    border-color:var(--tinta);
+  }
   button{
     border:none;
     border-radius:14px;
@@ -305,6 +327,21 @@
   </div>
 
   <div class="pie">Al marcar, se envía tu ubicación GPS junto con la hora exacta. Necesitas tener el GPS del celular activado.</div>
+
+  <div class="tarjeta" style="margin-top:18px">
+    <div class="subtitulo" style="margin-bottom:12px">📍 Marcar visita a un punto</div>
+    <div class="tipoBtns">
+      <button type="button" class="tipoBtn" id="btnTipoMultimarca" onclick="seleccionarTipoVisita('MULTIMARCA')">MULTIMARCA</button>
+      <button type="button" class="tipoBtn" id="btnTipoRecarga" onclick="seleccionarTipoVisita('RECARGA')">RECARGA</button>
+      <button type="button" class="tipoBtn" id="btnTipoMixto" onclick="seleccionarTipoVisita('MIXTO')">MIXTO</button>
+    </div>
+    <input type="text" id="puntoVisita" placeholder="Nombre del punto o cliente (opcional)">
+    <button id="btnMarcarVisita" onclick="marcarVisita()" style="background:var(--verde);color:#fff;width:100%">
+      <span class="icono">📍</span> MARCAR VISITA
+    </button>
+    <div class="estado" id="estadoVisita"></div>
+  </div>
+  <div class="pie">Marca cada vez que llegues a un punto multimarca o de recarga. No hay límite de veces al día — funciona aunque el punto todavía no tenga geocalización guardada.</div>
   </div>
 
   <div class="vista" id="vistaAvance">
@@ -595,6 +632,74 @@
     document.getElementById('btnEntrada').disabled = !activo;
     document.getElementById('btnMediodia').disabled = !activo;
     document.getElementById('btnSalida').disabled = !activo;
+  }
+
+  let tipoVisitaSeleccionado = null;
+  function seleccionarTipoVisita(tipo){
+    tipoVisitaSeleccionado = tipo;
+    ['btnTipoMultimarca','btnTipoRecarga','btnTipoMixto'].forEach(function(id){
+      document.getElementById(id).classList.remove('activo');
+    });
+    const mapaBtn = { MULTIMARCA:'btnTipoMultimarca', RECARGA:'btnTipoRecarga', MIXTO:'btnTipoMixto' };
+    document.getElementById(mapaBtn[tipo]).classList.add('activo');
+  }
+
+  function mostrarEstadoVisita(tipo, mensaje){
+    const el = document.getElementById('estadoVisita');
+    el.className = 'estado ' + tipo;
+    el.textContent = mensaje;
+  }
+
+  function marcarVisita(){
+    const nombre = document.getElementById('nombre').value;
+    if(!nombre){
+      mostrarEstadoVisita('error', 'Primero selecciona tu nombre.');
+      return;
+    }
+    if(!sesionAbierta){
+      mostrarEstadoVisita('error', 'Tu sesión no está abierta. Recarga la página.');
+      return;
+    }
+    if(!tipoVisitaSeleccionado){
+      mostrarEstadoVisita('error', 'Selecciona si la visita es Multimarca, Recarga o Mixto.');
+      return;
+    }
+    if(!navigator.geolocation){
+      mostrarEstadoVisita('error', 'Este celular no soporta ubicación GPS.');
+      return;
+    }
+
+    const punto = document.getElementById('puntoVisita').value || '';
+    mostrarEstadoVisita('cargando', 'Obteniendo tu ubicación…');
+    document.getElementById('btnMarcarVisita').disabled = true;
+
+    navigator.geolocation.getCurrentPosition(function(pos){
+      const datosVisita = {
+        action: 'marcar_visita',
+        nombre: nombre,
+        tipoVisita: tipoVisitaSeleccionado,
+        punto: punto,
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude
+      };
+      fetch(URL_SCRIPT, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(datosVisita)
+      }).then(function(){
+        const horaV = new Date().toLocaleTimeString('es-PE');
+        mostrarEstadoVisita('ok', 'Visita ' + tipoVisitaSeleccionado + ' registrada — ' + horaV);
+        document.getElementById('puntoVisita').value = '';
+        document.getElementById('btnMarcarVisita').disabled = false;
+      }).catch(function(){
+        mostrarEstadoVisita('error', 'No se pudo enviar. Revisa tu conexión e intenta de nuevo.');
+        document.getElementById('btnMarcarVisita').disabled = false;
+      });
+    }, function(error){
+      mostrarEstadoVisita('error', 'No se pudo obtener tu ubicación. Activa el GPS y vuelve a intentar.');
+      document.getElementById('btnMarcarVisita').disabled = false;
+    }, { enableHighAccuracy: true, timeout: 15000 });
   }
 
   function marcar(tipo){
