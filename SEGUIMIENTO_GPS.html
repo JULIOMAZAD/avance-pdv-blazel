@@ -598,9 +598,11 @@
         const lista = porAsesor[nombre];
         const conteo = { MULTIMARCA:0, RECARGA:0, MIXTO:0 };
         lista.forEach(function(v){ if(conteo[v.tipo] !== undefined) conteo[v.tipo]++; });
+        var rutaVisitas = enlaceRutaVisitas(lista);
         html += '<tr><td colspan="7" style="padding:8px;background:var(--gris-claro);font-weight:700">' +
           nombre + ' — ' + lista.length + ' visita(s)  ·  Multimarca: ' + conteo.MULTIMARCA +
-          '  ·  Recarga: ' + conteo.RECARGA + '  ·  Mixto: ' + conteo.MIXTO + '</td></tr>';
+          '  ·  Recarga: ' + conteo.RECARGA + '  ·  Mixto: ' + conteo.MIXTO +
+          (rutaVisitas ? '  ·  ' + rutaVisitas : '') + '</td></tr>';
         lista.forEach(function(v){
           html += '<tr><td style="padding:6px 8px">' + (v.hora||'—') + '</td>' +
             '<td style="padding:6px 8px">' + (v.tipo||'—') + '</td>' +
@@ -618,9 +620,22 @@
     }
   }
 
+  function enlaceRutaVisitas(lista){
+    var puntos = lista.map(function(v){ return [v.lat, v.lng]; }).filter(function(p){ return p[0] && p[1]; });
+    if (puntos.length === 0) return '';
+    if (puntos.length === 1) {
+      return '<a href="https://www.google.com/maps?q=' + puntos[0][0] + ',' + puntos[0][1] + '" target="_blank" style="color:var(--rojo);font-weight:700;text-decoration:none">📍 Ver ruta de visitas</a>';
+    }
+    var ruta = puntos.map(function(p){ return p[0] + ',' + p[1]; }).join('/');
+    return '<a href="https://www.google.com/maps/dir/' + ruta + '" target="_blank" style="color:var(--rojo);font-weight:700;text-decoration:none">📍 Ver ruta de visitas (' + puntos.length + ')</a>';
+  }
+
   function celdaCliente(v){
     if (v.clienteEncontrado === 'SI') {
       return v.nombreCliente || 'Sí';
+    }
+    if (v.clienteEncontrado === 'NUEVO') {
+      return '<span style="color:var(--ambar);font-weight:700">\uD83C\uDD95 Nuevo (auto-registrado)</span>';
     }
     return '<span style="color:var(--rojo);font-weight:700">\u26A0 No encontrado</span>';
   }
