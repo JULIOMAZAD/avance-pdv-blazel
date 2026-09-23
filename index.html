@@ -110,6 +110,25 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
 .mnums{font-size:11px;color:#666;margin-top:4px}
 .mnums b{color:#1a1a2e}
 @media(max-width:600px){.gauges{grid-template-columns:repeat(2,1fr)}}
+/* === ACCESOS: aviso de actualización + panel ¿quién ya vio? === */
+.aviso-act{display:none;align-items:center;gap:8px;margin:0 0 12px;padding:9px 14px;border-radius:10px;font-size:13px;font-weight:700;letter-spacing:.3px;background:#eceef2;color:#3b4252}
+.aviso-act.hoy{background:#cc0000;color:#fff}
+.aviso-act .dot{width:9px;height:9px;border-radius:50%;background:currentColor;flex:0 0 auto}
+.aviso-act.hoy .dot{background:#fff;animation:accPulse 1.4s infinite}
+@keyframes accPulse{0%{box-shadow:0 0 0 0 rgba(255,255,255,.8)}70%{box-shadow:0 0 0 8px rgba(255,255,255,0)}100%{box-shadow:0 0 0 0 rgba(255,255,255,0)}}
+.acc-panel{display:none;background:#fff;border:1px solid #e3e5ea;border-radius:12px;padding:14px 16px;margin:0 0 14px}
+.acc-panel h3{font-size:15px;color:#1a1a2e;margin:0 0 4px}
+.acc-sub{font-size:12px;color:#666;margin-bottom:10px}
+.acc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px}
+.acc-u{border-radius:9px;padding:8px 10px;font-size:13px;font-weight:700;border:1px solid}
+.acc-u small{display:block;font-weight:400;font-size:11px;margin-top:2px;opacity:.85}
+.acc-u.ok{background:#e8f6ee;border-color:#9fd5b5;color:#0f6b3a}
+.acc-u.no{background:#fdecee;border-color:#f2aab3;color:#a3001b}
+.acc-acts{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px}
+.acc-btn{border:1px solid #d5d8de;background:#f7f8fa;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;color:#1a1a2e}
+.acc-btn.pri{background:#13A05F;border-color:#13A05F;color:#fff}
+.acc-rec{margin-top:10px;font-size:12px;color:#444;max-height:180px;overflow-y:auto;border-top:1px solid #eee;padding-top:8px}
+.acc-rec div{padding:3px 0;border-bottom:1px dashed #f0f0f0}
 </style>
 </head>
 <body>
@@ -140,6 +159,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
 
 <div id="mainScreen" class="screen">
   <div class="main-wrap">
+    <div class="aviso-act"><span class="dot"></span><span class="aviso-txt"></span></div>
     <div class="top-bar">
       <div class="top-left">
         <h2>Avance por Punto de Venta</h2>
@@ -173,10 +193,11 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
 
 <div id="gerScreen" class="screen">
   <div class="main-wrap">
+    <div class="aviso-act"><span class="dot"></span><span class="aviso-txt"></span></div>
     <div class="top-bar">
       <div class="top-left">
         <h2>COORD. TIENDAS — Consolidado</h2>
-        <div class="pdv">Toca "Todas" para el global, o marca una o varias tiendas para sumarlas · <strong>v42</strong></div>
+        <div class="pdv">Toca "Todas" para el global, o marca una o varias tiendas para sumarlas · <strong>v43</strong></div>
       </div>
       <div class="top-actions">
         <button class="btn-vend" onclick="abrirVendedor()"><span class="bico" style="background:#3B82F6">📊</span>Ver por vendedor</button>
@@ -186,10 +207,12 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
         <button class="btn-vend" onclick="abrirPersonal('gerScreen')"><span class="bico" style="background:#3B4252">🗂️</span>Control Personal</button>
         <button class="btn-vend" id="btnGPS" style="display:none" onclick="openEmbed('SEGUIMIENTO_GPS.html?u=jmaza','📍 Seguimiento GPS','gerScreen')"><span class="bico" style="background:#0E7C7B">📍</span>Seguimiento GPS</button>
         <button class="btn-vend" id="btnPreEntregas" style="display:none" onclick="openEmbed('PRE_ENTREGAS_PANEL.html?u=jmaza','📦 Pre-entregas','gerScreen')"><span class="bico" style="background:#C77D17">📦</span>Pre-entregas</button>
+        <button class="btn-vend" id="btnAccesos" style="display:none" onclick="toggleAccesos()"><span class="bico" style="background:#13A05F">👁️</span>¿Quién ya vio?</button>
         <button class="btn-vend" id="btnHideKpisGer" onclick="toggleHideKpis()"><span class="bico" style="background:#6B7077">🙈</span>Ocultar cifras</button>
         <button class="btn-logout" onclick="doLogout()">⏻ Cerrar sesión</button>
       </div>
     </div>
+    <div id="accPanel" class="acc-panel"></div>
     <div class="mes-tabs" id="gerMesTabs"></div>
     <div class="ger-pick">
       <h3>Tiendas</h3>
@@ -206,6 +229,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
 
 <div id="recarScreen" class="screen">
   <div class="main-wrap">
+    <div class="aviso-act"><span class="dot"></span><span class="aviso-txt"></span></div>
     <div class="top-bar">
       <div class="top-left"><h2>COORD. CAMPO — Avance de Campo</h2><div class="pdv">Avance por responsable y asesor</div></div>
       <div class="top-actions"><button class="btn-vend" id="btnCampoAmparo" onclick="toggleCampoAmparo()"><span class="bico" style="background:#CC0000">⚑</span>Campo</button><button class="btn-vend" onclick="abrirSanFelipeAmparo()"><span class="bico" style="background:#1F8A55">🏪</span>San Felipe</button><button class="btn-vend" id="btnRecarDash" style="display:none" onclick="abrirRecargaAmparo()"><span class="bico" style="background:#E6A817">⚡</span>Recarga</button><button class="btn-vend" onclick="openEmbed('DASHBOARD_MULTIMARCA_BLAZEL.html?embed=1&u=amparo','🔀 Multimarca','recarScreen')"><span class="bico" style="background:#13A05F">🏷️</span>Multimarca</button><button class="btn-vend" onclick="abrirPersonal('recarScreen')"><span class="bico" style="background:#3B4252">🗂️</span>Control Personal</button><button class="btn-vend" id="btnGPSAmparo" style="display:none" onclick="openEmbed('SEGUIMIENTO_GPS.html?u=amparo','📍 Seguimiento GPS','recarScreen')"><span class="bico" style="background:#0E7C7B">📍</span>Seguimiento GPS</button><button class="btn-vend" onclick="openEmbed('PRE_ENTREGAS_PANEL.html?u=amparo','📦 Pre-entregas','recarScreen')"><span class="bico" style="background:#C77D17">📦</span>Pre-entregas</button><button class="btn-logout" onclick="doLogout()">⏻ Cerrar sesión</button></div>
@@ -231,6 +255,7 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
 
 <div id="gracieScreen" class="screen">
   <div class="main-wrap">
+    <div class="aviso-act"><span class="dot"></span><span class="aviso-txt"></span></div>
     <div class="top-bar">
       <div class="top-left"><h2>SUPER CAMPO</h2><div class="pdv">Recarga y seguimiento de asistencia</div></div>
       <div class="top-actions">
@@ -413,6 +438,7 @@ function doLogin(){
   if(!t||PWD[t]!==p){e.style.display="block";return;}
   e.style.display="none";
   curLoginType=t;
+  registrarAcceso(t);
 
   if(t==="COMERCIAL"){
     gerenteMode=true; comercialMode=true;
@@ -421,6 +447,7 @@ function doLogin(){
     document.getElementById("btnMultimarca").style.display="";
     document.getElementById("btnGPS").style.display="";
     document.getElementById("btnPreEntregas").style.display="";
+    document.getElementById("btnAccesos").style.display="";
     var _gh=document.querySelector("#gerScreen h2"); if(_gh) _gh.textContent="COMERCIAL — Consolidado";
     showScreen("gerScreen");
     renderGerMesTabs();
@@ -498,7 +525,7 @@ function toggleHideKpis(){
   function doLogout(){
   curTienda="";gerenteMode=false;comercialMode=false;curLoginType="";gerMode="all";gerSel.clear();
   document.body.classList.remove("hide-kpis");["btnHideKpis","btnHideKpisGer"].forEach(function(id){ var b=document.getElementById(id); if(b) b.innerHTML='<span class="bico" style="background:#6B7077">🙈</span>Ocultar cifras'; });
-  ["btnMasivo","btnRecarga","btnMultimarca","btnRecarDash","btnGPS","btnGPSAmparo","btnPreEntregas","btnVolverCampo"].forEach(function(id){ var b=document.getElementById(id); if(b) b.style.display="none"; });
+  ["btnMasivo","btnRecarga","btnMultimarca","btnRecarDash","btnGPS","btnGPSAmparo","btnPreEntregas","btnVolverCampo","btnAccesos"].forEach(function(id){ var b=document.getElementById(id); if(b) b.style.display="none"; });
   var _gh=document.querySelector("#gerScreen h2"); if(_gh) _gh.textContent="COORD. TIENDAS — Consolidado";
   document.getElementById("passIn").value="";
   document.getElementById("tiendaInput").value="";
@@ -509,6 +536,7 @@ function toggleHideKpis(){
   document.getElementById("gerTableSection").innerHTML="";
   document.getElementById("gerKpis").innerHTML="";
   var as=document.getElementById("asesoresSection"); if(as) as.innerHTML="";
+  var ap=document.getElementById("accPanel"); if(ap){ap.style.display="none";ap.innerHTML="";}
 }
 
 function showScreen(id){
@@ -524,6 +552,67 @@ function abrirVendedor(){
 }
 function salirVendedor(){
   showScreen(gerenteMode ? "gerScreen" : "mainScreen");
+}
+
+// ===================== ACCESOS =====================
+// 1) Anota cada ingreso en la hoja ACCESOS  2) Muestra "ACTUALIZADO HOY"  3) Panel ¿Quién ya vio? (solo COMERCIAL)
+function accFmt(iso){
+  if(!iso) return "";
+  const d=new Date(iso); if(isNaN(d)) return "";
+  const hoy=new Date(); const ayer=new Date(); ayer.setDate(hoy.getDate()-1);
+  const hora=d.toLocaleTimeString("es-PE",{hour:"numeric",minute:"2-digit",hour12:true}).toUpperCase().replace(/\s*A\.?\s*M\.?/,' AM').replace(/\s*P\.?\s*M\.?/,' PM');
+  if(d.toDateString()===hoy.toDateString()) return "HOY "+hora;
+  if(d.toDateString()===ayer.toDateString()) return "AYER "+hora;
+  return d.toLocaleDateString("es-PE",{day:"2-digit",month:"2-digit"})+" "+hora;
+}
+function mostrarAvisoAct(iso){
+  if(!iso) return;
+  const txt=accFmt(iso); const esHoy=txt.indexOf("HOY")===0;
+  document.querySelectorAll(".aviso-act").forEach(el=>{
+    el.classList.toggle("hoy",esHoy);
+    el.querySelector(".aviso-txt").textContent=esHoy?("ACTUALIZADO "+txt):("Última actualización: "+txt);
+    el.style.display="flex";
+  });
+}
+function registrarAcceso(u){
+  const disp=/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)?"Celular":"PC";
+  const sep=SCRIPT_URL.includes('?')?'&':'?';
+  fetch(`${SCRIPT_URL}${sep}modo=log&u=${encodeURIComponent(u)}&disp=${disp}`)
+    .then(r=>r.json()).then(j=>{ if(j&&j.ultAct) mostrarAvisoAct(j.ultAct); }).catch(()=>{});
+}
+let accData=null;
+function toggleAccesos(){
+  const p=document.getElementById("accPanel");
+  if(p.style.display==="block"){ p.style.display="none"; return; }
+  p.style.display="block"; cargarAccesos();
+}
+function cargarAccesos(){
+  const p=document.getElementById("accPanel");
+  p.innerHTML='<div class="acc-sub">Cargando quién ya entró…</div>';
+  const sep=SCRIPT_URL.includes('?')?'&':'?';
+  fetch(`${SCRIPT_URL}${sep}modo=accesos&t=${Date.now()}`).then(r=>r.json()).then(j=>{
+    accData=j; if(j.ultAct) mostrarAvisoAct(j.ultAct);
+    const us=j.usuarios||[]; const ok=us.filter(u=>u.visto); const no=us.filter(u=>!u.visto);
+    const card=u=>`<div class="acc-u ${u.visto?'ok':'no'}">${u.visto?'✔':'✖'} ${u.label}<small>${u.ultimo?('Entró: '+accFmt(u.ultimo)):'Nunca ha entrado'}</small></div>`;
+    const rec=(j.recientes||[]).map(r=>`<div>${r[0]} · ${r[1]} — <b>${r[2]}</b> <span style="color:#999">(${r[3]||''})</span></div>`).join('')||'<div>Aún no hay ingresos registrados.</div>';
+    p.innerHTML=`<h3>👁️ ¿Quién ya vio el avance? — ${ok.length} de ${us.length}</h3>
+      <div class="acc-sub">Avance actualizado: <b>${accFmt(j.ultAct)||'—'}</b>. En verde los que entraron después de esa hora; en rojo los que faltan.</div>
+      <div class="acc-grid">${no.map(card).join('')}${ok.map(card).join('')}</div>
+      <div class="acc-acts">
+        ${no.length?'<button class="acc-btn pri" onclick="copiarRecordatorio()">📋 Copiar mensaje para los que faltan</button>':''}
+        <button class="acc-btn" onclick="cargarAccesos()">🔄 Actualizar</button>
+        ${j.hoja?`<button class="acc-btn" onclick="window.open('https://docs.google.com/spreadsheets/d/${j.hoja}','_blank')">📄 Ver historial completo</button>`:''}
+      </div>
+      <div class="acc-rec"><b>Últimos ingresos</b>${rec}</div>`;
+  }).catch(()=>{ p.innerHTML='<div class="acc-sub">No se pudo cargar. Toca 🔄 para reintentar. <button class="acc-btn" onclick="cargarAccesos()">🔄 Reintentar</button></div>'; });
+}
+function copiarRecordatorio(){
+  if(!accData) return;
+  const no=(accData.usuarios||[]).filter(u=>!u.visto).map(u=>"• "+u.label).join("\n");
+  const msg=`*AVANCE ACTUALIZADO ${accFmt(accData.ultAct)}* ✅\nPor favor revisen su avance aquí: https://juliomazad.github.io/avance-pdv-blazel/\n\nFaltan revisar:\n${no}`;
+  const done=()=>{ const b=document.querySelector('.acc-btn.pri'); if(b){ b.textContent='✔ Copiado, pégalo en WhatsApp'; setTimeout(()=>{b.textContent='📋 Copiar mensaje para los que faltan';},2500);} };
+  if(navigator.clipboard) navigator.clipboard.writeText(msg).then(done).catch(()=>{});
+  else { const ta=document.createElement('textarea'); ta.value=msg; document.body.appendChild(ta); ta.select(); try{document.execCommand('copy');}catch(e){} ta.remove(); done(); }
 }
 
 document.getElementById("passIn").addEventListener("keydown",e=>{if(e.key==="Enter")doLogin();});
