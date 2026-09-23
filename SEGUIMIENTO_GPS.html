@@ -571,7 +571,7 @@
     return '<a href="https://www.google.com/maps?q=' + lat + ',' + lng + '" target="_blank" style="color:var(--rojo);font-weight:700;text-decoration:none">📍 Ver mapa</a>';
   }
 
-  // Distancia en metros entre dos coordenadas (fórmula de Haversine)
+  function enlaceRecorrido(m){ var puntos=[[m.latEntrada,m.lngEntrada],[m.latMediodia,m.lngMediodia],[m.latSalida,m.lngSalida]].filter(function(p){return p[0]&&p[1];}); if(puntos.length===0) return ''; if(puntos.length===1){ return '<a href="https://www.google.com/maps?q=' + puntos[0][0] + ',' + puntos[0][1] + '" target="_blank" style="color:var(--rojo);font-weight:700;text-decoration:none">📍 Ver mapa</a>'; } var ruta = puntos.map(function(p){return p[0]+','+p[1];}).join('/'); return '<a href="https://www.google.com/maps/dir/' + ruta + '" target="_blank" style="color:var(--rojo);font-weight:700;text-decoration:none">📍 Ver recorrido del día</a>'; } // Distancia en metros entre dos coordenadas (fórmula de Haversine)
   function distanciaMetros(lat1, lng1, lat2, lng2){
     if (!lat1 || !lng1 || !lat2 || !lng2) return null;
     const R = 6371000;
@@ -646,9 +646,9 @@
       else if (estado.clase === 'falta') falto++;
       else if (estado.clase === 'descanso') descanso++;
 
-      const mapaEntrada = enlaceMapa(m.latEntrada, m.lngEntrada) || '—';
-      const mapaSalida = enlaceMapa(m.latSalida, m.lngSalida) || '—';
-      const mapaMediodia = enlaceMapa(m.latMediodia, m.lngMediodia) || '—';
+      const mapaRecorrido = enlaceRecorrido(m) || '—'; const mapaEntrada = mapaRecorrido;
+      const mapaSalida = mapaRecorrido;
+      const mapaMediodia = mapaRecorrido;
       const medio = estadoMediodia(m.mediodia);
       const alerta = alertaUbicacion(m) || '<span class="muted">—</span>';
 
