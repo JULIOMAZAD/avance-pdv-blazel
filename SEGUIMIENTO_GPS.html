@@ -199,6 +199,17 @@
   // Apps Script — ya no hace falta editar código para dar de baja a
   // alguien, se hace desde el formulario de arriba.
   let INACTIVOS = {};
+  // Respaldo: última lista de bajas guardada en este equipo, por si el
+  // servidor demora (pasa mucho en celular) — así nunca reaparecen los que ya no trabajan.
+  try { INACTIVOS = JSON.parse(localStorage.getItem('gps_inactivos') || '{}') || {}; } catch(e) { INACTIVOS = {}; }
+  // Bajas fijas de respaldo (por si el equipo nunca cargó la lista)
+  const BAJAS_RESPALDO = {
+    "ANGELY JARITZA ALEGRÍA ZAMBRANO": {fecha:"2026-07-14", motivo:"RENUNCIO"},
+    "BRENNA JOSSARY SALAS SHAPIAMA": {fecha:"2026-08-05", motivo:"NO RENOVO"},
+    "RUTH SARAI VERGARA SANCHEZ": {fecha:"2026-08-31", motivo:"NO RENOVO"},
+    "CECILIA PUNTAS SALCEDO": {fecha:"2026-08-31", motivo:"NO RENOVO"}
+  };
+  Object.keys(BAJAS_RESPALDO).forEach(k => { if (!INACTIVOS[k]) INACTIVOS[k] = BAJAS_RESPALDO[k]; });
 
   document.getElementById('bajaNombre').innerHTML = '<option value="">Selecciona un asesor…</option>' +
     ASESORES.map(n => '<option value="' + n + '">' + n + '</option>').join('');
@@ -437,11 +448,14 @@
 
       try {
         const controlador = new AbortController();
-        const limite = setTimeout(() => controlador.abort(), 4000);
+        const limite = setTimeout(() => controlador.abort(), 15000);
         const respInact = await fetch(URL_SCRIPT + '?fecha=' + fechaISO, { signal: controlador.signal });
         clearTimeout(limite);
         const dataInact = await respInact.json();
-        if (dataInact && dataInact.inactivos) INACTIVOS = dataInact.inactivos;
+        if (dataInact && dataInact.inactivos) {
+          INACTIVOS = Object.assign({}, BAJAS_RESPALDO, dataInact.inactivos);
+          try { localStorage.setItem('gps_inactivos', JSON.stringify(INACTIVOS)); } catch(e) {}
+        }
         if (dataInact && dataInact.horaDesde && dataInact.horaHasta) {
           const [h1, m1] = dataInact.horaDesde.split(':').map(Number);
           const [h2, m2] = dataInact.horaHasta.split(':').map(Number);
