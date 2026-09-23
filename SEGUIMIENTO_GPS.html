@@ -592,19 +592,21 @@
       let html = '<table style="width:100%;border-collapse:collapse;font-size:13px">';
       html += '<tr style="border-bottom:1.5px solid var(--borde);text-align:left">' +
         '<th style="padding:6px 8px">Hora</th><th style="padding:6px 8px">Tipo</th>' +
-        '<th style="padding:6px 8px">DNI / RUC / Recargador</th><th style="padding:6px 8px">Distrito</th>' +
+        '<th style="padding:6px 8px">DNI / RUC / Recargador</th><th style="padding:6px 8px">Cliente</th><th style="padding:6px 8px">Distancia</th><th style="padding:6px 8px">Distrito</th>' +
         '<th style="padding:6px 8px">Ubicación</th></tr>';
       Object.keys(porAsesor).sort().forEach(function(nombre){
         const lista = porAsesor[nombre];
         const conteo = { MULTIMARCA:0, RECARGA:0, MIXTO:0 };
         lista.forEach(function(v){ if(conteo[v.tipo] !== undefined) conteo[v.tipo]++; });
-        html += '<tr><td colspan="5" style="padding:8px;background:var(--gris-claro);font-weight:700">' +
+        html += '<tr><td colspan="7" style="padding:8px;background:var(--gris-claro);font-weight:700">' +
           nombre + ' — ' + lista.length + ' visita(s)  ·  Multimarca: ' + conteo.MULTIMARCA +
           '  ·  Recarga: ' + conteo.RECARGA + '  ·  Mixto: ' + conteo.MIXTO + '</td></tr>';
         lista.forEach(function(v){
           html += '<tr><td style="padding:6px 8px">' + (v.hora||'—') + '</td>' +
             '<td style="padding:6px 8px">' + (v.tipo||'—') + '</td>' +
             '<td style="padding:6px 8px">' + (v.punto||'—') + '</td>' +
+            '<td style="padding:6px 8px">' + celdaCliente(v) + '</td>' +
+            '<td style="padding:6px 8px">' + celdaDistancia(v) + '</td>' +
             '<td style="padding:6px 8px">' + (v.distrito||'—') + '</td>' +
             '<td style="padding:6px 8px">' + (enlaceMapa(v.lat, v.lng) || '—') + '</td></tr>';
         });
@@ -614,6 +616,21 @@
     } catch (err) {
       cont.innerHTML = '<div class="estado-carga">No se pudieron cargar las visitas. (' + err.message + ')</div>';
     }
+  }
+
+  function celdaCliente(v){
+    if (v.clienteEncontrado === 'SI') {
+      return v.nombreCliente || 'Sí';
+    }
+    return '<span style="color:var(--rojo);font-weight:700">\u26A0 No encontrado</span>';
+  }
+
+  function celdaDistancia(v){
+    if (v.distanciaMetros === '' || v.distanciaMetros === undefined || v.distanciaMetros === null) return '—';
+    var d = Number(v.distanciaMetros);
+    if (isNaN(d)) return '—';
+    var alerta = d > 500;
+    return '<span' + (alerta ? ' style="color:var(--rojo);font-weight:700"' : '') + '>' + d + ' m' + (alerta ? ' \u26A0' : '') + '</span>';
   }
 
   function enlaceMapa(lat, lng){
