@@ -113,6 +113,13 @@
   </div>
 
   <div class="buscador-reclamo">
+    <label>📍 Ubicación geocalizada de un cliente</label>
+    <div style="display:flex;gap:8px;">
+      <input type="text" id="inputBuscarGeoDni" placeholder="DNI del cliente" autocomplete="off">
+      <button class="btn-rojo" onclick="buscarGeoClienteUI()">Buscar</button>
+    </div>
+    <div id="resultadoGeoCliente"></div>
+    <div style="height:14px;"></div>
     <label>🔓 Nombres abiertos hoy en algún celular</label>
     <div id="listaSesiones" style="font-size:13px;color:var(--gris);">Cargando…</div>
   </div>
@@ -1791,6 +1798,45 @@
       btn.textContent = '📷 Usar cámara del celular';
       camaraBuscarActiva = false;
     });
+  }
+
+  async function buscarGeoClienteUI(){
+    const dni = document.getElementById('inputBuscarGeoDni').value.trim();
+    const box = document.getElementById('resultadoGeoCliente');
+    if(!dni){ box.innerHTML = '<div class="sub" style="color:var(--rojo)">Escribe el DNI.</div>'; return; }
+    box.innerHTML = '<div class="sub">Buscando…</div>';
+    try {
+      const r = await fetch(URL_SCRIPT + '?modo=cliente&dni=' + encodeURIComponent(dni) + '&_=' + Date.now());
+      const d = await r.json();
+      if(!d || !d.cliente){ box.innerHTML = '<div class="sub" style="color:var(--rojo)">No se encontró un cliente con ese DNI.</div>'; return; }
+      const c = d.cliente;
+      if(c.lat && c.lng){
+        box.innerHTML =
+          '<div class="sub"><b>' + (c.nombre||'') + '</b> — geocalizado el ' + (c.geoFecha||'—') + '</div>' +
+          '<div class="sub"><a href="https://www.google.com/maps?q=' + c.lat + ',' + c.lng + '" target="_blank">📍 Ver mapa</a></div>' +
+          '<button class="btn-secundario" style="margin-top:6px;" onclick="borrarGeoClienteUI(\'' + dni + '\')">🗑 Borrar ubicación (para que se pueda volver a geocalizar)</button>';
+      } else {
+        box.innerHTML = '<div class="sub"><b>' + (c.nombre||'') + '</b> — todavía no está geocalizado. Le sigue saliendo el botón "Geocalizar" en su app.</div>';
+      }
+    } catch(err){
+      box.innerHTML = '<div class="sub" style="color:var(--rojo)">No se pudo conectar. Intenta de nuevo.</div>';
+    }
+  }
+
+  async function borrarGeoClienteUI(dni){
+    if(!confirm('¿Borrar la ubicación geocalizada de este cliente? La próxima vez que un vendedor lo busque, le va a volver a salir el botón "Geocalizar".')) return;
+    const box = document.getElementById('resultadoGeoCliente');
+    box.innerHTML = '<div class="sub">Borrando…</div>';
+    try {
+      await fetch(URL_SCRIPT, {
+        method: 'POST', mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'borrar_ubicacion_cliente', dni: dni })
+      });
+      box.innerHTML = '<div class="sub" style="color:var(--verde)">✔ Ubicación borrada.</div>';
+    } catch(err){
+      box.innerHTML = '<div class="sub" style="color:var(--rojo)">No se pudo borrar. Intenta de nuevo.</div>';
+    }
   }
 
   async function buscarPorSerieUI(){
