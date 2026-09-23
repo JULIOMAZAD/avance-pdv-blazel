@@ -119,6 +119,9 @@
       <button class="btn-rojo" onclick="buscarGeoClienteUI()">Buscar</button>
     </div>
     <div id="resultadoGeoCliente"></div>
+    <div style="height:10px;"></div>
+    <button class="btn-secundario" onclick="verResumenGeoUI()">📊 Ver resumen de geocalización por asesor</button>
+    <div id="resumenGeoAsesores" style="margin-top:10px;"></div>
     <div style="height:14px;"></div>
     <label>🔓 Nombres abiertos hoy en algún celular</label>
     <div id="listaSesiones" style="font-size:13px;color:var(--gris);">Cargando…</div>
@@ -1798,6 +1801,28 @@
       btn.textContent = '📷 Usar cámara del celular';
       camaraBuscarActiva = false;
     });
+  }
+
+  async function verResumenGeoUI(){
+    const box = document.getElementById('resumenGeoAsesores');
+    box.innerHTML = '<div class="sub">Cargando…</div>';
+    try {
+      const r = await fetch(URL_SCRIPT + '?modo=resumen_geo&_=' + Date.now());
+      const d = await r.json();
+      if(!d || !d.ok || !d.resumen){ box.innerHTML = '<div class="sub" style="color:var(--rojo)">No se pudo cargar el resumen.</div>'; return; }
+      if(d.resumen.length === 0){ box.innerHTML = '<div class="sub">Sin datos todavía.</div>'; return; }
+      let filas = d.resumen.map(function(v){
+        return '<tr><td style="padding:4px 8px;">' + v.vendedor + '</td>' +
+          '<td style="padding:4px 8px;text-align:center;">' + v.total + '</td>' +
+          '<td style="padding:4px 8px;text-align:center;color:var(--verde);font-weight:700;">' + v.geocalizados + '</td>' +
+          '<td style="padding:4px 8px;text-align:center;color:' + (v.faltan > 0 ? 'var(--rojo)' : 'var(--gris)') + ';font-weight:700;">' + v.faltan + '</td></tr>';
+      }).join('');
+      box.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:6px;">' +
+        '<tr style="border-bottom:1.5px solid var(--borde);"><th style="text-align:left;padding:4px 8px;">Asesor</th><th style="padding:4px 8px;">Total</th><th style="padding:4px 8px;">Geocalizados</th><th style="padding:4px 8px;">Faltan</th></tr>' +
+        filas + '</table>';
+    } catch(e) {
+      box.innerHTML = '<div class="sub" style="color:var(--rojo)">Error al cargar el resumen.</div>';
+    }
   }
 
   async function buscarGeoClienteUI(){
