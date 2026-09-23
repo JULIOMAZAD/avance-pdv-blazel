@@ -218,7 +218,7 @@ const barLabels = {
     ctx.save();
     ctx.font = '700 13px "Barlow Condensed", sans-serif';
     ctx.textAlign = o.horizontal ? 'left' : 'center';
-    ctx.textBaseline = o.horizontal ? 'middle' : 'bottom';
+    ctx.textBaseline = o.horizontal ? 'middle' : (o.inside ? 'middle' : 'bottom');
     const dss = chart.config.data.datasets;
     for(let di=0; di<dss.length; di++){
       const meta = chart.getDatasetMeta(di);
@@ -231,6 +231,11 @@ const barLabels = {
         const fmt = typeof o.fmt==='function' ? o.fmt : o.fmt==='k' ? fK : o.fmt==='n' ? fN : String;
         const txt = (dss[di].pctLabels && dss[di].pctLabels[i]!=null) ? dss[di].pctLabels[i] : fmt(v, di, i);
         if(o.horizontal) ctx.fillText(txt, bar.x+5, bar.y);
+        else if(o.inside && typeof bar.base==='number'){
+          const midY = (bar.y + bar.base)/2;
+          if(Math.abs(bar.base-bar.y) < 16) return; // segmento muy delgado: no forzar el texto adentro
+          ctx.fillText(txt, bar.x, midY);
+        }
         else ctx.fillText(txt, bar.x, bar.y-4);
       });
     }
@@ -1822,10 +1827,10 @@ function rOtroDistribuidor(){
   dona('dnSinReg', actual.total ? actual.sinReg/actual.total : null, '#9AA3B0', fP(actual.total?actual.sinReg/actual.total:null), 'del total');
 
   mkChart('chOtroDist',{type:'bar',data:{labels:mesesMostrar.map(m=>m.mes),datasets:[
-    {label:'Propio (Blazel)',data:mesesMostrar.map(m=>m.propio),backgroundColor:'#13A05F',stack:'s',pctLabels:mesesMostrar.map(m=>m.propio?fP(m.pctPropio):'')},
-    {label:'Otro distribuidor',data:mesesMostrar.map(m=>m.otro),backgroundColor:'#D81F26',stack:'s',pctLabels:mesesMostrar.map(m=>m.otro?fP(m.pctOtro):'')},
-    {label:'Sin registro',data:mesesMostrar.map(m=>m.sinReg),backgroundColor:'#C9CCD2',stack:'s',pctLabels:mesesMostrar.map(m=>m.sinReg?fP(m.pctSinReg):'')}
-  ]},options:{maintainAspectRatio:false,plugins:{legend:{position:'bottom'},barLabels:{on:true}},scales:{x:{stacked:true},y:{stacked:true,grace:'10%'}}}});
+    {label:'Propio (Blazel)',data:mesesMostrar.map(m=>m.propio),backgroundColor:'#13A05F',stack:'s',pctLabels:mesesMostrar.map(m=>m.propio?fP(m.pctPropio):''),labelColor:'#fff'},
+    {label:'Otro distribuidor',data:mesesMostrar.map(m=>m.otro),backgroundColor:'#D81F26',stack:'s',pctLabels:mesesMostrar.map(m=>m.otro?fP(m.pctOtro):''),labelColor:'#fff'},
+    {label:'Sin registro',data:mesesMostrar.map(m=>m.sinReg),backgroundColor:'#C9CCD2',stack:'s',pctLabels:mesesMostrar.map(m=>m.sinReg?fP(m.pctSinReg):''),labelColor:'#4A4F57'}
+  ]},options:{maintainAspectRatio:false,plugins:{legend:{position:'bottom'},barLabels:{on:true,inside:true}},scales:{x:{stacked:true},y:{stacked:true,grace:'10%'}}}});
 }
 
 function rPlanes(){
