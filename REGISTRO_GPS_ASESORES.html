@@ -344,7 +344,7 @@
         <div class="dato" id="clienteBioLabel"></div>
         <div class="chips-bio" id="clienteBioChips"></div>
         <div id="clienteUbicacionInfo" class="dato" style="margin-top:8px;"></div>
-        <button class="btn-link" id="btnActualizarUbicacion" onclick="actualizarUbicacion()" style="display:none">Actualizar datos del cliente</button>
+        <button class="btn-link" id="btnActualizarUbicacion" onclick="geocalizarCliente()" style="display:none">📍 Geocalizar</button>
       </div>
 
       <label for="cantidadChips" id="labelCantidad" style="display:none">Cantidad de chips que pide</label>
@@ -720,35 +720,35 @@
 
     const infoUbic = document.getElementById('clienteUbicacionInfo');
     const btnActualizar = document.getElementById('btnActualizarUbicacion');
-    if(c.lat && c.lng){
+    if(!c.lat || !c.lng){
       infoUbic.textContent = '';
       btnActualizar.style.display = 'block';
     } else {
-      infoUbic.textContent = '📍 Se registrará tu ubicación actual al guardar (primera vez).';
+      infoUbic.textContent = '📍 Ubicación registrada.';
       btnActualizar.style.display = 'none';
     }
 
     document.getElementById('tarjetaCliente').classList.add('visible');
   }
 
-  function actualizarUbicacion(){
+  function geocalizarCliente(){
     if(!clienteActual) return;
-    mostrarEstadoPre('cargando', 'Actualizando…');
+    mostrarEstadoPre('cargando', 'Obteniendo tu ubicación…');
     obtenerUbicacion().then(function(pos){
       fetch(URL_SCRIPT, {
         method: 'POST', mode: 'no-cors',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'actualizar_ubicacion_cliente', dni: clienteActual.dni, lat: pos.lat, lng: pos.lng })
+        body: JSON.stringify({ action: 'geocalizar_cliente', dni: clienteActual.dni, lat: pos.lat, lng: pos.lng })
       }).then(function(){
         clienteActual.lat = pos.lat; clienteActual.lng = pos.lng;
         clienteActual.geoFecha = new Date().toLocaleDateString('es-PE');
         renderTarjetaCliente();
-        mostrarEstadoPre('ok', 'Datos actualizados.');
+        mostrarEstadoPre('ok', '✔ Ubicación registrada.');
       }).catch(function(){
-        mostrarEstadoPre('error', 'No se pudo actualizar. Intenta de nuevo.');
+        mostrarEstadoPre('error', 'No se pudo geocalizar. Intenta de nuevo.');
       });
     }).catch(function(){
-      mostrarEstadoPre('error', 'No se pudo actualizar. Intenta de nuevo.');
+      mostrarEstadoPre('error', 'No se pudo geocalizar. Intenta de nuevo.');
     });
   }
 
@@ -797,8 +797,8 @@
       });
     }
 
-    // Solo pide ubicación si este cliente todavía no la tiene registrada.
-    if(!clienteActual.lat || !clienteActual.lng){
+    // La geolocalización ya no se pide aquí — se hace aparte con el botón "Geocalizar".
+    if(false){ // deshabilitado: ahora se geocaliza aparte con el botón "Geocalizar"
       obtenerUbicacion().then(function(pos){
         enviar(pos.lat, pos.lng);
       }).catch(function(){
