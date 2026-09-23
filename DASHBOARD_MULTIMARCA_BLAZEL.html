@@ -229,7 +229,7 @@ const barLabels = {
         const v = o.horizontal ? (p && p.x) : (p && p.y);
         if(typeof v !== 'number' || isNaN(v)) return;
         const fmt = typeof o.fmt==='function' ? o.fmt : o.fmt==='k' ? fK : o.fmt==='n' ? fN : String;
-        const txt = fmt(v, di, i);
+        const txt = (o.labels && o.labels[di] && o.labels[di][i]!=null) ? o.labels[di][i] : fmt(v, di, i);
         if(o.horizontal) ctx.fillText(txt, bar.x+5, bar.y);
         else ctx.fillText(txt, bar.x, bar.y-4);
       });
@@ -1825,11 +1825,11 @@ function rOtroDistribuidor(){
     {label:'Propio (Blazel)',data:mesesMostrar.map(m=>m.propio),backgroundColor:'#13A05F',stack:'s'},
     {label:'Otro distribuidor',data:mesesMostrar.map(m=>m.otro),backgroundColor:'#D81F26',stack:'s'},
     {label:'Sin registro',data:mesesMostrar.map(m=>m.sinReg),backgroundColor:'#C9CCD2',stack:'s'}
-  ]},options:{maintainAspectRatio:false,plugins:{legend:{position:'bottom'},barLabels:{on:true,fmt:(v,di,i)=>{
-    const m = mesesMostrar[i]; if(!m || !v) return '';
-    const pct = di===0?m.pctPropio:di===1?m.pctOtro:m.pctSinReg;
-    return fP(pct);
-  }}},scales:{x:{stacked:true},y:{stacked:true,grace:'10%'}}}});
+  ]},options:{maintainAspectRatio:false,plugins:{legend:{position:'bottom'},barLabels:{on:true,labels:[
+    mesesMostrar.map(m=>m.propio?fP(m.pctPropio):''),
+    mesesMostrar.map(m=>m.otro?fP(m.pctOtro):''),
+    mesesMostrar.map(m=>m.sinReg?fP(m.pctSinReg):'')
+  ]}},scales:{x:{stacked:true},y:{stacked:true,grace:'10%'}}}});
 }
 
 function rPlanes(){
