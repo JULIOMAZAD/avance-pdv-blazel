@@ -575,6 +575,7 @@ function rMultimarca(){
         <div class="stats">
           <div class="s"><div class="sl">Meta</div><div class="sv num">${fN(meta)}</div></div>
           <div class="s"><div class="sl">Avance</div><div class="sv num" style="color:var(--rojo)">${fN(av)}</div></div>
+          ${esProyeccion&&x.proy!=null?`<div class="s"><div class="sl">Proyectado</div><div class="sv num" style="color:${semColorMM((x.proy&&meta)?x.proy/meta:null)}">${fN(x.proy)}</div></div>`:''}
           <div class="s"><div class="sl">${falta>0?'Falta':'Meta cubierta'}</div><div class="sv num" style="color:${falta>0?'var(--rojo)':'var(--verde)'}">${falta>0?fN(falta):'✓'}</div></div>
         </div>
         ${esProyeccion?`<div class="vs ${pReal==null?'eq':pReal>=1?'up':'dn'}" style="${pReal==null?'':pReal>=1?'background:var(--verde-bg);color:var(--verde)':'background:var(--rojo-bg);color:var(--rojo)'}">${pReal==null?'—':fP(pReal)} avance real de la meta</div>`:''}
