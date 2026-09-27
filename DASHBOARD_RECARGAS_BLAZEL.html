@@ -856,7 +856,8 @@ function rAsesores(ym){
   if(!data.length){ el.innerHTML = `<h2>Asesores</h2><div class="card">No hay datos de asesores en el driver.</div>`; return; }
   const mesesOrden = ['MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SETIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE','ENERO','FEBRERO'];
   const mesesDisp = mesesOrden.filter(mm=>data.some(a=>a[mm]!=null));
-  const curNombre = MESN[m].toUpperCase()==='SETIEMBRE'||MESN[m].toUpperCase()==='SEPTIEMBRE' ? 'SETIEMBRE' : MESN[m].toUpperCase();
+if(!mesesDisp.length){ el.innerHTML = `<h2>Asesores</h2><div class="card">No hay datos de asesores en el driver.</div>`; return; }
+    const curNombre = MESN[m].toUpperCase()==='SETIEMBRE'||MESN[m].toUpperCase()==='SEPTIEMBRE' ? 'SETIEMBRE' : MESN[m].toUpperCase();
   const mesActivo = mesesDisp.includes(curNombre) ? curNombre : mesesDisp[mesesDisp.length-1];
   const activos = data.filter(a=>(a[mesActivo]||0)>0);
   if(!asesVendSel){ asesVendSel = new Set(activos.map(a=>a.asesor)); }
