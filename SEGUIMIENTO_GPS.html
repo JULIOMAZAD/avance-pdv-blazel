@@ -572,20 +572,27 @@
     }
   }
 
+  // ===================== VISITAS: filtro por vendedor + mapa + corregir/borrar =====================
+  let VISITAS_DIA = [];
+  let VIS_FECHA = '';
+  let VIS_SEL = '';
+  try { VIS_SEL = localStorage.getItem('vis_sel') || ''; } catch(e) {}
+  const PUEDE_EDITAR_VIS = ['jmaza','amparo','gracie'].indexOf(usuarioActual) !== -1;
+  const COLOR_TIPO = { MULTIMARCA:'#1E6FD9', RECARGA:'#E6A817', MIXTO:'#8E44AD' };
+
   async function cargarVisitasDia(fechaISO){
     const cont = document.getElementById('contenedorVisitas');
     if(!cont) return;
+    VIS_FECHA = fechaISO;
     cont.innerHTML = '<div class="estado-carga">Cargando visitas...</div>';
     try {
       // Reintenta hasta 3 veces: a veces Google responde con una página de error en vez de datos
-      let data = null, ultimoError = null;
+      let data = null;
       for (let intento = 1; intento <= 3 && !data; intento++) {
         try {
           const resp = await fetch(URL_SCRIPT + '?modo=visitas_dia&fecha=' + fechaISO + '&t=' + Date.now());
-          const texto = await resp.text();
-          data = JSON.parse(texto);
+          data = JSON.parse(await resp.text());
         } catch (e) {
-          ultimoError = e;
           if (intento < 3) {
             cont.innerHTML = '<div class="estado-carga">Cargando visitas... (reintento ' + intento + ')</div>';
             await new Promise(r => setTimeout(r, 1500 * intento));
@@ -593,44 +600,185 @@
         }
       }
       if (!data) throw new Error('Google no respondió, toca Actualizar');
-      const visitas = (data && data.ok && data.visitas) ? data.visitas : [];
-      if (visitas.length === 0){
+      VISITAS_DIA = (data && data.ok && data.visitas) ? data.visitas : [];
+      if (VISITAS_DIA.length === 0){
         cont.innerHTML = '<div class="estado-carga">Sin visitas marcadas este día.</div>';
         return;
       }
-      const porAsesor = {};
-      visitas.forEach(function(v){
-        if(!porAsesor[v.asesor]) porAsesor[v.asesor] = [];
-        porAsesor[v.asesor].push(v);
-      });
-      let html = '<table style="width:100%;border-collapse:collapse;font-size:13px">';
-      html += '<tr style="border-bottom:1.5px solid var(--borde);text-align:left">' +
-        '<th style="padding:6px 8px">Hora</th><th style="padding:6px 8px">Tipo</th>' +
-        '<th style="padding:6px 8px">DNI / RUC / Recargador</th><th style="padding:6px 8px">Cliente</th><th style="padding:6px 8px">Distancia</th><th style="padding:6px 8px">Distrito</th>' +
-        '<th style="padding:6px 8px">Ubicación</th></tr>';
-      Object.keys(porAsesor).sort().forEach(function(nombre){
-        const lista = porAsesor[nombre];
-        const conteo = { MULTIMARCA:0, RECARGA:0, MIXTO:0 };
-        lista.forEach(function(v){ if(conteo[v.tipo] !== undefined) conteo[v.tipo]++; });
-        var rutaVisitas = enlaceRutaVisitas(lista);
-        html += '<tr><td colspan="7" style="padding:8px;background:var(--gris-claro);font-weight:700">' +
-          nombre + ' — ' + lista.length + ' visita(s)  ·  Multimarca: ' + conteo.MULTIMARCA +
-          '  ·  Recarga: ' + conteo.RECARGA + '  ·  Mixto: ' + conteo.MIXTO +
-          (rutaVisitas ? '  ·  ' + rutaVisitas : '') + '</td></tr>';
-        lista.forEach(function(v){
-          html += '<tr><td style="padding:6px 8px">' + (v.hora||'—') + '</td>' +
-            '<td style="padding:6px 8px">' + (v.tipo||'—') + '</td>' +
-            '<td style="padding:6px 8px">' + (formatoDoc(v.punto)||'—') + '</td>' +
-            '<td style="padding:6px 8px">' + celdaCliente(v) + '</td>' +
-            '<td style="padding:6px 8px">' + celdaDistancia(v) + '</td>' +
-            '<td style="padding:6px 8px">' + (v.distrito||'—') + '</td>' +
-            '<td style="padding:6px 8px">' + (enlaceMapa(v.lat, v.lng) || '—') + '</td></tr>';
-        });
-      });
-      html += '</table>';
-      cont.innerHTML = html;
+      pintarVisitas();
     } catch (err) {
       cont.innerHTML = '<div class="estado-carga">No se pudieron cargar las visitas. (' + err.message + ')</div>';
+    }
+  }
+
+  function pintarVisitas(){
+    const cont = document.getElementById('contenedorVisitas');
+    const porAsesor = {};
+    VISITAS_DIA.forEach(v => { (porAsesor[v.asesor] = porAsesor[v.asesor] || []).push(v); });
+    const nombres = Object.keys(porAsesor).sort();
+    if (!nombres.length) { cont.innerHTML = '<div class="estado-carga">Sin visitas marcadas este día.</div>'; return; }
+    if (nombres.indexOf(VIS_SEL) === -1) VIS_SEL = nombres[0];
+
+    // Chips: un botón por vendedor con su total del día
+    let html = '<div style="display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 14px">';
+    nombres.forEach(n => {
+      const on = n === VIS_SEL;
+      html += '<button onclick="elegirVendedorVis(\'' + n.replace(/'/g,"\\'") + '\')" style="border:1.5px solid ' + (on?'var(--rojo)':'var(--borde)') + ';background:' + (on?'var(--rojo)':'#fff') + ';color:' + (on?'#fff':'var(--tinta)') + ';border-radius:20px;padding:7px 14px;font-size:12.5px;font-weight:700;cursor:pointer">' +
+        n + ' <span style="opacity:.85;font-weight:600">(' + porAsesor[n].length + ')</span></button>';
+    });
+    html += '</div>';
+
+    const lista = porAsesor[VIS_SEL].slice().sort((a,b) => a.hora < b.hora ? -1 : (a.hora > b.hora ? 1 : 0));
+    const conteo = { MULTIMARCA:0, RECARGA:0, MIXTO:0 };
+    lista.forEach(v => { if (conteo[v.tipo] !== undefined) conteo[v.tipo]++; });
+    const ruta = enlaceRutaVisitas(lista);
+    html += '<div style="background:#fff;border:1px solid var(--borde);border-radius:14px;padding:14px 16px">';
+    html += '<div style="font-weight:800;font-size:15px;margin-bottom:4px">' + VIS_SEL + ' — ' + lista.length + ' visita(s)</div>';
+    html += '<div style="font-size:12.5px;color:var(--gris);margin-bottom:10px">' +
+      '<span style="color:' + COLOR_TIPO.MULTIMARCA + ';font-weight:700">● Multimarca: ' + conteo.MULTIMARCA + '</span> · ' +
+      '<span style="color:' + COLOR_TIPO.RECARGA + ';font-weight:700">● Recarga: ' + conteo.RECARGA + '</span> · ' +
+      '<span style="color:' + COLOR_TIPO.MIXTO + ';font-weight:700">● Mixto: ' + conteo.MIXTO + '</span>' +
+      (ruta ? ' · ' + ruta : '') + '</div>';
+    html += '<div id="mapaVisitas" style="height:380px;border-radius:12px;border:1px solid var(--borde);margin-bottom:12px;background:var(--gris-claro)"></div>';
+    html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">';
+    html += '<tr style="border-bottom:1.5px solid var(--borde);text-align:left">' +
+      '<th style="padding:6px 8px">#</th><th style="padding:6px 8px">Hora</th><th style="padding:6px 8px">Tipo</th>' +
+      '<th style="padding:6px 8px">DNI / RUC / Recargador</th><th style="padding:6px 8px">Cliente</th><th style="padding:6px 8px">Distancia</th><th style="padding:6px 8px">Distrito</th>' +
+      '<th style="padding:6px 8px">Ubicación</th>' + (PUEDE_EDITAR_VIS ? '<th style="padding:6px 8px">Corregir</th>' : '') + '</tr>';
+    lista.forEach((v, k) => {
+      html += '<tr style="border-bottom:1px solid var(--gris-claro)">' +
+        '<td style="padding:6px 8px"><span style="display:inline-block;min-width:22px;text-align:center;border-radius:11px;background:' + (COLOR_TIPO[v.tipo]||'#666') + ';color:#fff;font-weight:700;font-size:11.5px;padding:2px 6px">' + (k+1) + '</span></td>' +
+        '<td style="padding:6px 8px">' + (v.hora||'—') + '</td>' +
+        '<td style="padding:6px 8px">' + (v.tipo||'—') + '</td>' +
+        '<td style="padding:6px 8px">' + (formatoDoc(v.punto)||'—') + '</td>' +
+        '<td style="padding:6px 8px">' + celdaCliente(v) + '</td>' +
+        '<td style="padding:6px 8px">' + celdaDistancia(v) + '</td>' +
+        '<td style="padding:6px 8px">' + (v.distrito||'—') + '</td>' +
+        '<td style="padding:6px 8px">' + (enlaceMapa(v.lat, v.lng) || '—') + '</td>' +
+        (PUEDE_EDITAR_VIS ? '<td style="padding:6px 8px;white-space:nowrap">' +
+          '<button title="Corregir" onclick="abrirEdicionVis(\'' + v.id + '\')" style="border:1px solid var(--borde);background:#fff;border-radius:8px;padding:4px 8px;cursor:pointer">✏️</button> ' +
+          '<button title="Borrar" onclick="abrirBorradoVis(\'' + v.id + '\')" style="border:1px solid #f2aab3;background:#fdecee;border-radius:8px;padding:4px 8px;cursor:pointer">🗑️</button></td>' : '') +
+        '</tr>';
+    });
+    html += '</table></div></div>';
+    html += '<div id="modalVis"></div>';
+    cont.innerHTML = html;
+    dibujarMapaVisitas(lista);
+  }
+
+  function elegirVendedorVis(n){
+    VIS_SEL = n;
+    try { localStorage.setItem('vis_sel', n); } catch(e) {}
+    pintarVisitas();
+  }
+
+  // ---- Mapa con globitos numerados (Leaflet + OpenStreetMap, gratis) ----
+  let mapaVisObj = null;
+  function cargarLeaflet(){
+    if (window.L) return Promise.resolve();
+    if (window._leafletCargando) return window._leafletCargando;
+    window._leafletCargando = new Promise((ok, mal) => {
+      const css = document.createElement('link');
+      css.rel = 'stylesheet'; css.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
+      document.head.appendChild(css);
+      const js = document.createElement('script');
+      js.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
+      js.onload = () => ok(); js.onerror = () => mal(new Error('No cargó el mapa'));
+      document.head.appendChild(js);
+    });
+    return window._leafletCargando;
+  }
+  async function dibujarMapaVisitas(lista){
+    const div = document.getElementById('mapaVisitas');
+    if (!div) return;
+    const puntos = lista.map((v,k) => ({ v:v, k:k+1, lat:Number(v.lat), lng:Number(v.lng) }))
+                        .filter(p => p.lat && p.lng && !isNaN(p.lat) && !isNaN(p.lng));
+    if (!puntos.length) { div.innerHTML = '<div class="estado-carga">Sin ubicaciones para mostrar.</div>'; div.style.height = 'auto'; return; }
+    try { await cargarLeaflet(); } catch(e) { div.innerHTML = '<div class="estado-carga">No se pudo cargar el mapa.</div>'; return; }
+    if (mapaVisObj) { try { mapaVisObj.remove(); } catch(e) {} mapaVisObj = null; }
+    mapaVisObj = L.map(div, { scrollWheelZoom: false });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(mapaVisObj);
+    const latlngs = [];
+    puntos.forEach(p => {
+      const color = COLOR_TIPO[p.v.tipo] || '#666';
+      const icono = L.divIcon({
+        className: '',
+        html: '<div style="position:relative;width:30px;height:40px">' +
+              '<svg width="30" height="40" viewBox="0 0 30 40"><path d="M15 0C6.7 0 0 6.7 0 15c0 10.5 15 25 15 25s15-14.5 15-25C30 6.7 23.3 0 15 0z" fill="' + color + '" stroke="#fff" stroke-width="2"/></svg>' +
+              '<div style="position:absolute;top:6px;left:0;width:30px;text-align:center;color:#fff;font-weight:800;font-size:12px;font-family:sans-serif">' + p.k + '</div></div>',
+        iconSize: [30, 40], iconAnchor: [15, 40], popupAnchor: [0, -36]
+      });
+      const cliente = p.v.clienteEncontrado === 'SI' ? (p.v.nombreCliente || '') : (p.v.clienteEncontrado === 'NUEVO' ? 'Nuevo (auto-registrado)' : 'No encontrado');
+      L.marker([p.lat, p.lng], { icon: icono }).addTo(mapaVisObj)
+        .bindPopup('<b>#' + p.k + ' · ' + (p.v.hora || '') + '</b><br>' + (p.v.tipo || '') + ' · ' + formatoDoc(p.v.punto) + '<br>' + cliente + (p.v.distrito ? '<br><span style="color:#888">' + p.v.distrito + '</span>' : ''));
+      latlngs.push([p.lat, p.lng]);
+    });
+    if (latlngs.length > 1) L.polyline(latlngs, { color: '#E4002B', weight: 3, opacity: .55, dashArray: '6 6' }).addTo(mapaVisObj);
+    mapaVisObj.fitBounds(latlngs, { padding: [30, 30], maxZoom: 17 });
+  }
+
+  // ---- Corregir / borrar una visita (pide PIN de administrador) ----
+  function pinGuardado(){ try { return sessionStorage.getItem('vis_pin') || ''; } catch(e) { return ''; } }
+  function buscarVisita(id){ return VISITAS_DIA.find(v => String(v.id) === String(id)); }
+  function cerrarModalVis(){ const m = document.getElementById('modalVis'); if (m) m.innerHTML = ''; }
+  function cajaModal(titulo, cuerpo, textoBoton, colorBoton, accion){
+    const m = document.getElementById('modalVis');
+    m.innerHTML = '<div style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px" onclick="if(event.target===this)cerrarModalVis()">' +
+      '<div style="background:#fff;border-radius:14px;padding:18px 20px;width:100%;max-width:380px;font-size:13.5px">' +
+      '<div style="font-weight:800;font-size:15px;margin-bottom:10px">' + titulo + '</div>' + cuerpo +
+      '<label style="display:block;margin-top:10px;font-weight:700;font-size:12px">PIN de administrador</label>' +
+      '<input id="visPin" type="password" inputmode="numeric" value="' + pinGuardado() + '" style="width:100%;box-sizing:border-box;padding:9px;border:1px solid var(--borde);border-radius:8px">' +
+      '<div id="visMsg" style="color:var(--rojo);font-size:12px;min-height:16px;margin-top:6px"></div>' +
+      '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px">' +
+      '<button onclick="cerrarModalVis()" style="border:1px solid var(--borde);background:#fff;border-radius:8px;padding:8px 14px;cursor:pointer">Cancelar</button>' +
+      '<button id="visBtnOk" onclick="' + accion + '" style="border:none;background:' + colorBoton + ';color:#fff;font-weight:700;border-radius:8px;padding:8px 14px;cursor:pointer">' + textoBoton + '</button>' +
+      '</div></div></div>';
+  }
+  function abrirEdicionVis(id){
+    const v = buscarVisita(id); if (!v) return;
+    const opts = ['MULTIMARCA','RECARGA','MIXTO'].map(t => '<option' + (t === v.tipo ? ' selected' : '') + '>' + t + '</option>').join('');
+    cajaModal('✏️ Corregir visita de las ' + v.hora,
+      '<div style="color:var(--gris);margin-bottom:8px">' + v.asesor + '</div>' +
+      '<label style="display:block;font-weight:700;font-size:12px">Tipo</label>' +
+      '<select id="visTipo" style="width:100%;padding:9px;border:1px solid var(--borde);border-radius:8px;margin-bottom:8px">' + opts + '</select>' +
+      '<label style="display:block;font-weight:700;font-size:12px">DNI / RUC / Número</label>' +
+      '<input id="visPunto" value="' + formatoDoc(v.punto) + '" inputmode="numeric" style="width:100%;box-sizing:border-box;padding:9px;border:1px solid var(--borde);border-radius:8px">',
+      'Guardar cambio', 'var(--verde)', "enviarAccionVis('editar','" + id + "')");
+  }
+  function abrirBorradoVis(id){
+    const v = buscarVisita(id); if (!v) return;
+    cajaModal('🗑️ Borrar visita de las ' + v.hora,
+      '<div style="margin-bottom:8px">' + v.asesor + '<br><b>' + v.tipo + '</b> · ' + formatoDoc(v.punto) + '</div>' +
+      '<div style="color:var(--gris);font-size:12px;margin-bottom:8px">No se pierde: queda guardada en la hoja VISITAS_ANULADAS.</div>' +
+      '<label style="display:block;font-weight:700;font-size:12px">Motivo</label>' +
+      '<input id="visMotivo" placeholder="Ej. marcó por error, duplicada" style="width:100%;box-sizing:border-box;padding:9px;border:1px solid var(--borde);border-radius:8px">',
+      'Borrar', 'var(--rojo)', "enviarAccionVis('borrar','" + id + "')");
+  }
+  async function enviarAccionVis(accion, id){
+    const msg = document.getElementById('visMsg');
+    const btn = document.getElementById('visBtnOk');
+    const pin = (document.getElementById('visPin').value || '').trim();
+    if (!pin) { msg.textContent = 'Escribe el PIN.'; return; }
+    let url = URL_SCRIPT + '?id=' + encodeURIComponent(id) + '&adminPin=' + encodeURIComponent(pin);
+    if (accion === 'editar') {
+      const punto = (document.getElementById('visPunto').value || '').trim();
+      if (!punto) { msg.textContent = 'Escribe el DNI / RUC / número.'; return; }
+      url += '&modo=editar_visita_get&tipo=' + encodeURIComponent(document.getElementById('visTipo').value) + '&punto=' + encodeURIComponent(punto);
+    } else {
+      const motivo = (document.getElementById('visMotivo').value || '').trim();
+      if (!motivo) { msg.textContent = 'Escribe el motivo.'; return; }
+      url += '&modo=borrar_visita_get&motivo=' + encodeURIComponent(motivo);
+    }
+    btn.disabled = true; btn.textContent = 'Guardando…'; msg.textContent = '';
+    try {
+      const r = await (await fetch(url)).json();
+      if (!r.ok) throw new Error(r.error || 'No se pudo guardar');
+      try { sessionStorage.setItem('vis_pin', pin); } catch(e) {}
+      cerrarModalVis();
+      cargarVisitasDia(VIS_FECHA);
+    } catch (e) {
+      msg.textContent = e.message;
+      btn.disabled = false; btn.textContent = accion === 'editar' ? 'Guardar cambio' : 'Borrar';
     }
   }
 
