@@ -645,7 +645,7 @@
     document.getElementById(mapaBtn[tipo]).classList.add('activo');
     const ayudas = {
       MULTIMARCA: ['DNI (8 dígitos) o RUC (11 dígitos)', 'Multimarca: DNI de 8 dígitos o RUC de 11 dígitos.'],
-      RECARGA: ['Celular del recargador (9 dígitos)', 'Recarga: celular de 9 dígitos que empieza con 9.'],
+      RECARGA: ['Celular (9 dígitos) o DNI (8 dígitos)', 'Recarga: celular de 9 dígitos que empieza con 9, o DNI de 8 dígitos.'],
       MIXTO: ['DNI, RUC o celular', 'Mixto: DNI (8), RUC (11) o celular (9 dígitos, empieza con 9).']
     };
     document.getElementById('puntoVisita').placeholder = ayudas[tipo][0];
@@ -655,12 +655,12 @@
   // Valida el DNI / RUC / celular según el tipo de visita (evita basura como '74' o texto)
   function validarPuntoVisita(tipo, valor){
     const s = String(valor || '').replace(/[\s.\-]/g, '');
-    if (!s) return 'Escribe el ' + (tipo === 'RECARGA' ? 'celular del recargador' : (tipo === 'MIXTO' ? 'DNI, RUC o celular' : 'DNI o RUC')) + '.';
+    if (!s) return 'Escribe el ' + (tipo === 'RECARGA' ? 'celular o DNI del recargador' : (tipo === 'MIXTO' ? 'DNI, RUC o celular' : 'DNI o RUC')) + '.';
     if (/\D/.test(s)) return 'Solo se permiten números.';
     const dniRuc = /^\d{8}$/.test(s) || /^(10|15|17|20)\d{9}$/.test(s);
     const cel = /^9\d{8}$/.test(s);
     if (tipo === 'MULTIMARCA' && !dniRuc) return 'Multimarca: el DNI debe tener 8 dígitos o el RUC 11 dígitos (empieza con 10, 15, 17 o 20). Escribiste ' + s.length + ' dígitos.';
-    if (tipo === 'RECARGA' && !cel) return 'Recarga: el celular debe tener 9 dígitos y empezar con 9. Escribiste ' + s.length + ' dígitos.';
+    if (tipo === 'RECARGA' && !cel && !/^\d{8}$/.test(s)) return 'Recarga: escribe el celular (9 dígitos, empieza con 9) o el DNI (8 dígitos). Escribiste ' + s.length + ' dígitos.';
     if (tipo === 'MIXTO' && !dniRuc && !cel) return 'Mixto: escribe un DNI (8), RUC (11) o celular (9 dígitos, empieza con 9).';
     return '';
   }
