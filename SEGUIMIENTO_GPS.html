@@ -747,7 +747,45 @@
   }
 
   // "Ver ruta de visitas": el mismo mapa, en grande, dentro de la página
-  async function abrirMapaGrande(){
+  // "Ver ruta de visitas": abre una PESTAÑA NUEVA con el mapa a pantalla completa
+  function abrirMapaGrande(){
+    const puntos = LISTA_SEL.map((v,k) => ({
+      k: k+1, lat: Number(v.lat), lng: Number(v.lng), tipo: v.tipo || '', hora: v.hora || '',
+      doc: formatoDoc(v.punto), distrito: v.distrito || '',
+      cliente: v.clienteEncontrado === 'SI' ? (v.nombreCliente || '') : (v.clienteEncontrado === 'NUEVO' ? 'Nuevo (auto-registrado)' : (v.clienteEncontrado === 'INVALIDO' ? 'Dato inválido' : 'No encontrado'))
+    })).filter(p => p.lat && p.lng && !isNaN(p.lat) && !isNaN(p.lng));
+    if (!puntos.length) return;
+    const conteo = { MULTIMARCA:0, RECARGA:0, MIXTO:0 };
+    LISTA_SEL.forEach(v => { if (conteo[v.tipo] !== undefined) conteo[v.tipo]++; });
+    const titulo = 'Ruta de visitas — ' + VIS_SEL + (VIS_FECHA ? ' — ' + VIS_FECHA.split('-').reverse().join('/') : '');
+    const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    const pill = (t, n) => '<span class="p" style="color:' + COLOR_TIPO[t] + ';background:' + COLOR_TIPO[t] + '1f;border-color:' + COLOR_TIPO[t] + '55">' + t + '</span> ' + n;
+    const html = '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
+      '<title>' + esc(titulo) + '</title>' +
+      '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">' +
+      '<style>html,body{margin:0;height:100%;font-family:-apple-system,Segoe UI,Roboto,sans-serif}' +
+      '#top{position:absolute;top:10px;left:56px;right:10px;z-index:1000;background:#fff;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.2);padding:8px 12px;font-size:13px}' +
+      '#top b{font-size:14px}.p{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:800;border:1px solid}' +
+      '#mapa{position:absolute;inset:0}</style></head><body>' +
+      '<div id="top"><b>📍 ' + esc(titulo) + '</b><div style="margin-top:4px">' + pill('MULTIMARCA', conteo.MULTIMARCA) + ' &nbsp; ' + pill('RECARGA', conteo.RECARGA) + ' &nbsp; ' + pill('MIXTO', conteo.MIXTO) + '</div></div>' +
+      '<div id="mapa"></div>' +
+      '<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"><\/script>' +
+      '<script>' +
+      'var P=' + JSON.stringify(puntos).replace(/</g, '\\u003c') + ';var C=' + JSON.stringify(COLOR_TIPO) + ';' +
+      'var m=L.map("mapa");L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap"}).addTo(m);' +
+      'var ll=[];P.forEach(function(p){var c=C[p.tipo]||"#666";' +
+      'var ic=L.divIcon({className:"",html:\'<div style="position:relative;width:34px;height:45px"><svg width="34" height="45" viewBox="0 0 30 40"><path d="M15 0C6.7 0 0 6.7 0 15c0 10.5 15 25 15 25s15-14.5 15-25C30 6.7 23.3 0 15 0z" fill="\'+c+\'" stroke="#fff" stroke-width="2"/></svg><div style="position:absolute;top:7px;left:0;width:34px;text-align:center;color:#fff;font-weight:800;font-size:13px">\'+p.k+\'</div></div>\',iconSize:[34,45],iconAnchor:[17,45],popupAnchor:[0,-40]});' +
+      'L.marker([p.lat,p.lng],{icon:ic,zIndexOffset:p.k}).addTo(m).bindPopup("<b>#"+p.k+" · "+p.hora+"</b><br><span style=\\"color:"+c+";font-weight:800\\">"+p.tipo+"</span> "+p.doc+"<br>"+p.cliente+(p.distrito?"<br><span style=\\"color:#888\\">"+p.distrito+"</span>":""));' +
+      'll.push([p.lat,p.lng]);});' +
+      'if(ll.length>1)L.polyline(ll,{color:"#E4002B",weight:3,opacity:.6,dashArray:"6 6"}).addTo(m);' +
+      'm.fitBounds(ll,{padding:[70,40],maxZoom:17});' +
+      '<\/script></body></html>';
+    const w = window.open('', '_blank');
+    if (!w) { abrirMapaGrandeModal(); return; } // si el navegador bloquea la pestaña, se abre dentro de la página
+    w.document.open(); w.document.write(html); w.document.close();
+  }
+
+  async function abrirMapaGrandeModal(){
     try { await cargarLeaflet(); } catch(e) { return; }
     cerrarMapaGrande();
     const capa = document.createElement('div');
