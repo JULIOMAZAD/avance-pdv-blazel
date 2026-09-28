@@ -577,8 +577,22 @@
     if(!cont) return;
     cont.innerHTML = '<div class="estado-carga">Cargando visitas...</div>';
     try {
-      const resp = await fetch(URL_SCRIPT + '?modo=visitas_dia&fecha=' + fechaISO);
-      const data = await resp.json();
+      // Reintenta hasta 3 veces: a veces Google responde con una página de error en vez de datos
+      let data = null, ultimoError = null;
+      for (let intento = 1; intento <= 3 && !data; intento++) {
+        try {
+          const resp = await fetch(URL_SCRIPT + '?modo=visitas_dia&fecha=' + fechaISO + '&t=' + Date.now());
+          const texto = await resp.text();
+          data = JSON.parse(texto);
+        } catch (e) {
+          ultimoError = e;
+          if (intento < 3) {
+            cont.innerHTML = '<div class="estado-carga">Cargando visitas... (reintento ' + intento + ')</div>';
+            await new Promise(r => setTimeout(r, 1500 * intento));
+          }
+        }
+      }
+      if (!data) throw new Error('Google no respondió, toca Actualizar');
       const visitas = (data && data.ok && data.visitas) ? data.visitas : [];
       if (visitas.length === 0){
         cont.innerHTML = '<div class="estado-carga">Sin visitas marcadas este día.</div>';
@@ -606,7 +620,7 @@
         lista.forEach(function(v){
           html += '<tr><td style="padding:6px 8px">' + (v.hora||'—') + '</td>' +
             '<td style="padding:6px 8px">' + (v.tipo||'—') + '</td>' +
-            '<td style="padding:6px 8px">' + (v.punto||'—') + '</td>' +
+            '<td style="padding:6px 8px">' + (formatoDoc(v.punto)||'—') + '</td>' +
             '<td style="padding:6px 8px">' + celdaCliente(v) + '</td>' +
             '<td style="padding:6px 8px">' + celdaDistancia(v) + '</td>' +
             '<td style="padding:6px 8px">' + (v.distrito||'—') + '</td>' +
@@ -640,10 +654,16 @@
     return '<span style="color:var(--rojo);font-weight:700">\u26A0 No encontrado</span>';
   }
 
+  // DNI de 7 dígitos = perdió el 0 de adelante en la hoja; se completa a 8
+  function formatoDoc(p){
+    const s = String(p == null ? '' : p).trim();
+    return /^\d{6,7}$/.test(s) ? ('00000000' + s).slice(-8) : s;
+  }
+
   function celdaDistancia(v){
     if (v.distanciaMetros === '' || v.distanciaMetros === undefined || v.distanciaMetros === null) return '—';
     var d = Number(v.distanciaMetros);
-    if (isNaN(d)) return '—';
+    if (isNaN(d) || d > 500000) return '—'; // >500 km = cliente sin ubicación guardada
     var alerta = d > 500;
     return '<span' + (alerta ? ' style="color:var(--rojo);font-weight:700"' : '') + '>' + d + ' m' + (alerta ? ' \u26A0' : '') + '</span>';
   }
