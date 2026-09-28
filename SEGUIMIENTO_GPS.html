@@ -631,14 +631,13 @@
     const lista = porAsesor[VIS_SEL].slice().sort((a,b) => a.hora < b.hora ? -1 : (a.hora > b.hora ? 1 : 0));
     const conteo = { MULTIMARCA:0, RECARGA:0, MIXTO:0 };
     lista.forEach(v => { if (conteo[v.tipo] !== undefined) conteo[v.tipo]++; });
-    const ruta = enlaceRutaVisitas(lista);
+    const nConUbic = lista.filter(v => Number(v.lat) && Number(v.lng)).length;
+    const ruta = nConUbic ? '<a href="#" onclick="abrirMapaGrande();return false" style="color:var(--rojo);font-weight:700;text-decoration:none">📍 Ver ruta de visitas (' + nConUbic + ')</a>' : '';
     html += '<div style="background:#fff;border:1px solid var(--borde);border-radius:14px;padding:14px 16px">';
     html += '<div style="font-weight:800;font-size:15px;margin-bottom:4px">' + VIS_SEL + ' — ' + lista.length + ' visita(s)</div>';
     html += '<div style="font-size:12.5px;color:var(--gris);margin-bottom:10px">' +
-      '<span style="color:' + COLOR_TIPO.MULTIMARCA + ';font-weight:700">● Multimarca: ' + conteo.MULTIMARCA + '</span> · ' +
-      '<span style="color:' + COLOR_TIPO.RECARGA + ';font-weight:700">● Recarga: ' + conteo.RECARGA + '</span> · ' +
-      '<span style="color:' + COLOR_TIPO.MIXTO + ';font-weight:700">● Mixto: ' + conteo.MIXTO + '</span>' +
-      (ruta ? ' · ' + ruta : '') + '</div>';
+      pildoraTipo('MULTIMARCA') + ' ' + conteo.MULTIMARCA + ' &nbsp; ' + pildoraTipo('RECARGA') + ' ' + conteo.RECARGA + ' &nbsp; ' + pildoraTipo('MIXTO') + ' ' + conteo.MIXTO +
+      (ruta ? ' &nbsp;·&nbsp; ' + ruta : '') + '</div>';
     html += '<div id="mapaVisitas" style="height:380px;border-radius:12px;border:1px solid var(--borde);margin-bottom:12px;background:var(--gris-claro)"></div>';
     html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">';
     html += '<tr style="border-bottom:1.5px solid var(--borde);text-align:left">' +
@@ -649,12 +648,12 @@
       html += '<tr style="border-bottom:1px solid var(--gris-claro)">' +
         '<td style="padding:6px 8px"><span style="display:inline-block;min-width:22px;text-align:center;border-radius:11px;background:' + (COLOR_TIPO[v.tipo]||'#666') + ';color:#fff;font-weight:700;font-size:11.5px;padding:2px 6px">' + (k+1) + '</span></td>' +
         '<td style="padding:6px 8px">' + (v.hora||'—') + '</td>' +
-        '<td style="padding:6px 8px">' + (v.tipo||'—') + '</td>' +
+        '<td style="padding:6px 8px">' + pildoraTipo(v.tipo) + '</td>' +
         '<td style="padding:6px 8px">' + (formatoDoc(v.punto)||'—') + '</td>' +
         '<td style="padding:6px 8px">' + celdaCliente(v) + '</td>' +
         '<td style="padding:6px 8px">' + celdaDistancia(v) + '</td>' +
         '<td style="padding:6px 8px">' + (v.distrito||'—') + '</td>' +
-        '<td style="padding:6px 8px">' + (enlaceMapa(v.lat, v.lng) || '—') + '</td>' +
+        '<td style="padding:6px 8px">' + ((Number(v.lat) && Number(v.lng)) ? '<a href="#" onclick="enfocarVisita(' + (k+1) + ');return false" style="color:var(--rojo);font-weight:700;text-decoration:none">📍 Ver mapa</a>' : '—') + '</td>' +
         (PUEDE_EDITAR_VIS ? '<td style="padding:6px 8px;white-space:nowrap">' +
           '<button title="Corregir" onclick="abrirEdicionVis(\'' + v.id + '\')" style="border:1px solid var(--borde);background:#fff;border-radius:8px;padding:4px 8px;cursor:pointer">✏️</button> ' +
           '<button title="Borrar" onclick="abrirBorradoVis(\'' + v.id + '\')" style="border:1px solid #f2aab3;background:#fdecee;border-radius:8px;padding:4px 8px;cursor:pointer">🗑️</button></td>' : '') +
@@ -663,6 +662,7 @@
     html += '</table></div></div>';
     html += '<div id="modalVis"></div>';
     cont.innerHTML = html;
+    LISTA_SEL = lista;
     dibujarMapaVisitas(lista);
   }
 
@@ -688,17 +688,25 @@
     });
     return window._leafletCargando;
   }
-  async function dibujarMapaVisitas(lista){
-    const div = document.getElementById('mapaVisitas');
-    if (!div) return;
+  let LISTA_SEL = [];
+  let marcadoresVis = {};
+  let mapaGrandeObj = null;
+
+  // Etiqueta de tipo con su color (el mismo en toda la página y en el mapa)
+  function pildoraTipo(t){
+    const c = COLOR_TIPO[t] || '#666';
+    return '<span style="display:inline-block;padding:3px 9px;border-radius:12px;font-size:11.5px;font-weight:800;color:' + c + ';background:' + c + '1f;border:1px solid ' + c + '55">' + (t || '—') + '</span>';
+  }
+
+  // Dibuja los globitos numerados en cualquier contenedor (mapa chico o grande)
+  function pintarMapaEn(div, lista, guardarMarcadores){
     const puntos = lista.map((v,k) => ({ v:v, k:k+1, lat:Number(v.lat), lng:Number(v.lng) }))
                         .filter(p => p.lat && p.lng && !isNaN(p.lat) && !isNaN(p.lng));
-    if (!puntos.length) { div.innerHTML = '<div class="estado-carga">Sin ubicaciones para mostrar.</div>'; div.style.height = 'auto'; return; }
-    try { await cargarLeaflet(); } catch(e) { div.innerHTML = '<div class="estado-carga">No se pudo cargar el mapa.</div>'; return; }
-    if (mapaVisObj) { try { mapaVisObj.remove(); } catch(e) {} mapaVisObj = null; }
-    mapaVisObj = L.map(div, { scrollWheelZoom: false });
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(mapaVisObj);
+    if (!puntos.length) return null;
+    const mapa = L.map(div, { scrollWheelZoom: false });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(mapa);
     const latlngs = [];
+    if (guardarMarcadores) marcadoresVis = {};
     puntos.forEach(p => {
       const color = COLOR_TIPO[p.v.tipo] || '#666';
       const icono = L.divIcon({
@@ -709,13 +717,60 @@
         iconSize: [30, 40], iconAnchor: [15, 40], popupAnchor: [0, -36]
       });
       const cliente = p.v.clienteEncontrado === 'SI' ? (p.v.nombreCliente || '') : (p.v.clienteEncontrado === 'NUEVO' ? 'Nuevo (auto-registrado)' : 'No encontrado');
-      L.marker([p.lat, p.lng], { icon: icono }).addTo(mapaVisObj)
-        .bindPopup('<b>#' + p.k + ' · ' + (p.v.hora || '') + '</b><br>' + (p.v.tipo || '') + ' · ' + formatoDoc(p.v.punto) + '<br>' + cliente + (p.v.distrito ? '<br><span style="color:#888">' + p.v.distrito + '</span>' : ''));
+      const m = L.marker([p.lat, p.lng], { icon: icono, zIndexOffset: p.k }).addTo(mapa)
+        .bindPopup('<b>#' + p.k + ' · ' + (p.v.hora || '') + '</b><br>' + pildoraTipo(p.v.tipo) + ' ' + formatoDoc(p.v.punto) + '<br>' + cliente + (p.v.distrito ? '<br><span style="color:#888">' + p.v.distrito + '</span>' : ''));
+      if (guardarMarcadores) marcadoresVis[p.k] = m;
       latlngs.push([p.lat, p.lng]);
     });
-    if (latlngs.length > 1) L.polyline(latlngs, { color: '#E4002B', weight: 3, opacity: .55, dashArray: '6 6' }).addTo(mapaVisObj);
-    mapaVisObj.fitBounds(latlngs, { padding: [30, 30], maxZoom: 17 });
+    if (latlngs.length > 1) L.polyline(latlngs, { color: '#E4002B', weight: 3, opacity: .55, dashArray: '6 6' }).addTo(mapa);
+    mapa.fitBounds(latlngs, { padding: [40, 40], maxZoom: 17 });
+    return mapa;
   }
+
+  async function dibujarMapaVisitas(lista){
+    const div = document.getElementById('mapaVisitas');
+    if (!div) return;
+    if (!lista.some(v => Number(v.lat) && Number(v.lng))) { div.innerHTML = '<div class="estado-carga">Sin ubicaciones para mostrar.</div>'; div.style.height = 'auto'; return; }
+    try { await cargarLeaflet(); } catch(e) { div.innerHTML = '<div class="estado-carga">No se pudo cargar el mapa.</div>'; return; }
+    if (mapaVisObj) { try { mapaVisObj.remove(); } catch(e) {} mapaVisObj = null; }
+    mapaVisObj = pintarMapaEn(div, lista, true);
+  }
+
+  // "Ver mapa" de una fila: sube al mapa y abre ese globito
+  function enfocarVisita(k){
+    const m = marcadoresVis[k];
+    const div = document.getElementById('mapaVisitas');
+    if (!m || !mapaVisObj || !div) return;
+    div.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    mapaVisObj.setView(m.getLatLng(), 17);
+    setTimeout(() => m.openPopup(), 350);
+  }
+
+  // "Ver ruta de visitas": el mismo mapa, en grande, dentro de la página
+  async function abrirMapaGrande(){
+    try { await cargarLeaflet(); } catch(e) { return; }
+    cerrarMapaGrande();
+    const capa = document.createElement('div');
+    capa.id = 'capaMapaGrande';
+    capa.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9998;display:flex;align-items:center;justify-content:center;padding:14px';
+    capa.onclick = e => { if (e.target === capa) cerrarMapaGrande(); };
+    const conteo = { MULTIMARCA:0, RECARGA:0, MIXTO:0 };
+    LISTA_SEL.forEach(v => { if (conteo[v.tipo] !== undefined) conteo[v.tipo]++; });
+    capa.innerHTML = '<div style="background:#fff;border-radius:16px;width:100%;max-width:1200px;height:100%;max-height:860px;display:flex;flex-direction:column;overflow:hidden">' +
+      '<div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--borde)">' +
+        '<div style="flex:1"><div style="font-weight:800;font-size:15px">📍 Ruta de visitas — ' + VIS_SEL + '</div>' +
+        '<div style="font-size:12.5px;margin-top:2px">' + pildoraTipo('MULTIMARCA') + ' ' + conteo.MULTIMARCA + ' &nbsp; ' + pildoraTipo('RECARGA') + ' ' + conteo.RECARGA + ' &nbsp; ' + pildoraTipo('MIXTO') + ' ' + conteo.MIXTO + '</div></div>' +
+        '<button onclick="cerrarMapaGrande()" style="border:1px solid var(--borde);background:#fff;border-radius:10px;padding:8px 14px;font-weight:700;cursor:pointer">✕ Cerrar</button>' +
+      '</div><div id="mapaGrande" style="flex:1"></div></div>';
+    document.body.appendChild(capa);
+    mapaGrandeObj = pintarMapaEn(document.getElementById('mapaGrande'), LISTA_SEL, false);
+    if (mapaGrandeObj) mapaGrandeObj.scrollWheelZoom.enable();
+  }
+  function cerrarMapaGrande(){
+    if (mapaGrandeObj) { try { mapaGrandeObj.remove(); } catch(e) {} mapaGrandeObj = null; }
+    const c = document.getElementById('capaMapaGrande'); if (c) c.remove();
+  }
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarMapaGrande(); });
 
   // ---- Corregir / borrar una visita (pide PIN de administrador) ----
   function pinGuardado(){ try { return sessionStorage.getItem('vis_pin') || ''; } catch(e) { return ''; } }
