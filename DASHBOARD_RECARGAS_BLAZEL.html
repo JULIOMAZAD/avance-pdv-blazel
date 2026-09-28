@@ -936,6 +936,28 @@ let EMB_MEDIDAS={"ope": {"tot": {"ope": 299, "cli": 1340, "nue": 0, "ant": 299},
     }
   }catch(e){ /* localStorage no disponible: seguimos con los datos de ejemplo */ }
 })();
+/* Mismo caso que arriba pero para el segundo driver (cargarLiveV2: cuotas por ano, canales,
+   asesores, multimarca, comparativo, historico, desabasto). Antes solo se restauraba dentro
+   del catch (si la carga en vivo fallaba); ahora se aplica de una vez, antes del primer render,
+   para que esas pestanas tampoco se vean en blanco al abrir. */
+(function(){
+  try{
+    const c = JSON.parse(localStorage.getItem('blazel_v2_last_ok'));
+    if(c){
+      if(c.cuotas) DATA.cuotas = c.cuotas;
+      if(c.bloques) DATA.bloques = c.bloques;
+      if(c.canalesMensual) DATA.canalesMensual = c.canalesMensual;
+      if(c.asesoresMensual) DATA.asesoresMensual = c.asesoresMensual;
+      if(c.desabastoMensual) DATA.desabastoMensual = c.desabastoMensual;
+      if(c.multimarcaBloques) DATA.multimarcaBloques = c.multimarcaBloques;
+      if(c.multimarcaHistorico) DATA.multimarcaHistorico = c.multimarcaHistorico;
+      if(c.comparativo) DATA.comparativo = c.comparativo;
+      if(c.deb) EMB_MEDIDAS.deb = c.deb;
+      if(c.ope) EMB_MEDIDAS.ope = { tot: c.ope.tot, dist: c.ope.dist, vend: EMB_MEDIDAS.ope.vend };
+      if(c.diaAvanceMM!=null) window._diaAvanceMM = c.diaAvanceMM;
+    }
+  }catch(e){ /* localStorage no disponible: seguimos con los datos de ejemplo */ }
+})();
 function _pill(p, altoBueno){
   let cls = altoBueno ? (p>=90?'pv':(p>=70?'pa':'pr')) : (p<=10?'pv':(p<=15?'pa':'pr'));
   return `<span class="pill ${cls}">${p.toFixed(1)}%</span>`;
