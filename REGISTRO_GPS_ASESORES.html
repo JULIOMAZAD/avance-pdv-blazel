@@ -335,13 +335,14 @@
       <button type="button" class="tipoBtn" id="btnTipoRecarga" onclick="seleccionarTipoVisita('RECARGA')">RECARGA</button>
       <button type="button" class="tipoBtn" id="btnTipoMixto" onclick="seleccionarTipoVisita('MIXTO')">MIXTO</button>
     </div>
-    <input type="text" id="puntoVisita" placeholder="DNI, RUC o N° recargador (opcional)">
+    <input type="text" id="puntoVisita" inputmode="numeric" maxlength="11" placeholder="Primero elige el tipo de visita" oninput="this.value=this.value.replace(/\D/g,'')">
+    <div id="ayudaPunto" style="font-size:12px;color:#6B6B75;margin:-4px 0 10px">Solo números.</div>
     <button id="btnMarcarVisita" onclick="marcarVisita()" style="background:var(--verde);color:#fff;width:100%">
       <span class="icono">📍</span> MARCAR VISITA
     </button>
     <div class="estado" id="estadoVisita"></div>
   </div>
-  <div class="pie">Marca cada vez que llegues a un punto multimarca o de recarga. No hay límite de veces al día — funciona aunque el punto todavía no tenga geocalización guardada.</div>
+  <div class="pie">Marca cada vez que llegues a un punto multimarca o de recarga. No hay límite de veces al día. El DNI, RUC o celular es obligatorio y debe estar completo.</div>
   </div>
 
   <div class="vista" id="vistaAvance">
@@ -642,6 +643,26 @@
     });
     const mapaBtn = { MULTIMARCA:'btnTipoMultimarca', RECARGA:'btnTipoRecarga', MIXTO:'btnTipoMixto' };
     document.getElementById(mapaBtn[tipo]).classList.add('activo');
+    const ayudas = {
+      MULTIMARCA: ['DNI (8 dígitos) o RUC (11 dígitos)', 'Multimarca: DNI de 8 dígitos o RUC de 11 dígitos.'],
+      RECARGA: ['Celular del recargador (9 dígitos)', 'Recarga: celular de 9 dígitos que empieza con 9.'],
+      MIXTO: ['DNI, RUC o celular', 'Mixto: DNI (8), RUC (11) o celular (9 dígitos, empieza con 9).']
+    };
+    document.getElementById('puntoVisita').placeholder = ayudas[tipo][0];
+    document.getElementById('ayudaPunto').textContent = ayudas[tipo][1];
+  }
+
+  // Valida el DNI / RUC / celular según el tipo de visita (evita basura como '74' o texto)
+  function validarPuntoVisita(tipo, valor){
+    const s = String(valor || '').replace(/[\s.\-]/g, '');
+    if (!s) return 'Escribe el ' + (tipo === 'RECARGA' ? 'celular del recargador' : (tipo === 'MIXTO' ? 'DNI, RUC o celular' : 'DNI o RUC')) + '.';
+    if (/\D/.test(s)) return 'Solo se permiten números.';
+    const dniRuc = /^\d{8}$/.test(s) || /^(10|15|17|20)\d{9}$/.test(s);
+    const cel = /^9\d{8}$/.test(s);
+    if (tipo === 'MULTIMARCA' && !dniRuc) return 'Multimarca: el DNI debe tener 8 dígitos o el RUC 11 dígitos (empieza con 10, 15, 17 o 20). Escribiste ' + s.length + ' dígitos.';
+    if (tipo === 'RECARGA' && !cel) return 'Recarga: el celular debe tener 9 dígitos y empezar con 9. Escribiste ' + s.length + ' dígitos.';
+    if (tipo === 'MIXTO' && !dniRuc && !cel) return 'Mixto: escribe un DNI (8), RUC (11) o celular (9 dígitos, empieza con 9).';
+    return '';
   }
 
   function mostrarEstadoVisita(tipo, mensaje){
@@ -669,7 +690,13 @@
       return;
     }
 
-    const punto = document.getElementById('puntoVisita').value || '';
+    const punto = (document.getElementById('puntoVisita').value || '').replace(/[\s.\-]/g, '');
+    const errorPunto = validarPuntoVisita(tipoVisitaSeleccionado, punto);
+    if (errorPunto) {
+      mostrarEstadoVisita('error', errorPunto);
+      document.getElementById('puntoVisita').focus();
+      return;
+    }
     mostrarEstadoVisita('cargando', 'Obteniendo tu ubicación…');
     document.getElementById('btnMarcarVisita').disabled = true;
 

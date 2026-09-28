@@ -851,6 +851,9 @@
     if (v.clienteEncontrado === 'SI') {
       return v.nombreCliente || 'Sí';
     }
+    if (v.clienteEncontrado === 'INVALIDO') {
+      return '<span style="color:var(--rojo);font-weight:700">\u26A0 Dato inválido (no se registró)</span>';
+    }
     if (v.clienteEncontrado === 'NUEVO') {
       return '<span style="color:var(--ambar);font-weight:700">\uD83C\uDD95 Nuevo (auto-registrado)</span>';
     }
