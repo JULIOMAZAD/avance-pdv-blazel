@@ -1424,6 +1424,28 @@ window.addEventListener('drop', e=>{
    más abajo, porque renderAll() ya llama a rVentaDiaria() y usa DATA_VCRL. */
 const EXCEL_VCRL_REMOTO = 'VENTAS CRL 2026.xlsx';
 let DATA_VCRL = null;
+/* Julio sube "VENTAS CRL 2026.xlsx" día a día y el archivo SIEMPRE trae solo el mes en
+   curso (no guarda meses pasados) — por eso esta pestaña, antes, solo podía mostrar el
+   mes que Julio tenía cargado en ese momento, sin manera de volver a ver un mes cerrado.
+   Para arreglar eso, cada vez que se carga el archivo se guarda una copia (snapshot) en
+   el navegador, agrupada por mes ("YYYY-MM"), así las fotos de meses ya cerrados quedan
+   disponibles aunque el Excel ya haya avanzado al mes siguiente. Es memoria LOCAL de ESTE
+   navegador (no se comparte entre dispositivos ni usuarios), así que solo guarda lo que
+   ya se vio aquí — no "resucita" meses de antes de este cambio. */
+const LS_VCRL_ARCHIVO = 'blazel_vcrl_archivo_v1';
+let vcrlMesSel = null; // null = el mes más reciente (en vivo); si no, 'YYYY-MM' del mes elegido
+function cargarArchivoVCRL(){
+  try{ return JSON.parse(localStorage.getItem(LS_VCRL_ARCHIVO)||'{}'); }catch(e){ return {}; }
+}
+function guardarSnapshotVCRL(data){
+  const ym = anioMesAvance_vcrl(data.pivots);
+  if(!ym) return;
+  const key = ym.anio+'-'+String(ym.mes).padStart(2,'0');
+  const archivo = cargarArchivoVCRL();
+  archivo[key] = data;
+  try{ localStorage.setItem(LS_VCRL_ARCHIVO, JSON.stringify(archivo)); }
+  catch(e){ console.log('No se pudo guardar el snapshot de VENTAS CRL (localStorage lleno?):', e); }
+}
 const num_vcrl = v => {
   if(typeof v==='number' && isFinite(v)) return v;
   if(typeof v==='string' && v.trim()!=='' && v.trim()!=='-' && !isNaN(parseFloat(v))) return parseFloat(v);
@@ -1552,14 +1574,27 @@ function rVentaDiaria(){
   const el = document.getElementById('tab-ventadiaria');
   if(!el) return;
   if(!DATA_VCRL){ el.innerHTML = `<h2>Venta Diaria</h2><div class="card">Cargando desde GitHub…</div>`; return; }
-  const pDiario = DATA_VCRL.pivots.find(p=>p.campos.includes('ENVIOS'));
-  const pCuota = DATA_VCRL.pivots.find(p=>p.campos.includes('CUOTA'));
-  if(!pDiario && !pCuota){ el.innerHTML = `<h2>Venta Diaria</h2><div class="card">No encontré las tablas de Envíos/Venta/Depósito ni Venta/Cuota/Falta en la hoja VENTAS de ${EXCEL_VCRL_REMOTO}.</div>`; return; }
 
-  const diaAv = diaAvance_vcrl(DATA_VCRL.pivots);
-  const ym = anioMesAvance_vcrl(DATA_VCRL.pivots);
+  // ---- Selector de mes: el mes en vivo (DATA_VCRL, lo que trae ahora el Excel) +
+  // cualquier mes cerrado que ya haya quedado guardado como snapshot en este navegador ----
+  const archivo = cargarArchivoVCRL();
+  const ymVivo = anioMesAvance_vcrl(DATA_VCRL.pivots);
+  const keyVivo = ymVivo ? (ymVivo.anio+'-'+String(ymVivo.mes).padStart(2,'0')) : null;
+  const meses = Object.keys(archivo).sort();
+  if(!vcrlMesSel || !meses.includes(vcrlMesSel)) vcrlMesSel = meses.length ? meses[meses.length-1] : keyVivo;
+  const esVivo = !vcrlMesSel || vcrlMesSel===keyVivo;
+  const DATOS = esVivo ? DATA_VCRL : (archivo[vcrlMesSel] || DATA_VCRL);
+  const lblMesSel = k => { const [y,m]=k.split('-'); return MESN[+m]+' '+y; };
+  const segHTML = meses.length>1 ? `<div class="segRow">${meses.map(m=>`<button class="segBtn ${m===vcrlMesSel?'on':''}" data-m="${m}">${lblMesSel(m)}${m===keyVivo?' (en vivo)':''}</button>`).join('')}</div>` : '';
+
+  const pDiario = DATOS.pivots.find(p=>p.campos.includes('ENVIOS'));
+  const pCuota = DATOS.pivots.find(p=>p.campos.includes('CUOTA'));
+  if(!pDiario && !pCuota){ el.innerHTML = `<h2>Venta Diaria</h2>${segHTML}<div class="card">No encontré las tablas de Envíos/Venta/Depósito ni Venta/Cuota/Falta en la hoja VENTAS de ${EXCEL_VCRL_REMOTO}.</div>`; return; }
+
+  const diaAv = diaAvance_vcrl(DATOS.pivots);
+  const ym = anioMesAvance_vcrl(DATOS.pivots);
   const mesLbl = (pCuota && pCuota.filtros['MES']) || '';
-  const porDia = DATA_VCRL.porDia;
+  const porDia = DATOS.porDia;
   // días del mes actual que ya tienen datos en BASE DE DATOS, ordenados
   const clavesMes = (porDia && ym) ? Object.keys(porDia).filter(k=>k.startsWith(ym.anio+'-'+String(ym.mes).padStart(2,'0'))).sort() : [];
   const diasDelMes = ym ? new Date(Date.UTC(ym.anio, ym.mes, 0)).getUTCDate() : null;
@@ -1569,7 +1604,7 @@ function rVentaDiaria(){
   const pctProy = (cuotaTotal && proyTotal!=null) ? proyTotal/cuotaTotal : null;
   if(!_vcrlDiaSel || !clavesMes.includes(_vcrlDiaSel)) _vcrlDiaSel = clavesMes.length ? clavesMes[clavesMes.length-1] : null;
 
-  let h = `<h2>Venta Diaria <span class="tag">de ${EXCEL_VCRL_REMOTO}</span></h2>`;
+  let h = `<h2>Venta Diaria <span class="tag">de ${EXCEL_VCRL_REMOTO}</span></h2>${segHTML}`;
 
   // ---- Dona de cuota del equipo + KPIs ----
   h += `<div class="grid donas">
@@ -1639,6 +1674,7 @@ function rVentaDiaria(){
     <p class="note">"Proyección" = venta acumulada ÷ días transcurridos × días del mes (si sigue al mismo ritmo). "Falta" = Venta − Cuota. "Sin cuota" = ese usuario no tiene cuota asignada en el Excel.</p>`;
   }
   el.innerHTML = h;
+  el.querySelectorAll('.segRow .segBtn').forEach(b=> b.onclick = ()=>{ vcrlMesSel = b.dataset.m; _vcrlDiaSel = null; rVentaDiaria(); });
 
   // ---- dibujar gráficos ----
   dona('dnVcrlCuota', pctProy, cuotaTotal==null?'#C9CCD2':semColor(pctProy), pctProy==null?'—':(pctProy*100).toFixed(1)+'%', 'proyección');
@@ -1688,6 +1724,7 @@ function cargarExcelVentasCRL(){
       const wb = XLSX.read(new Uint8Array(buf), {type:'array', cellDates:true});
       DATA_VCRL = parseVentasCRL(wb);
       try{ DATA_VCRL.porDia = parseBaseDatosVCRL(wb); }catch(e){ console.log('BASE DE DATOS de VENTAS CRL no disponible:', e); DATA_VCRL.porDia = null; }
+      guardarSnapshotVCRL(DATA_VCRL);
       rVentaDiaria();
     })
     .catch(err => {
