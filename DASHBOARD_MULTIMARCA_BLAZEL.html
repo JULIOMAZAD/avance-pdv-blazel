@@ -167,6 +167,7 @@ tr.tot td{font-weight:700;background:#FAFAFB;border-top:2px solid var(--line)}
   <button data-t="comparativo">Comparativo</button>
   <button data-t="diaadia">Día a día</button>
   <button data-t="vendedor">Por Vendedor</button>
+  <button data-t="ranking">Por Asesor</button>
   <button data-t="otrodist">Otro Distribuidor</button>
   <button data-t="planes">Planes</button>
 </nav>
@@ -178,6 +179,7 @@ tr.tot td{font-weight:700;background:#FAFAFB;border-top:2px solid var(--line)}
   <section class="tab" id="tab-comparativo"></section>
   <section class="tab" id="tab-diaadia"></section>
   <section class="tab" id="tab-vendedor"></section>
+  <section class="tab" id="tab-ranking"></section>
   <section class="tab" id="tab-otrodist"></section>
   <section class="tab" id="tab-planes"></section>
 </main>
@@ -1091,6 +1093,14 @@ function mesesDisponiblesPorAsesor(){
   cp.forEach(c=> (c.meses||[]).forEach(m=> set.set(m.mes, true)));
   return [...set.keys()].sort((a,b)=> mesCodigo(a).localeCompare(mesCodigo(b)));
 }
+function rRanking(){
+  const elTab = document.getElementById('tab-ranking');
+  elTab.innerHTML = `
+  <h2>Ranking de activación por asesor <span class="tag">elige el mes para ver cómo cerró cada asesor</span></h2>
+  <div class="segRow" id="vendRankSel"></div>
+  <div id="vendRankRes"></div>`;
+  rRankingAsesores();
+}
 function rRankingAsesores(){
   const el = document.getElementById('vendRankRes'), sel = document.getElementById('vendRankSel');
   if(!el) return;
@@ -1131,21 +1141,12 @@ function rRankingAsesores(){
   <p class="note">Activación = chips/líneas (prepago + postpago) de los clientes a nombre de cada asesor en ${escAttr(vendMesSel)}. <b>Clientes activados</b> = cuántos de sus puntos vendieron algo ese mes (sin importar cuánto). Ordenado de mayor a menor total — así cerró cada asesor ese mes.</p>`;
 }
 
-/* ================= ACTIVACIÓN POR VENDEDOR (detalle día a día, mes actual vs anterior) ================= */
+/* ================= ACTIVACIÓN POR VENDEDOR ================= */
 function rPorVendedor(){
   const el = document.getElementById('tab-vendedor');
-  el.innerHTML = `
-  <h2>Ranking de activación por asesor <span class="tag">elige el mes para ver cómo cerró cada asesor</span></h2>
-  <div class="segRow" id="vendRankSel"></div>
-  <div id="vendRankRes" style="margin-bottom:28px"></div>
-  <h2>Detalle día a día por asesor <span class="tag">mes en curso vs. mes anterior</span></h2>
-  <div id="vendDetalle"></div>`;
-  rRankingAsesores();
-
-  const elDet = document.getElementById('vendDetalle');
   const dd = DATA.diaadia;
   if(!dd || !dd.puntos || !dd.puntos.length){
-    elDet.innerHTML = `<div class="card">No se encontró la hoja <b>COMPARATIVO_DIA_A_DIA</b> en el archivo cargado.</div>`;
+    el.innerHTML = `<h2>Activación por vendedor</h2><div class="card">No se encontró la hoja <b>COMPARATIVO_DIA_A_DIA</b> en el archivo cargado.</div>`;
     return;
   }
   const abAnt = abrevMes(dd.mesAnterior), abAct = abrevMes(dd.mesActual);
@@ -1167,8 +1168,8 @@ function rPorVendedor(){
     v.numClientes = v.puntos.length;
   });
 
-  elDet.innerHTML = `
-  <p class="note" style="margin-top:0">${dd.mesActual||''}${dd.diaCorte?' (al día '+dd.diaCorte+')':''}${dd.mesAnterior?' vs '+dd.mesAnterior+' (mismo día)':''}</p>
+  el.innerHTML = `
+  <h2>Activación por vendedor <span class="tag">${dd.mesActual||''}${dd.diaCorte?' (al día '+dd.diaCorte+')':''}${dd.mesAnterior?' vs '+dd.mesAnterior+' (mismo día)':''}</span></h2>
   <div class="card" style="margin-bottom:14px">
     <label style="font-weight:600;display:block;margin-bottom:6px">Buscar vendedor</label>
     <input id="vBuscar" type="text" placeholder="Escribe para filtrar…" autocomplete="off"
@@ -1253,7 +1254,7 @@ function setGlobals(){
 }
 function renderAll(){
   setGlobals();
-  rMultimarca(); rCuotas(); rHistorico(); rComparativo(); rDiaADia(); rPorVendedor(); rOtroDistribuidor(); rPlanes();
+  rMultimarca(); rCuotas(); rHistorico(); rComparativo(); rDiaADia(); rPorVendedor(); rRanking(); rOtroDistribuidor(); rPlanes();
   requestAnimationFrame(()=>Object.values(charts).forEach(c=>{try{c.resize();c.draw();}catch(e){}}));
 }
 
