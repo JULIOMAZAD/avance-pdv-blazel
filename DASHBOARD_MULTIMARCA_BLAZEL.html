@@ -711,6 +711,7 @@ window.toggleDistrito = function(elHead){
 
 /* ================= HISTÓRICO MULTIMARCA ================= */
 let histMetSel = 'venta_pre';
+let vendMesSel = null; // null = el mes más reciente cargado; si no, el nombre exacto del mes elegido en el ranking por asesor
 function rHistorico(){
   const el = document.getElementById('tab-historico');
   const H = DATA.multimarcaHistorico;
@@ -1078,12 +1079,73 @@ function rDiaADia(){
   pintar('');
 }
 
-/* ================= ACTIVACIÓN POR VENDEDOR ================= */
+/* ================= RANKING DE ACTIVACIÓN POR ASESOR (con filtro de mes) =================
+   A diferencia del bloque de abajo (que compara solo el mes en curso vs el mes anterior, y
+   viene de COMPARATIVO_DIA_A_DIA), este ranking usa TODOS los meses que haya en la hoja
+   REPORTE_POR_CLIENTE (la misma fuente de la pestaña "Comparativo por cliente"), así que
+   Julio puede elegir cualquier mes ya cerrado (Junio, Julio, Agosto...) y ver cómo cerró
+   cada asesor ese mes, sin tener que esperar a la comparación del mes actual. */
+function mesesDisponiblesPorAsesor(){
+  const cp = DATA.comparativo || [];
+  const set = new Map();
+  cp.forEach(c=> (c.meses||[]).forEach(m=> set.set(m.mes, true)));
+  return [...set.keys()].sort((a,b)=> mesCodigo(a).localeCompare(mesCodigo(b)));
+}
+function rRankingAsesores(){
+  const el = document.getElementById('vendRankRes'), sel = document.getElementById('vendRankSel');
+  if(!el) return;
+  const cp = DATA.comparativo || [];
+  if(!cp.length){
+    el.innerHTML = `<div class="card">No se encontró la hoja <b>REPORTE_POR_CLIENTE</b> en el archivo cargado.</div>`;
+    if(sel) sel.innerHTML = '';
+    return;
+  }
+  const meses = mesesDisponiblesPorAsesor();
+  if(!meses.length){ el.innerHTML = `<div class="card">Todavía no hay meses cargados.</div>`; return; }
+  if(!vendMesSel || !meses.includes(vendMesSel)) vendMesSel = meses[meses.length-1];
+  if(sel){
+    sel.innerHTML = meses.map(m=>`<button class="segBtn ${m===vendMesSel?'on':''}" data-m="${escAttr(m)}">${m}</button>`).join('');
+    sel.querySelectorAll('.segBtn').forEach(b=> b.onclick = ()=>{ vendMesSel = b.dataset.m; rRankingAsesores(); });
+  }
+  const byVend = new Map();
+  cp.forEach(c=>{
+    const v = (c.vendedor||'').trim() || '(Sin asesor asignado)';
+    const mReg = (c.meses||[]).find(m=>m.mes===vendMesSel);
+    const pre = mReg ? (mReg.pre||0) : 0, post = mReg ? (mReg.post||0) : 0;
+    if(!byVend.has(v)) byVend.set(v, {vendedor:v, pre:0, post:0, cap:0});
+    const b = byVend.get(v);
+    b.pre += pre; b.post += post;
+    if((pre+post)>0) b.cap += 1;
+  });
+  const lista = [...byVend.values()].map(v=>({...v, tot:v.pre+v.post})).sort((a,b)=> b.tot-a.tot).map((v,i)=>({...v, rank:i+1}));
+  if(!lista.length){ el.innerHTML = `<div class="card">Sin datos de asesores para ${escAttr(vendMesSel)}.</div>`; return; }
+  const fila = v => `<tr><td class="num"><b>${v.rank}</b></td><td style="text-align:left"><b>${v.vendedor}</b></td>
+    <td class="num">${fN(v.pre)}</td><td class="num">${fN(v.post)}</td><td class="num"><b>${fN(v.tot)}</b></td><td class="num">${fN(v.cap)}</td></tr>`;
+  el.innerHTML = `<div class="twrap"><table class="cmpTable">
+    <thead><tr><th>#</th><th style="text-align:left">Asesor</th><th>Prepago</th><th>Postpago</th><th>Total</th><th>Clientes activados</th></tr></thead>
+    <tbody>${lista.map(fila).join('')}</tbody>
+    <tfoot><tr style="font-weight:700;background:#F4F5F7"><td></td><td style="text-align:left">TOTAL</td>
+      <td class="num">${fN(lista.reduce((s,v)=>s+v.pre,0))}</td><td class="num">${fN(lista.reduce((s,v)=>s+v.post,0))}</td>
+      <td class="num">${fN(lista.reduce((s,v)=>s+v.tot,0))}</td><td class="num">${fN(lista.reduce((s,v)=>s+v.cap,0))}</td></tr></tfoot>
+  </table></div>
+  <p class="note">Activación = chips/líneas (prepago + postpago) de los clientes a nombre de cada asesor en ${escAttr(vendMesSel)}. <b>Clientes activados</b> = cuántos de sus puntos vendieron algo ese mes (sin importar cuánto). Ordenado de mayor a menor total — así cerró cada asesor ese mes.</p>`;
+}
+
+/* ================= ACTIVACIÓN POR VENDEDOR (detalle día a día, mes actual vs anterior) ================= */
 function rPorVendedor(){
   const el = document.getElementById('tab-vendedor');
+  el.innerHTML = `
+  <h2>Ranking de activación por asesor <span class="tag">elige el mes para ver cómo cerró cada asesor</span></h2>
+  <div class="segRow" id="vendRankSel"></div>
+  <div id="vendRankRes" style="margin-bottom:28px"></div>
+  <h2>Detalle día a día por asesor <span class="tag">mes en curso vs. mes anterior</span></h2>
+  <div id="vendDetalle"></div>`;
+  rRankingAsesores();
+
+  const elDet = document.getElementById('vendDetalle');
   const dd = DATA.diaadia;
   if(!dd || !dd.puntos || !dd.puntos.length){
-    el.innerHTML = `<h2>Activación por vendedor</h2><div class="card">No se encontró la hoja <b>COMPARATIVO_DIA_A_DIA</b> en el archivo cargado.</div>`;
+    elDet.innerHTML = `<div class="card">No se encontró la hoja <b>COMPARATIVO_DIA_A_DIA</b> en el archivo cargado.</div>`;
     return;
   }
   const abAnt = abrevMes(dd.mesAnterior), abAct = abrevMes(dd.mesActual);
@@ -1105,8 +1167,8 @@ function rPorVendedor(){
     v.numClientes = v.puntos.length;
   });
 
-  el.innerHTML = `
-  <h2>Activación por vendedor <span class="tag">${dd.mesActual||''}${dd.diaCorte?' (al día '+dd.diaCorte+')':''}${dd.mesAnterior?' vs '+dd.mesAnterior+' (mismo día)':''}</span></h2>
+  elDet.innerHTML = `
+  <p class="note" style="margin-top:0">${dd.mesActual||''}${dd.diaCorte?' (al día '+dd.diaCorte+')':''}${dd.mesAnterior?' vs '+dd.mesAnterior+' (mismo día)':''}</p>
   <div class="card" style="margin-bottom:14px">
     <label style="font-weight:600;display:block;margin-bottom:6px">Buscar vendedor</label>
     <input id="vBuscar" type="text" placeholder="Escribe para filtrar…" autocomplete="off"
