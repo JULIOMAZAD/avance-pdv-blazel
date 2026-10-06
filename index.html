@@ -797,12 +797,8 @@ function pickCampo(){ gerMode="campo"; gerSel.clear(); renderGerChips(); loadCam
 
 function renderGerChips(){
   const isAll = gerMode==="all";
-  
-  
-  let html=`<div class="tchip all${isAll?" on":""}" onclick="setAll()">${isAll?"✓ ":""}Todas — Cuota Global</div>`;
-  if(comercialMode){
-    
-  }
+      const ocultarCallCenter = true; // Call Center ya no está operativo; se oculta en todos los meses
+      let html=`<div class="tchip all${isAll?" on":""}" onclick="setAll()">${isAll?"✓ ":""}Todas — Cuota Global</div>`;
   html+=(comercialMode?GER_ALL_COMERCIAL:GER_ALL).filter(t=>!(ocultarCallCenter && t==="Call Center")).map(t=>{
     const on = gerMode==="custom" && gerSel.has(t);
     return `<div class="tchip${on?" on":""}" onclick="toggleStore('${t.replace(/'/g,"\\'")}')">${on?"✓ ":""}${TIENDA_LABEL[t]}</div>`;
