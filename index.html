@@ -285,14 +285,14 @@ const PWD={
   "Tienda - Mall Bellavista":"Halcon482",
   "Tienda - Mall del Sur 1":"Delfin931",
   "Tienda - Mall del Sur 2":"Tucan704",
-  "Tienda - Mega Plaza":"Puma256",
+  "Tienda - Mega Plaza 1":"Puma256","Tienda - Mega Plaza 2":"Puma257",
   "Tienda - Plaza Norte":"Aguila839",
   "Tienda - Primavera":"Colibri617",
   "Tienda - Rambla Brasil":"Jaguar375",
   "Tienda - Santa Anita 1":"Condor942",
   "Tienda - Santa Anita 2":"Condor943",
   "Call Center":"Fenix508",
-  "GERENCIA":"tiendas",
+  
   "AMPARO":"campo",
   "GRACIE":"gracie",
   "COMERCIAL":"jmaza"
@@ -303,15 +303,14 @@ const LOGIN_OPTIONS=[
   {key:"Tienda - Mall Bellavista",label:"Tienda - Mall Bellavista"},
   {key:"Tienda - Mall del Sur 1",label:"Tienda - Mall del Sur 1"},
   {key:"Tienda - Mall del Sur 2",label:"Tienda - Mall del Sur 2"},
-  {key:"Tienda - Mega Plaza",label:"Tienda - Mega Plaza"},
+  {key:"Tienda - Mega Plaza 1",label:"Tienda - Mega Plaza 1"},{key:"Tienda - Mega Plaza 2",label:"Tienda - Mega Plaza 2"},
   {key:"Tienda - Plaza Norte",label:"Tienda - Plaza Norte"},
   {key:"Tienda - Primavera",label:"Tienda - Primavera"},
   {key:"Tienda - Rambla Brasil",label:"Tienda - Rambla Brasil"},
   {key:"Tienda - Santa Anita 1",label:"Tienda - Santa Anita"},
   {key:"Tienda - Santa Anita 2",label:"Tienda - Santa Anita 2"},
   {key:"Call Center",label:"Call Center"},
-  {key:"GERENCIA",label:"🔑 COORD. TIENDAS"},
-  {key:"AMPARO",label:"🔑 COORD. CAMPO"},
+    {key:"AMPARO",label:"🔑 COORD. CAMPO"},
   {key:"GRACIE",label:"🔑 SUPER CAMPO"},
   {key:"COMERCIAL",label:"🔑 COMERCIAL"}
 ];
@@ -341,7 +340,7 @@ const SHEET_NAME={
   "Tienda - Mall Bellavista":"mall bellavista",
   "Tienda - Mall del Sur 1":"mall del sur 1",
   "Tienda - Mall del Sur 2":"MALL DEL SU 2",
-  "Tienda - Mega Plaza":"mega plaza",
+  "Tienda - Mega Plaza 1":"mega plaza 1","Tienda - Mega Plaza 2":"mega plaza 2",
   "Tienda - Plaza Norte":"plaza norte",
   "Tienda - Primavera":"primavera",
   "Tienda - Rambla Brasil":"rambla",
@@ -354,13 +353,13 @@ function sheetNameFor(tienda, mes){
   if(tienda==="Tienda - Santa Anita 1" && (MES_ORDER[mes]||0) < MES_ORDER["agosto"]){
     return "santa anita"; // pestaña historica antes de la division en 1 y 2
   }
-  return SHEET_NAME[tienda]||"";
+  if(tienda==="Tienda - Mega Plaza 1" && (MES_ORDER[mes]||0) < MES_ORDER["octubre"]){ return "mega plaza"; } return SHEET_NAME[tienda]||"";
 }
 const TIENDA_LABEL={
   "Tienda - Mall Bellavista":"Bellavista",
   "Tienda - Mall del Sur 1":"Sur 1",
   "Tienda - Mall del Sur 2":"Sur 2",
-  "Tienda - Mega Plaza":"Mega Plaza",
+  "Tienda - Mega Plaza 1":"mega plaza 1","Tienda - Mega Plaza 2":"mega plaza 2",
   "Tienda - Plaza Norte":"Plaza Norte",
   "Tienda - Primavera":"Primavera",
   "Tienda - Rambla Brasil":"Rambla",
@@ -371,14 +370,14 @@ const TIENDA_LABEL={
 };
 const GER_ALL=[
   "Tienda - Mall Bellavista","Tienda - Mall del Sur 1","Tienda - Mall del Sur 2",
-  "Tienda - Mega Plaza","Tienda - Plaza Norte","Tienda - Primavera",
+  "Tienda - Mega Plaza 1","Tienda - Mega Plaza 2","Tienda - Plaza Norte","Tienda - Primavera",
   "Tienda - Rambla Brasil","Tienda - Santa Anita 1","Tienda - Santa Anita 2","Call Center"
 ];
-// Solo para el login COMERCIAL (jmaza): agrega San Felipe (TPC), no debe verla Gustavo
+// Solo para el login COMERCIAL (jmaza): agrega San Felipe (TPC)
 const GER_ALL_COMERCIAL=[...GER_ALL,"Tienda - San Felipe"];
 const GER_GLOBAL=[
   "Tienda - Mall Bellavista","Tienda - Mall del Sur 1","Tienda - Mall del Sur 2",
-  "Tienda - Mega Plaza","Tienda - Plaza Norte","Tienda - Primavera",
+  "Tienda - Mega Plaza 1","Tienda - Mega Plaza 2","Tienda - Plaza Norte","Tienda - Primavera",
   "Tienda - Rambla Brasil","Tienda - Santa Anita 1","Tienda - Santa Anita 2","Call Center"
 ];
 const GER_GLOBAL_COMERCIAL=[...GER_GLOBAL,"Tienda - San Felipe"];
@@ -396,7 +395,7 @@ function extractMesFromRows(rows){
 }
 async function cargarMeses(){
   const sep=SCRIPT_URL.includes('?')?'&':'?';
-  const store="mega plaza"; // tienda de referencia para probar cada mes
+      const store="mega plaza 1"; // tienda de referencia para probar cada mes
   const ordenMeses=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
   const yaConocidos = MESES.map(m=>m.key);
   const ultimoIdx = Math.max(...yaConocidos.map(k=>ordenMeses.indexOf(k)));
@@ -426,7 +425,7 @@ async function cargarMeses(){
 cargarMeses();
 
 const AUTO_KEY = 'blazel-hub-2026';
-const HUB_TO_PERSONAL = { "COMERCIAL":"jmaza", "GERENCIA":"gustavo", "AMPARO":"amparo" };
+const HUB_TO_PERSONAL = { "COMERCIAL":"jmaza", "AMPARO":"amparo" };
 let curLoginType = "";
 let curTienda="", curMes="junio", cache={};
 let gerenteMode=false, comercialMode=false, gerMes="junio", gerMode="all", gerSel=new Set();
@@ -455,7 +454,7 @@ function doLogin(){
     loadGerencia();
     return;
   }
-  if(t==="GERENCIA"){
+  if(false){
     gerenteMode=true;
     document.getElementById("btnMasivo").style.display="";
     document.getElementById("btnRecarga").style.display="none";
@@ -787,22 +786,22 @@ async function loadCampo(){
   recarMes=gerMes;
   RECAR_TGT={info:"gerKpis",kpis:"gerKpis",table:"gerTableSection",combine:true};
   try{
-    const j=await aFetchJSON(SCRIPT_URL+(SCRIPT_URL.includes('?')?'&':'?')+'tienda='+encodeURIComponent('RECAR-MM')+'&mes='+gerMes);
-    const rows=(j&&j.data)||[];
-    if(!rows.length) throw new Error('sin datos');
-    renderRecar(rows);
+      const j=await aFetchJSON(SCRIPT_URL+(SCRIPT_URL.includes('?')?'&':'?')+'tienda='+encodeURIComponent('RECAR-MM')+'&mes='+gerMes);
+  const rows=(j&&j.data)||[];
+      if(!rows.length) throw new Error('sin datos');
+          renderRecar(rows);
   }catch(e){ gt.innerHTML='<div class="load-err">No se pudo cargar Campo (RECAR-MM).</div>'; }
   RECAR_TGT={info:"recarInfo",kpis:"recarKpis",table:"recarTable",combine:false};
 }
 function pickCampo(){ gerMode="campo"; gerSel.clear(); renderGerChips(); loadCampo(); }
-function pickGustavo(){ gerMode="gustavo"; gerSel.clear(); renderGerChips(); loadGerencia(); }
+
 function renderGerChips(){
   const isAll = gerMode==="all";
-  const isGustavo = gerMode==="gustavo";
-  const ocultarCallCenter = true; // Call Center ya no está operativo; se oculta en todos los meses
+  
+  
   let html=`<div class="tchip all${isAll?" on":""}" onclick="setAll()">${isAll?"✓ ":""}Todas — Cuota Global</div>`;
   if(comercialMode){
-    html+=`<div class="tchip${isGustavo?" on":""}" onclick="pickGustavo()">${isGustavo?"✓ ":""}Gustavo</div>`;
+    
   }
   html+=(comercialMode?GER_ALL_COMERCIAL:GER_ALL).filter(t=>!(ocultarCallCenter && t==="Call Center")).map(t=>{
     const on = gerMode==="custom" && gerSel.has(t);
@@ -867,7 +866,7 @@ async function loadGerencia(){
   console.log("[DIAG] loadGerencia START gen="+myGen+" mes="+gerMes+" sel="+JSON.stringify(gerMode==="custom"?[...gerSel]:"("+gerMode+")"));
   const isCurrent = () => myGen === GER_GEN;
   const sel = gerMode==="custom" ? [...gerSel]
-    : (gerMode==="gustavo" || (gerMode==="all" && !comercialMode)) ? GER_GLOBAL.filter(t=>t!=="Call Center")
+        : (gerMode==="all" && !comercialMode) ? GER_GLOBAL.filter(t=>t!=="Call Center")
     : GER_GLOBAL_COMERCIAL.filter(t=>t!=="Call Center");
   const km=document.getElementById("gerKpis");
   const ts=document.getElementById("gerTableSection");
@@ -1239,17 +1238,17 @@ function comisionCardsHtml(comis, filtroPv, filtroList, mesSel){
 async function comisionKpiFragmentGerencia(sel){
   try{
     const comis=await fetchComisiones();
-    if(gerMode==="gustavo"){
-      return comisionCardsFragment(comis, "Coordinador Comercial (Gustavo)", null, gerMes);
+          if(false){
+              return comisionCardsFragment(comis, "Gerente Comercial (Julio)", null, gerMes);
     }
     const isGlobal = gerMode==="all";
     if(!isGlobal && sel && sel.length){
       return comisionCardsFragment(comis, null, sel, gerMes);
     } else if(comercialMode){
       return comisionCardsFragment(comis, "Gerente Comercial (Julio)", null, gerMes)
-           + comisionCardsFragment(comis, "Coordinador Comercial (Gustavo)", null, gerMes);
+                   ;
     } else {
-      return comisionCardsFragment(comis, "Coordinador Comercial (Gustavo)", null, gerMes);
+              return comisionCardsFragment(comis, "Gerente Comercial (Julio)", null, gerMes);
     }
   }catch(e){ return ""; }
 }
@@ -1341,7 +1340,7 @@ function aParse(rows,mes,anio){
   return recs;
 }
 async function aFetchJSON(u){const r=await fetch(u);if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}
-const STORE_TO_TI={"Tienda - Mall Bellavista":"Mall Bellavista","Tienda - Mall del Sur 1":"Mall del Sur I","Tienda - Mall del Sur 2":"Mall del Sur II","Tienda - Mega Plaza":"Mega Plaza","Tienda - Plaza Norte":"Plaza Norte","Tienda - Primavera":"Primavera","Tienda - Rambla Brasil":"La Rambla","Tienda - Santa Anita 1":"Santa Anita","Tienda - Santa Anita 2":"Santa Anita 2"};
+const STORE_TO_TI={"Tienda - Mall Bellavista":"Mall Bellavista","Tienda - Mall del Sur 1":"Mall del Sur I","Tienda - Mall del Sur 2":"Mall del Sur II","Tienda - Mega Plaza 1":"mega plaza 1","Tienda - Mega Plaza 2":"mega plaza 2","Tienda - Plaza Norte":"Plaza Norte","Tienda - Primavera":"Primavera","Tienda - Rambla Brasil":"La Rambla","Tienda - Santa Anita 1":"Santa Anita","Tienda - Santa Anita 2":"Santa Anita 2"};
 const UNIT_CATS=["Alta Prepago","Portabilidad Prepago","Packs Prepago","Portabilidad Postpago","Altas Postpago","Packs Postpago","Líneas Adicionales Postpago","HFC","UGIS Inalámbricos","OLO","Accesorios","Portabilidad CF >=95.50"];
 let asesorCache={};
 async function getAsesorData(mesKey){
