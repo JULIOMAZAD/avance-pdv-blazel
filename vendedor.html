@@ -121,9 +121,7 @@ function parseStackedRows(rows,mes,anio){
   const recs=[]; let curCat=null;
   for(let i=0;i<rows.length;i++){
     const r=rows[i]||[]; const b=r[1],c=r[2],d=r[3];
-    const ds=(d==null)?'':String(d).trim();
-    if(ds && (b==null||b==='')&&(c==null||c==='')&&ds!=='TOTAL'){ curCat=canonCat(ds); continue; }
-    const tipo=r[1], pdv=r[2], ases=r[3];
+"Mega Plaza 1":"Tienda - Mega Plaza 1","Mega Plaza 2":"Tienda - Mega Plaza 2","Mega Plaza":"Tienda - Mega Plaza 1",    const tipo=r[1], pdv=r[2], ases=r[3];
     if(!curCat||tipo==null||tipo==='')continue;
     const tu=String(tipo).toUpperCase(); if(tu==='TOTAL'||tu==='TIPO')continue;
     if(typeof ases!=='string'||!ases.trim())continue;
@@ -145,7 +143,7 @@ async function loadLive(){
     // detectar SOLO los meses reales (el campo MES debe coincidir con lo pedido)
     const meses=[];
     await Promise.all(cand.map(async mn=>{
-      try{ const r=await fetch(`${SCRIPT_URL}${sep}tienda=${encodeURIComponent('mega plaza')}&mes=${mn}`); const jj=await r.json();
+      try{ const r=await fetch(`${SCRIPT_URL}${sep}tienda=${encodeURIComponent('mega plaza 1')}&mes=${mn}`); const jj=await r.json();
         if(jj&&!jj.error&&Array.isArray(jj.data)&&jj.data.length>3){ const mm=extractMesFromRows(jj.data); if(mm&&mm===mn.toUpperCase()) meses.push(mn); } }catch(e){}
     }));
     meses.sort((a,b)=>(MES_MAP[a]||0)-(MES_MAP[b]||0));
