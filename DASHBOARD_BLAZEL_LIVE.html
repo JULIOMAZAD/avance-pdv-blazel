@@ -336,7 +336,9 @@ function normPdv(p){
     'call center':'Call center', 'call centre':'Call center',
     'tienda - plaza norte':'Tienda - Plaza Norte',
     'tienda - san miguel':'Tienda - San Miguel',
-    'tienda - mega plaza':'Tienda - Mega Plaza','tienda - megaplaza':'Tienda - Mega Plaza',
+    'tienda - mega plaza 1':'Tienda - Mega Plaza 1','tienda - megaplaza 1':'Tienda - Mega Plaza 1',
+    'tienda - mega plaza 2':'Tienda - Mega Plaza 2','tienda - megaplaza 2':'Tienda - Mega Plaza 2',
+    'tienda - mega plaza':'Tienda - Mega Plaza 1','tienda - megaplaza':'Tienda - Mega Plaza 1',
     'tienda - mall del sur':'Tienda - Mall del Sur 1',
     'tienda - mall del sur 1':'Tienda - Mall del Sur 1',
     'tienda - mall del sur 2':'Tienda - Mall del Sur 2',
@@ -623,7 +625,7 @@ function buildDataFromBase(rowsWithHeader){
 
 
   // lista de pdvs ordenada (las "tiendas" primero por volumen, luego los demás)
-  const PDV_ORDER = ['Tienda - Mega Plaza','Tienda - Plaza Norte','Tienda - Santa Anita','Tienda - Santa Anita 2',
+  const PDV_ORDER = ['Tienda - Mega Plaza 1','Tienda - Mega Plaza 2','Tienda - Plaza Norte','Tienda - Santa Anita','Tienda - Santa Anita 2',
     'Tienda - Mall del Sur 1','Tienda - Mall del Sur 2','Tienda - Primavera','Tienda - Rambla Brasil',
     'Tienda - Mall Bellavista','Tienda - San Miguel','Call center','Multimarca','Campo','Otros'];
   const pdvs = PDV_ORDER.filter(p=>pdvSet.has(p));
@@ -714,7 +716,7 @@ const CATS_LABEL = ['Alta Prepago','Portabilidad Prepago','Pack Prepago','Alta P
 
 // mapea nombre de hoja de tienda -> nombre de tienda normalizado del dashboard
 const HOJA_PDV = {
-  'mega plaza':'Tienda - Mega Plaza','plaza norte':'Tienda - Plaza Norte','santa anita':'Tienda - Santa Anita',
+  'mega plaza 1':'Tienda - Mega Plaza 1','mega plaza 2':'Tienda - Mega Plaza 2','plaza norte':'Tienda - Plaza Norte','santa anita':'Tienda - Santa Anita',
   'mall del sur 1':'Tienda - Mall del Sur 1','mall del su 2':'Tienda - Mall del Sur 2','mall del sur 2':'Tienda - Mall del Sur 2',
   'primavera':'Tienda - Primavera','rambla brasil':'Tienda - Rambla Brasil','call center':'Call center',
   'mall bellavista':'Tienda - Mall Bellavista','santa anita2':'Tienda - Santa Anita 2','santa anita 2':'Tienda - Santa Anita 2',
@@ -1953,7 +1955,8 @@ const CUOTAS_SHEET_NAME = {
   "Tienda - Mall Bellavista": "mall bellavista",
   "Tienda - Mall del Sur 1": "mall del sur 1",
   "Tienda - Mall del Sur 2": "MALL DEL SU 2",
-  "Tienda - Mega Plaza": "mega plaza",
+  "Tienda - Mega Plaza 1": "mega plaza 1",
+  "Tienda - Mega Plaza 2": "mega plaza 2",
   "Tienda - Plaza Norte": "plaza norte",
   "Tienda - Primavera": "primavera",
   "Tienda - Rambla Brasil": "rambla",
