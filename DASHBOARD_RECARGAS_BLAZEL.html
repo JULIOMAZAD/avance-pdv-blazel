@@ -1659,19 +1659,24 @@ function rVentaDiaria(){
   if(pCuota){
     const filas = pCuota.filas.slice().sort((a,b)=>(a.FALTA==null?Infinity:a.FALTA)-(b.FALTA==null?Infinity:b.FALTA));
     h += `<div class="secHead" style="margin-top:22px"><h2 style="margin:0">Avance de cuota${mesLbl?(' — '+mesLbl):''}${diaAv?(' (al día '+diaAv+')'):''} <span class="tag">acumulado del mes</span></h2></div>
-    <div class="twrap"><table><thead><tr><th style="text-align:left">Asesor</th><th>Venta</th><th>Cuota</th><th>Proyección</th><th>Falta</th></tr></thead>
+    <div class="twrap"><table><thead><tr><th style="text-align:left">Asesor</th><th>Venta</th><th>Cuota</th><th>% Avance</th><th>Proyección</th><th>Falta</th></tr></thead>
       <tbody>${filas.map(f=>{
         const pct = f.CUOTA ? Math.max(0,Math.min(1,(f.VENTA||0)/f.CUOTA)) : null;
+        const pctReal = f.CUOTA ? (f.VENTA||0)/f.CUOTA : null;
         const proyV = (diaAv && diasDelMes) ? (f.VENTA||0)/diaAv*diasDelMes : null;
         const col = f.CUOTA==null ? '#C9CCD2' : semColor(proyV!=null&&f.CUOTA?proyV/f.CUOTA:pct);
         return `<tr><td>${f.etiqueta}${pct!=null?`<div style="background:#EEF0F3;border-radius:6px;height:5px;width:100%;overflow:hidden;margin-top:5px"><div style="background:${col};height:100%;width:${(pct*100).toFixed(0)}%"></div></div>`:''}</td>
         <td class="num">${fS(f.VENTA)}</td><td class="num">${f.CUOTA==null?'—':fS(f.CUOTA)}</td>
+        <td class="num" style="color:${f.CUOTA==null?'inherit':semColor(pctReal)};font-weight:700">${pctReal==null?'—':(pctReal*100).toFixed(1)+'%'}</td>
         <td class="num" style="color:${f.CUOTA==null?'inherit':col}">${f.CUOTA==null?'—':fS(proyV)}</td>
         <td class="num">${faltaPill_vcrl(f.FALTA)}</td></tr>`;
       }).join('')}
-      ${pCuota.total?`<tr class="tot"><td>Total general</td><td class="num">${fS(pCuota.total.VENTA)}</td><td class="num">${fS(pCuota.total.CUOTA)}</td><td class="num">${fS(proyTotal)}</td><td class="num">${faltaPill_vcrl(pCuota.total.FALTA)}</td></tr>`:''}
+      ${pCuota.total?(()=>{ const pctTot = pCuota.total.CUOTA ? (pCuota.total.VENTA||0)/pCuota.total.CUOTA : null;
+        return `<tr class="tot"><td>Total general</td><td class="num">${fS(pCuota.total.VENTA)}</td><td class="num">${fS(pCuota.total.CUOTA)}</td>
+        <td class="num" style="color:${pctTot==null?'inherit':semColor(pctTot)}">${pctTot==null?'—':(pctTot*100).toFixed(1)+'%'}</td>
+        <td class="num">${fS(proyTotal)}</td><td class="num">${faltaPill_vcrl(pCuota.total.FALTA)}</td></tr>`; })():''}
       </tbody></table></div>
-    <p class="note">"Proyección" = venta acumulada ÷ días transcurridos × días del mes (si sigue al mismo ritmo). "Falta" = Venta − Cuota. "Sin cuota" = ese usuario no tiene cuota asignada en el Excel.</p>`;
+    <p class="note">"% Avance" = Venta acumulada ÷ Cuota (lo ya logrado, sin proyectar). "Proyección" = venta acumulada ÷ días transcurridos × días del mes (si sigue al mismo ritmo). "Falta" = Venta − Cuota. "Sin cuota" = ese usuario no tiene cuota asignada en el Excel.</p>`;
   }
   el.innerHTML = h;
   el.querySelectorAll('.segRow .segBtn').forEach(b=> b.onclick = ()=>{ vcrlMesSel = b.dataset.m; _vcrlDiaSel = null; rVentaDiaria(); });
