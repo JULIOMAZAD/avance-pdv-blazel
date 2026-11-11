@@ -76,7 +76,7 @@ tr.rk-last .rk-pos{background:#cc0000;color:#fff}
 <div class="wrap">
   <div class="head">
     <h2>Avance por Vendedor</h2>
-    <div class="sub">Elige la tienda y toca un vendedor para ver su cuota · <strong>v22</strong> · <span id="liveStatus" style="color:#22a843;font-weight:700">cargando…</span></div>
+    <div class="sub">Elige la tienda y toca un vendedor para ver su cuota · <strong>v23</strong> · <span id="liveStatus" style="color:#22a843;font-weight:700">cargando…</span></div>
   </div>
   <div class="view-tabs">
     <button class="view-tab on" id="viewTabBtn_vendedor" onclick="switchView('vendedor')">Avance por vendedor</button>
@@ -121,7 +121,8 @@ function parseStackedRows(rows,mes,anio){
   const recs=[]; let curCat=null;
   for(let i=0;i<rows.length;i++){
     const r=rows[i]||[]; const b=r[1],c=r[2],d=r[3];
-"Mega Plaza 1":"Tienda - Mega Plaza 1","Mega Plaza 2":"Tienda - Mega Plaza 2","Mega Plaza":"Tienda - Mega Plaza 1",    const tipo=r[1], pdv=r[2], ases=r[3];
+    if((b==null||b==='')&&(c==null||c==='')&&typeof d==='string'&&d.trim()){ if(d.trim().toUpperCase()!=='TOTAL') curCat=canonCat(d); continue; }
+    const tipo=r[1], pdv=r[2], ases=r[3];
     if(!curCat||tipo==null||tipo==='')continue;
     const tu=String(tipo).toUpperCase(); if(tu==='TOTAL'||tu==='TIPO')continue;
     if(typeof ases!=='string'||!ases.trim())continue;
@@ -144,15 +145,24 @@ async function loadLive(){
     const meses=[];
     await Promise.all(cand.map(async mn=>{
       try{ const r=await fetch(`${SCRIPT_URL}${sep}tienda=${encodeURIComponent('mega plaza 1')}&mes=${mn}`); const jj=await r.json();
-        if(jj&&!jj.error&&Array.isArray(jj.data)&&jj.data.length>3){ const mm=extractMesFromRows(jj.data); if(mm&&mm===mn.toUpperCase()) meses.push(mn); } }catch(e){}
+        if(jj&&!jj.error&&Array.isArray(jj.data)&&jj.data.length>3){ const mm=extractMesFromRows(jj.data); if(mm&&(mm===mn.toUpperCase()||(mm==='SETIEMBRE'&&mn==='septiembre'))) meses.push(mn); } }catch(e){}
     }));
     meses.sort((a,b)=>(MES_MAP[a]||0)-(MES_MAP[b]||0));
     let all=[];
-    for(const mn of meses){
-      try{const j=await fetchJSON(SCRIPT_URL+sep+'modo=vendedor&mes='+encodeURIComponent(mn));
-        if(j&&j.data&&j.data.length){const mnum=MES_MAP[String(mn).toLowerCase()]||0;const anio=parseInt(j.anio)||2026;all=all.concat(parseStackedRows(j.data,mnum,anio));}
+    // Cada mes se lee de la pestaña "Avance Tiendas" del archivo mensual; si no existe, del archivo "Detalle" antiguo.
+    // En ambos casos el mes que trae la hoja debe coincidir con el pedido (evita mostrar otro mes disfrazado).
+    const mesDe=rows=>{let mm=String((rows[2]||[])[7]||'').trim().toUpperCase();return mm==='SETIEMBRE'?'SEPTIEMBRE':mm;};
+    const partes=await Promise.all(meses.map(async mn=>{
+      const mnum=MES_MAP[mn]||0;
+      try{const a=await fetchJSON(SCRIPT_URL+sep+'tienda='+encodeURIComponent('avance tiendas')+'&mes='+encodeURIComponent(mn));
+        if(a&&!a.error&&Array.isArray(a.data)&&a.data.length>6&&mesDe(a.data)===mn.toUpperCase()) return parseStackedRows(a.data,mnum,2026);
       }catch(e){}
-    }
+      try{const j=await fetchJSON(SCRIPT_URL+sep+'modo=vendedor&mes='+encodeURIComponent(mn));
+        if(j&&Array.isArray(j.data)&&j.data.length>6&&mesDe(j.data)===mn.toUpperCase()) return parseStackedRows(j.data,mnum,parseInt(j.anio)||2026);
+      }catch(e){}
+      return [];
+    }));
+    partes.forEach(p=>{all=all.concat(p);});
     if(all.length){DATA=all; const mx=Math.max.apply(null,DATA.map(r=>r.m)); if(mx>0)curMes=mx; const dd=(DATA.find(r=>r.m===curMes)||DATA[0]); renderMes();fillTiendas();renderRankingMesTabs();fillRankingTiendas();setStatus('en vivo · día '+(dd?dd.d:'?'));}
     else setStatus('datos embebidos (sin conexión)');
   }catch(e){ setStatus('datos embebidos (sin conexión)'); }
@@ -169,7 +179,7 @@ const GROUPS=[
 ];
 const CF_AVANCE="Avance Cargo Fijo", CF_PROM="Promedio Cargo Fijo";
 const UNIT_CATS=["Alta Prepago","Portabilidad Prepago","Packs Prepago","Portabilidad Postpago","Altas Postpago","Packs Postpago","Líneas Adicionales Postpago","HFC","UGIS Inalámbricos","OLO","Accesorios","Portabilidad CF >=95.50"];
-const TI_TO_STORE={"Mall Bellavista":"Tienda - Mall Bellavista","Mall del Sur I":"Tienda - Mall del Sur 1","Mall del Sur II":"Tienda - Mall del Sur 2","Mega Plaza":"Tienda - Mega Plaza","Plaza Norte":"Tienda - Plaza Norte","Primavera":"Tienda - Primavera","La Rambla":"Tienda - Rambla Brasil","Santa Anita":"Tienda - Santa Anita"};
+const TI_TO_STORE={"Mall Bellavista":"Tienda - Mall Bellavista","Mall del Sur I":"Tienda - Mall del Sur 1","Mall del Sur II":"Tienda - Mall del Sur 2","Mega Plaza 1":"Tienda - Mega Plaza 1","Mega Plaza 2":"Tienda - Mega Plaza 2","Mega Plaza":"Tienda - Mega Plaza 1","Plaza Norte":"Tienda - Plaza Norte","Primavera":"Tienda - Primavera","La Rambla":"Tienda - Rambla Brasil","Santa Anita":"Tienda - Santa Anita"};
 let COMIS_CACHE=null;
 async function fetchComisiones(){
   if(COMIS_CACHE) return COMIS_CACHE;
