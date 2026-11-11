@@ -197,10 +197,11 @@ td:first-child{text-align:left;padding-left:16px;font-weight:500;color:#1a1a2e}
     <div class="top-bar">
       <div class="top-left">
         <h2>COORD. TIENDAS — Consolidado</h2>
-        <div class="pdv">Toca "Todas" para el global, o marca una o varias tiendas para sumarlas · <strong>v45</strong></div>
+        <div class="pdv">Toca "Todas" para el global, o marca una o varias tiendas para sumarlas · <strong>v46</strong></div>
       </div>
       <div class="top-actions">
         <button class="btn-vend" onclick="abrirVendedor()"><span class="bico" style="background:#3B82F6">📊</span>Ver por vendedor</button>
+        <button class="btn-vend" id="btnMMVend" style="display:none" onclick="openEmbed('vendedor_campo.html?v=2','🚩 MMRECARGA por vendedor','gerScreen')"><span class="bico" style="background:#CC0000">🚩</span>MMRECARGA por vendedor</button>
         <button class="btn-vend" id="btnMasivo" style="display:none" onclick="abrirMasivo()"><span class="bico" style="background:#8E44AD">📡</span>Masivo</button>
         <button class="btn-vend" id="btnRecarga" style="display:none" onclick="abrirRecargaDash()"><span class="bico" style="background:#E6A817">⚡</span>Recarga</button>
         <button class="btn-vend" id="btnMultimarca" style="display:none" onclick="abrirMultimarcaDash()"><span class="bico" style="background:#13A05F">🏷️</span>Multimarca</button>
@@ -447,6 +448,7 @@ function doLogin(){
     document.getElementById("btnRecarga").style.display="";
     document.getElementById("btnMultimarca").style.display="";
     document.getElementById("btnGPS").style.display="";
+    document.getElementById("btnMMVend").style.display="";
     document.getElementById("btnPreEntregas").style.display="";
     document.getElementById("btnAccesos").style.display="";
     var _gh=document.querySelector("#gerScreen h2"); if(_gh) _gh.textContent="COMERCIAL — Consolidado";
@@ -526,7 +528,7 @@ function toggleHideKpis(){
   function doLogout(){
   curTienda="";gerenteMode=false;comercialMode=false;curLoginType="";gerMode="all";gerSel.clear();
   document.body.classList.remove("hide-kpis");["btnHideKpis","btnHideKpisGer"].forEach(function(id){ var b=document.getElementById(id); if(b) b.innerHTML='<span class="bico" style="background:#6B7077">🙈</span>Ocultar cifras'; });
-  ["btnMasivo","btnRecarga","btnMultimarca","btnRecarDash","btnGPS","btnGPSAmparo","btnPreEntregas","btnVolverCampo","btnAccesos"].forEach(function(id){ var b=document.getElementById(id); if(b) b.style.display="none"; });
+  ["btnMasivo","btnRecarga","btnMultimarca","btnRecarDash","btnGPS","btnMMVend","btnGPSAmparo","btnPreEntregas","btnVolverCampo","btnAccesos"].forEach(function(id){ var b=document.getElementById(id); if(b) b.style.display="none"; });
   var _gh=document.querySelector("#gerScreen h2"); if(_gh) _gh.textContent="COORD. TIENDAS — Consolidado";
   document.getElementById("passIn").value="";
   document.getElementById("tiendaInput").value="";
