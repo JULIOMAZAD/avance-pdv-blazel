@@ -70,13 +70,17 @@ tr.rk-first td{background:#e6f4ea}
 tr.rk-first .rk-pos{background:#22a843;color:#fff}
 tr.rk-last td{background:#fdecea}
 tr.rk-last .rk-pos{background:#cc0000;color:#fff}
+.vtitle{background:linear-gradient(135deg,#cc0000 0%,#8f0000 100%);color:#fff;padding:18px 22px;text-align:center}
+.vt-sup{font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;opacity:.85}
+.vt-name{font-family:Georgia,"Times New Roman",serif;font-size:30px;font-weight:700;line-height:1.15;margin:4px 0 5px;letter-spacing:.3px}
+.vt-sub{font-size:13px;font-weight:600;opacity:.92}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="head">
     <h2>MMRECARGA — Avance por Vendedor</h2>
-    <div class="sub">Toca un vendedor de campo para ver su cuota · <strong>c3</strong> · <span id="liveStatus" style="color:#22a843;font-weight:700">cargando…</span></div>
+    <div class="sub">Toca un vendedor de campo para ver su cuota · <strong>c4</strong> · <span id="liveStatus" style="color:#22a843;font-weight:700">cargando…</span></div>
   </div>
   <div class="view-tabs">
     <button class="view-tab on" id="viewTabBtn_vendedor" onclick="switchView('vendedor')">Avance por vendedor</button>
@@ -355,7 +359,7 @@ function render(){
 
   document.getElementById("gaugesV").innerHTML=gaugesRowV(byC,cf);
   // Tabla por producto (unidades)
-  let html=`<div class="table-card"><div class="table-wrap"><table><thead><tr>
+  let html=`<div class="table-card"><div class="vtitle"><div class="vt-sup">Avance de ventas · ${curTienda}</div><div class="vt-name">${cleanName(curVend)}</div><div class="vt-sub">${MES_N[curMes]} 2026 · Día ${dia} de ${dm}</div></div><div class="table-wrap"><table><thead><tr>
     <th style="text-align:left;min-width:200px">Producto</th><th>Meta</th><th>Avance</th><th>Proyección</th>
     <th>Falta</th><th>Venta Diaria<br>Para Llegar</th><th>Proyección Final</th><th>Estado</th></tr></thead><tbody>`;
   let tMeta=0,tAv=0;
