@@ -76,7 +76,7 @@ tr.rk-last .rk-pos{background:#cc0000;color:#fff}
 <div class="wrap">
   <div class="head">
     <h2>MMRECARGA — Avance por Vendedor</h2>
-    <div class="sub">Toca un vendedor de campo para ver su cuota · <strong>c1</strong> · <span id="liveStatus" style="color:#22a843;font-weight:700">cargando…</span></div>
+    <div class="sub">Toca un vendedor de campo para ver su cuota · <strong>c2</strong> · <span id="liveStatus" style="color:#22a843;font-weight:700">cargando…</span></div>
   </div>
   <div class="view-tabs">
     <button class="view-tab on" id="viewTabBtn_vendedor" onclick="switchView('vendedor')">Avance por vendedor</button>
@@ -339,8 +339,7 @@ function render(){
   const tipo=rows[0].t;
 
   document.getElementById("infoRow").innerHTML=
-    `<div class="chip">Tienda: <strong>${curTienda}</strong></div>
-     <div class="chip">Tipo: <strong>${tipo||"-"}</strong></div>
+    `<div class="chip">Canal: <strong>${curTienda}</strong></div>
      <div class="chip">Avance día: <strong>${dia}</strong> / ${dm}</div>
      ${prom?`<div class="chip">Promedio Cargo Fijo: <strong>S/ ${fmt(prom.av)}</strong> (meta ${fmt(prom.ob)})</div>`:""}`;
 
