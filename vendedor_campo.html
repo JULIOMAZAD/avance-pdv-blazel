@@ -76,7 +76,7 @@ tr.rk-last .rk-pos{background:#cc0000;color:#fff}
 <div class="wrap">
   <div class="head">
     <h2>MMRECARGA — Avance por Vendedor</h2>
-    <div class="sub">Toca un vendedor de campo para ver su cuota · <strong>c2</strong> · <span id="liveStatus" style="color:#22a843;font-weight:700">cargando…</span></div>
+    <div class="sub">Toca un vendedor de campo para ver su cuota · <strong>c3</strong> · <span id="liveStatus" style="color:#22a843;font-weight:700">cargando…</span></div>
   </div>
   <div class="view-tabs">
     <button class="view-tab on" id="viewTabBtn_vendedor" onclick="switchView('vendedor')">Avance por vendedor</button>
@@ -118,13 +118,14 @@ function canonCat(s){s=(s||'').trim();return CAT_MAP[s.toLowerCase()]||s;}
 function canonTienda(s){s=(s||'').trim().replace(/^(Tienda|PDV)\s*-\s*/i,'').trim();const fix={'Mall del Sur 1':'Mall del Sur I','Mall del Sur 2':'Mall del Sur II','Rambla Brasil':'La Rambla','Santa Anita I':'Santa Anita','Santa Anita 1':'Santa Anita'};return fix[s]||s;}
 const NOMBRES={};
 function canonNombre(n){n=String(n).trim().replace(/\s+/g,' ');const k=n.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();if(!NOMBRES[k])NOMBRES[k]=n;return NOMBRES[k];}
-function parseStackedRows(rows,mes,anio){
+function parseStackedRows(rows,mes,anio,ocultas){
+  const oc=new Set(ocultas||[]); // filas de título ocultas en la hoja = producto que no se muestra
   let dias=toNum((rows[2]||[])[6])||31;
   if(!mes){ mes=MES_MAP[String((rows[2]||[])[7]||'').toLowerCase()]||0; }
   const recs=[]; let curCat=null;
   for(let i=0;i<rows.length;i++){
     const r=rows[i]||[]; const b=r[1],c=r[2],d=r[3];
-    if((b==null||b==='')&&(c==null||c==='')&&typeof d==='string'&&d.trim()){ if(d.trim().toUpperCase()!=='TOTAL') curCat=canonCat(d); continue; }
+    if((b==null||b==='')&&(c==null||c==='')&&typeof d==='string'&&d.trim()){ if(d.trim().toUpperCase()!=='TOTAL') curCat=oc.has(i)?null:canonCat(d); continue; }
     const tipo=r[1], pdv=r[2], ases=r[3];
     if(!curCat||tipo==null||tipo==='')continue;
     const tu=String(tipo).toUpperCase(); if(tu==='TOTAL'||tu==='TIPO')continue;
@@ -147,15 +148,15 @@ async function loadLive(){
     const ALT={SETIEMBRE:'SEPTIEMBRE'};
     const porMes={};
     await Promise.all(cand.map(async mn=>{
-      try{ const r=await fetch(`${SCRIPT_URL}${sep}tienda=${encodeURIComponent(HOJA_CAMPO)}&mes=${mn}`); const jj=await r.json();
+      try{ const r=await fetch(`${SCRIPT_URL}${sep}tienda=${encodeURIComponent(HOJA_CAMPO)}&mes=${mn}&ocultas=1`); const jj=await r.json();
         if(jj&&!jj.error&&Array.isArray(jj.data)&&jj.data.length>6){
           // el mes REAL que trae la hoja (celda junto al día de avance) debe coincidir con lo pedido
           let mm=String((jj.data[2]||[])[7]||'').trim().toUpperCase(); mm=ALT[mm]||mm;
-          if(mm===mn.toUpperCase()) porMes[mn]=jj.data;
+          if(mm===mn.toUpperCase()) porMes[mn]=jj;
         } }catch(e){}
     }));
     let all=[];
-    Object.keys(porMes).sort((x,y)=>(MES_MAP[x]||0)-(MES_MAP[y]||0)).forEach(mn=>{ all=all.concat(parseStackedRows(porMes[mn],MES_MAP[mn],2026)); });
+    Object.keys(porMes).sort((x,y)=>(MES_MAP[x]||0)-(MES_MAP[y]||0)).forEach(mn=>{ all=all.concat(parseStackedRows(porMes[mn].data,MES_MAP[mn],2026,porMes[mn].ocultas)); });
     if(all.length){DATA=all; const mx=Math.max.apply(null,DATA.map(r=>r.m)); if(mx>0)curMes=mx; const dd=(DATA.find(r=>r.m===curMes)||DATA[0]); renderMes();fillTiendas();renderRankingMesTabs();fillRankingTiendas();setStatus('en vivo · día '+(dd?dd.d:'?'));}
     else setStatus('sin datos — revisa la pestaña AVANCE CAMPO');
   }catch(e){ setStatus('sin conexión'); }
@@ -398,12 +399,13 @@ function gauge(label,pct,meta,av){
 function gaugesRowV(byC,cf){
   function med(label,names){
     let r=null; for(const n of names){ if(byC[n]){r=byC[n];break;} }
-    if(!r) return gauge(label,0,0,0);
+    if(!r) return '';
     const dia=r.d,dm=r.dm,factor=dia>0?dm/dia:0; const meta=parseFloat(r.ob)||0,av=parseFloat(r.av)||0;
     const proy=factor>0?av*factor:av; const pct=meta>0?proy/meta:0;
     return gauge(label,pct,meta,av);
   }
   return `<div class="gauges">`+
+    med('Alta Prepago',["Alta Prepago"])+
     med('Portab. Prepago',["Portabilidad Prepago","Portabiilidad Prepago"])+
     med('Portab. Postpago',["Portabilidad Postpago","Portabiilidad Postpago"])+
     med('Packs Postpago',["Packs Postpago"])+
