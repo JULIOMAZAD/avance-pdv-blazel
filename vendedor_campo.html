@@ -80,7 +80,7 @@ tr.rk-last .rk-pos{background:#cc0000;color:#fff}
 <div class="wrap">
   <div class="head">
     <h2>MMRECARGA — Avance por Vendedor</h2>
-    <div class="sub">Toca un vendedor de campo para ver su cuota · <strong>c4</strong> · <span id="liveStatus" style="color:#22a843;font-weight:700">cargando…</span></div>
+    <div class="sub">Toca un vendedor de campo para ver su cuota · <strong>c5</strong> · <span id="liveStatus" style="color:#22a843;font-weight:700">cargando…</span></div>
   </div>
   <div class="view-tabs">
     <button class="view-tab on" id="viewTabBtn_vendedor" onclick="switchView('vendedor')">Avance por vendedor</button>
@@ -378,6 +378,17 @@ function render(){
         <td><span class="tag ${tg.cls}">${tg.lbl}</span></td></tr>`;
     }
   }
+  const rc=recargaDe(curVend);
+  if(rc&&rc.cuota){
+    const rd=RECARGA.dia||dia, rdm=RECARGA.dm||dm, rrest=rdm>rd?rdm-rd:0;
+    const rproy=rd>0?rc.venta*rdm/rd:rc.venta, rpct=rproy/rc.cuota, rfal=rc.cuota-rc.venta, rvd=(rfal>0&&rrest>0)?rfal/rrest:0;
+    const rtg=getTag(estadoFromPct(rpct));
+    html+=`<tr class="cat-row"><td colspan="8">Recarga <span style="font-weight:400;opacity:.85;text-transform:none;letter-spacing:0">· al día ${rd}</span></td></tr>
+      <tr><td>Recarga (S/)</td><td>${fmt(rc.cuota)}</td><td>${fmt(rc.venta)}</td>
+        <td><span style="display:inline-flex;align-items:center;gap:4px"><span class="dot ${rtg.dot}"></span>${fmtPct(rpct)}</span></td>
+        <td class="${rfal<=0?"falta-g":"falta-r"}">${fmt(rfal)}</td><td>${fmtUp(rvd)}</td><td>${fmtUp(rproy)}</td>
+        <td><span class="tag ${rtg.cls}">${rtg.lbl}</span></td></tr>`;
+  }
   const tt=getTag(estadoFromPct(cfPct));
   html+=`<tr class="total-row"><td>TOTAL (Cargo Fijo S/)</td><td>${fmt(cf.ob)}</td><td>${fmt(cf.av)}</td><td>${fmtPct(cfPct)}</td>
     <td>${fmt(cfFalta)}</td><td>${fmtUp(cfVd)}</td><td>${fmtUp(cfProy)}</td>
@@ -539,7 +550,47 @@ function showVendTrendTab(kind){
   if(bv) bv.classList.toggle("on", !isCuota);
 }
 
-renderMes(); fillTiendas(); loadLive(); renderRankingMesTabs(); fillRankingTiendas();
+/* ===== RECARGA: venta y cuota por vendedor, leídas de "VENTAS CRL 2026.xlsx" (hoja VENTAS, tabla Venta/Cuota) ===== */
+const EXCEL_RECARGA='VENTAS CRL 2026.xlsx';
+let RECARGA=null; // {mes, dia, dm, filas:[{et, venta, cuota}]}
+function normTok(s){return String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().replace(/[^A-Z ]/g,' ').split(/\s+/).filter(t=>t.length>2);}
+function numRec(v){ if(typeof v==='number'&&isFinite(v))return v; if(typeof v==='string'&&v.trim()!==''&&!isNaN(parseFloat(v)))return parseFloat(v); return null; }
+function parseRecarga(rows){
+  let mes=0,dia=null,dm=null;
+  for(let r=0;r<Math.min(rows.length,8)&&!mes;r++){ const row=rows[r]||[]; const ca=row.findIndex(c=>String(c||'').trim().toUpperCase()==='AVANCE'); if(ca<0)continue;
+    const nx=rows[r+1]||[]; row.forEach((c,j)=>{ const k=String(c||'').trim().toUpperCase(); if(k==='AVANCE')dia=numRec(nx[j]); if(k==='MES')mes=MES_MAP[String(nx[j]||'').trim().toLowerCase()]||0; if(k==='DIAS')dm=numRec(nx[j]); }); }
+  for(let r=0;r<rows.length;r++){ const row=rows[r]||[];
+    for(let c=0;c<row.length;c++){ if(row[c]!=='Etiquetas de fila')continue;
+      const cols={}; for(let cc=c+1;cc<row.length&&row[cc]!=null&&row[cc]!=='';cc++) cols[String(row[cc]).trim().toUpperCase()]=cc;
+      if(cols.CUOTA==null||cols.VENTA==null)continue;
+      const filas=[]; for(let rr=r+1;rr<rows.length;rr++){ const et=rows[rr]&&rows[rr][c]; if(et==null||et==='')break; if(String(et).trim().toUpperCase()==='TOTAL GENERAL')break;
+        filas.push({et:String(et).trim(),venta:numRec(rows[rr][cols.VENTA])||0,cuota:numRec(rows[rr][cols.CUOTA])}); }
+      return {mes,dia,dm,filas};
+    } }
+  return null;
+}
+function cargarRecarga(){
+  const s=document.createElement('script'); s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+  s.onload=()=>{ fetch(encodeURI(EXCEL_RECARGA)+'?t='+Date.now(),{cache:'no-store'})
+    .then(r=>{ if(!r.ok)throw new Error('HTTP '+r.status); return r.arrayBuffer(); })
+    .then(buf=>{ const wb=XLSX.read(new Uint8Array(buf),{type:'array',sheets:['VENTAS']}); const ws=wb.Sheets['VENTAS']; if(!ws)return;
+      RECARGA=parseRecarga(XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null})); if(RECARGA)render(); })
+    .catch(e=>{ console.log('Recarga no disponible:',e); }); };
+  document.head.appendChild(s);
+}
+// Empareja el vendedor de AVANCE CAMPO con su fila de recarga (allá figura como "VEND <zona> NOMBRE APELLIDO")
+function recargaDe(vend){
+  if(!RECARGA||RECARGA.mes!==curMes)return null;
+  const vt=normTok(vend); let best=null,bs=0,empate=false;
+  RECARGA.filas.forEach(f=>{ const ft=normTok(f.et); const sc=vt.filter(t=>ft.includes(t)).length; if(sc>bs){bs=sc;best=f;empate=false;} else if(sc===bs&&sc>0){empate=true;} });
+  if(bs>=2) return empate?null:best;
+  // Si solo coincide una palabra (ej. el apellido), vale únicamente si esa palabra no se repite en nadie más
+  const vends=[...new Set(DATA.filter(r=>r.m===curMes).map(r=>r.n))];
+  const unica=vt.find(t=>RECARGA.filas.filter(f=>normTok(f.et).includes(t)).length===1&&vends.filter(v=>normTok(v).includes(t)).length===1);
+  return unica?RECARGA.filas.find(f=>normTok(f.et).includes(unica)):null;
+}
+
+renderMes(); fillTiendas(); loadLive(); cargarRecarga(); renderRankingMesTabs(); fillRankingTiendas();
 </script>
 </body>
 </html>
